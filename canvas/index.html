@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Legion Health — current journey</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="data.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="masthead">
+        <a class="wordmark" href="#desktop" aria-label="Legion Health current journey, return to start"><span class="brand-mark" aria-hidden="true">L</span><span>Legion Health <span class="wordmark-divider">/</span> <span class="wordmark-secondary">Current journey</span></span></a>
+        <div class="header-meta"><span class="evidence-dot"></span> Evidence board <span class="meta-divider">·</span><span id="capture-date">Current flow review</span></div>
+      </div>
+      <div class="toolbar" aria-label="Canvas controls">
+        <div class="toolbar-left">
+          <nav class="lane-nav" aria-label="Board sections">
+            <button type="button" data-jump="desktop" class="active" aria-pressed="true">Desktop</button>
+            <button type="button" data-jump="mobile" aria-pressed="false">Mobile</button>
+            <button type="button" data-jump="funnel" aria-pressed="false">Funnel</button>
+            <button type="button" data-jump="follow-through" aria-pressed="false">Through first visit</button>
+          </nav>
+          <span class="toolbar-divider"></span>
+          <label class="stage-picker"><span class="sr-only">Jump to a screen</span><select id="stage-select"><option value="">Jump to screen…</option></select></label>
+        </div>
+        <div class="toolbar-right">
+          <div class="zoom-control" aria-label="Zoom">
+            <button type="button" id="zoom-out" aria-label="Zoom out" title="Zoom out (−)">−</button>
+            <button type="button" id="zoom-reset" title="Reset to 100% (0)"><span id="zoom-label">100%</span></button>
+            <button type="button" id="zoom-in" aria-label="Zoom in" title="Zoom in (+)">+</button>
+          </div>
+          <button type="button" id="fit-board" class="text-button" title="Fit the entire board (F)">Fit board</button>
+          <button type="button" id="help-open" class="help-button" aria-label="Canvas help" title="Canvas help (?)">?</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="viewport" aria-label="Pan and zoom journey evidence canvas" tabindex="-1">
+      <div id="world">
+        <section id="desktop" class="board-lane" aria-labelledby="desktop-title">
+          <div class="lane-heading">
+            <div><p class="eyebrow">01 / Observed experience</p><h1 id="desktop-title">The current desktop journey</h1><p class="lane-intro" id="board-description">From intake entry to the furthest observable step. Select any screen to inspect the original capture.</p></div>
+            <div class="lane-key"><span><i class="key-dot live"></i>Live observation</span><span><i class="key-dot historical"></i>Historical telemetry</span><span><i class="key-dot hypothesis"></i>Hypothesis to test</span></div>
+          </div>
+          <div class="scope-note"><strong>Read the numbers as transitions.</strong> Session loss describes where an ordered journey stops in the historical funnel. It does not establish what caused someone to leave. The snapshot is not segmented by device.</div>
+          <div id="desktop-stages" class="stage-grid"></div>
+        </section>
+
+        <section id="mobile" class="board-lane" aria-labelledby="mobile-title">
+          <div class="lane-heading">
+            <div><p class="eyebrow">02 / Responsive comparison</p><h2 id="mobile-title">The same journey on mobile</h2><p class="lane-intro">Aligned with the desktop stages above. Captures preserve the page as observed, including friction and incomplete states.</p></div>
+            <div class="lane-key"><span><i class="key-dot historical"></i>Same aggregate funnel; no mobile-specific drop-off supplied</span></div>
+          </div>
+          <div id="mobile-stages" class="stage-grid"></div>
+        </section>
+
+        <section id="funnel" class="board-lane analysis-lane" aria-labelledby="funnel-title">
+          <div class="lane-heading">
+            <div><p class="eyebrow">03 / Assignment evidence</p><h2 id="funnel-title">Eleven milestones. Eight routes.</h2><p class="lane-intro" id="telemetry-period">Ordered milestones reached in the same PostHog browser session.</p></div>
+          </div>
+          <div id="overview" class="overview-strip"></div>
+          <div class="funnel-layout">
+            <div class="table-surface"><table class="funnel-table"><caption class="sr-only">Historical ordered session funnel from the assignment, with loss shown toward the next milestone</caption><thead><tr><th scope="col">Milestone</th><th scope="col">Sessions</th><th scope="col">From previous</th><th scope="col">From start</th><th scope="col">Loss to next milestone</th></tr></thead><tbody id="funnel-body"></tbody></table></div>
+            <aside class="reading-notes"><p class="eyebrow">How to interpret this</p><h3>Boundaries of the evidence</h3><ul><li>These are browser sessions, not verified individual patients.</li><li>Repeat visits, blocked analytics and continuation in another session can change counts.</li><li>Page milestones use automatic <code>$pageview</code>; explicit events are used for the named actions.</li><li>A reservation is not a completed visit. Payment-page reach is not payment success.</li><li>The supplied funnel stops before the assignment’s real end: a completed first visit.</li></ul></aside>
+          </div>
+        </section>
+
+        <section id="follow-through" class="board-lane analysis-lane" aria-labelledby="follow-through-title">
+          <div class="lane-heading">
+            <div><p class="eyebrow">04 / Remaining journey</p><h2 id="follow-through-title">Onboarding ends after the first visit.</h2><p class="lane-intro">The boundaries below separate what was observable from the work still needed. They are not fabricated current-product screens.</p></div>
+          </div>
+          <div id="follow-through-items" class="follow-through-grid"></div>
+          <div class="recommendations-heading"><p class="eyebrow">Design discussion / hypotheses</p><h3>Where to look next</h3><p>Initial opportunities for review, before committing to a prototype direction.</p></div>
+          <div id="recommendations" class="recommendation-grid"></div>
+          <p class="board-footer">Legion Health · Current journey review <span>Captured evidence, historical context, and hypotheses are intentionally labeled throughout.</span></p>
+        </section>
+      </div>
+      <div id="loading-state" class="loading-state"><span class="brand-mark">L</span><h2>Journey evidence is loading</h2><p>If the board stays empty, confirm that <code>data.js</code> is next to this file.</p></div>
+    </main>
+
+    <div class="canvas-hint" id="canvas-hint"><span class="hint-mouse" aria-hidden="true">↔</span> Drag the board to pan <span>·</span> Pinch / Ctrl + scroll to zoom <span>·</span> Click a screen to inspect</div>
+    <div class="minimap" id="minimap" aria-label="Board overview" title="Click to navigate the board"><div class="minimap-content" id="minimap-content"></div><div id="minimap-window"></div><span class="minimap-label">OVERVIEW</span></div>
+    <div class="sr-only" id="canvas-status" role="status" aria-live="polite"></div>
+
+    <dialog id="screen-dialog" class="screen-dialog">
+      <div class="dialog-toolbar"><div><p class="eyebrow" id="dialog-lane"></p><h2 id="dialog-title"></h2></div><div class="dialog-toolbar-actions"><a id="dialog-source" target="_blank" rel="noopener noreferrer">Open source ↗</a><button type="button" class="dialog-close" data-close="screen-dialog" aria-label="Close screen inspection">×</button></div></div>
+      <div class="inspection-layout"><div class="inspection-image-panel"><div class="frame-controls"><button type="button" id="frame-prev" aria-label="Previous capture">←</button><p id="frame-caption"></p><button type="button" id="frame-next" aria-label="Next capture">→</button></div><div class="inspection-scroll"><img id="inspection-image" alt=""></div></div><aside id="inspection-details" class="inspection-details"></aside></div>
+    </dialog>
+
+    <dialog id="help-dialog" class="help-dialog">
+      <div class="help-heading"><h2>Move around the canvas</h2><button type="button" class="dialog-close" data-close="help-dialog" aria-label="Close help">×</button></div>
+      <dl><div><dt>Pan</dt><dd>Drag the background, scroll, or hold <kbd>Space</kbd> and drag anywhere.</dd></div><div><dt>Zoom</dt><dd>Pinch, hold <kbd>Ctrl</kbd> / <kbd>⌘</kbd> while scrolling, or use <kbd>+</kbd> and <kbd>−</kbd>.</dd></div><div><dt>Read a screen</dt><dd>Click its image to open the full capture and annotations.</dd></div><div><dt>Jump</dt><dd>Use Desktop, Mobile, Funnel, or the screen selector above.</dd></div><div><dt>Reset / fit</dt><dd><kbd>0</kbd> resets zoom. <kbd>F</kbd> fits the whole board.</dd></div><div><dt>Keyboard</dt><dd><kbd>Tab</kbd> moves through screens and controls. Arrow keys pan the board. <kbd>Esc</kbd> closes an inspector.</dd></div></dl>
+      <p class="help-note">All captures remain intact. A missing capture is labeled as unobserved; no existing screens have been reconstructed.</p>
+    </dialog>
+  </body>
+</html>
