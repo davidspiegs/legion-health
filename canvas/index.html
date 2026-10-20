@@ -64,7 +64,7 @@
           <div id="overview" class="overview-strip"></div>
           <div class="funnel-layout">
             <div class="table-surface"><table class="funnel-table"><caption class="sr-only">Historical ordered session funnel from the assignment, with loss shown toward the next milestone</caption><thead><tr><th scope="col">Milestone</th><th scope="col">Sessions</th><th scope="col">From previous</th><th scope="col">From start</th><th scope="col">Loss to next milestone</th></tr></thead><tbody id="funnel-body"></tbody></table></div>
-            <aside class="reading-notes"><p class="eyebrow">How to interpret this</p><h3>Boundaries of the evidence</h3><ul><li>These are browser sessions, not verified individual patients.</li><li>Repeat visits, blocked analytics and continuation in another session can change counts.</li><li>Page milestones use automatic <code>$pageview</code>; explicit events are used for the named actions.</li><li>A reservation is not a completed visit. Payment-page reach is not payment success.</li><li>The supplied funnel stops before the assignment’s real end: a completed first visit.</li></ul></aside>
+            <aside class="reading-notes"><p class="eyebrow">How to interpret this</p><h3>Boundaries of the evidence</h3><ul><li>These are browser sessions, not verified individual patients.</li><li>Repeat visits, blocked analytics and continuation in another session can change counts.</li><li>Page milestones use automatic <code>$pageview</code>; explicit events are used for the named actions.</li><li>A reservation is not a completed visit. Payment-page reach is not payment success.</li><li>The supplied funnel stops before the assignment’s real end: a completed first visit.</li></ul><a id="assignment-source" class="source-link" hidden>Read the assignment source ↗</a></aside>
           </div>
         </section>
 
@@ -87,7 +87,7 @@
 
     <dialog id="screen-dialog" class="screen-dialog">
       <div class="dialog-toolbar"><div><p class="eyebrow" id="dialog-lane"></p><h2 id="dialog-title"></h2></div><div class="dialog-toolbar-actions"><a id="dialog-source" target="_blank" rel="noopener noreferrer">Open source ↗</a><button type="button" class="dialog-close" data-close="screen-dialog" aria-label="Close screen inspection">×</button></div></div>
-      <div class="inspection-layout"><div class="inspection-image-panel"><div class="frame-controls"><button type="button" id="frame-prev" aria-label="Previous capture">←</button><p id="frame-caption"></p><button type="button" id="frame-next" aria-label="Next capture">→</button></div><div class="inspection-scroll"><img id="inspection-image" alt=""></div></div><aside id="inspection-details" class="inspection-details"></aside></div>
+      <div class="inspection-layout"><div class="inspection-image-panel"><div class="frame-controls"><button type="button" id="frame-prev" aria-label="Previous capture">←</button><p id="frame-caption"></p><button type="button" id="frame-next" aria-label="Next capture">→</button><button type="button" id="image-size" aria-pressed="false" title="Toggle between fitted width and original image dimensions">Actual size</button></div><div class="inspection-scroll"><img id="inspection-image" alt=""></div></div><aside id="inspection-details" class="inspection-details"></aside></div>
     </dialog>
 
     <dialog id="help-dialog" class="help-dialog">

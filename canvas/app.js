@@ -20,7 +20,7 @@
   const mapContent = $("#minimap-content");
   const mapWindow = $("#minimap-window");
   const screenDialog = $("#screen-dialog");
-  const state = { x: 0, y: 0, scale: 0.9, min: 0.12, max: 2, lane: "desktop", dragging: false, space: false, pointer: null, mapScale: 1, mapOffsetX: 9, mapOffsetY: 9 };
+  const state = { x: 0, y: 0, scale: 0.9, min: 0.06, max: 2, lane: "desktop", dragging: false, space: false, pointer: null, mapScale: 1, mapOffsetX: 9, mapOffsetY: 9 };
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let animation = 0;
   let mapFrame = 0;
@@ -110,7 +110,12 @@
 
   function render() {
     document.title = `${data.title || "Legion Health — current journey"} | Evidence board`;
-    if (data.capturedAt) $("#capture-date").textContent = `Captured ${data.capturedAt}`;
+    if (data.capturedAt) $("#capture-date").textContent = data.capturedAt;
+    if (data.source) {
+      $("#assignment-source").href = data.source;
+      $("#assignment-source").textContent = `${data.sourceLabel || "Read the assignment source"} ↗`;
+      $("#assignment-source").hidden = false;
+    }
     if (data.description) $("#board-description").textContent = data.description;
     if (data.telemetryPeriod) $("#telemetry-period").textContent = `${data.telemetryPeriod} · Ordered milestones in the same browser session.`;
     $("#desktop-stages").innerHTML = stages.map((stage, index) => stageHTML(stage, index, "desktop")).join("");
@@ -248,7 +253,10 @@
     const frames = captureFrames(stage, lane);
     if (!frames.length) return;
     inspector = { stage, lane, frames, index: Math.max(0, Math.min(frameIndex, frames.length - 1)) };
-    $("#dialog-lane").textContent = `${lane} · live capture`;
+    $(".inspection-scroll").classList.remove("actual-size");
+    $("#image-size").setAttribute("aria-pressed", "false");
+    $("#image-size").textContent = "Actual size";
+    $("#dialog-lane").textContent = `${lane} · ${stage[lane]?.status || "Live capture"}`;
     $("#dialog-title").textContent = stage.title;
     $("#dialog-source").href = safeURL(stage.url);
     $("#inspection-details").innerHTML = detailsHTML(stage, lane, true);
@@ -291,6 +299,11 @@
   $("#help-open").addEventListener("click", () => $("#help-dialog").showModal());
   $("#frame-prev").addEventListener("click", () => { if (inspector.index > 0) { inspector.index--; updateInspectorFrame(); } });
   $("#frame-next").addEventListener("click", () => { if (inspector.index < inspector.frames.length - 1) { inspector.index++; updateInspectorFrame(); } });
+  $("#image-size").addEventListener("click", () => {
+    const actual = $(".inspection-scroll").classList.toggle("actual-size");
+    $("#image-size").setAttribute("aria-pressed", String(actual));
+    $("#image-size").textContent = actual ? "Fit width" : "Actual size";
+  });
   $$("dialog").forEach(dialog => dialog.addEventListener("click", event => {
     if (event.target !== dialog) return;
     const rect = dialog.getBoundingClientRect();
