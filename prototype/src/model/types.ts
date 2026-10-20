@@ -112,6 +112,8 @@ export interface JourneyState {
   scenario: Scenario;
   fit: Record<string, string>;
   exitReason: string;
+  conditions: string[];
+  /** Retained only to read saved drafts from the earlier single-topic design. */
   topic: string;
   goal: string;
   coverage: Coverage;

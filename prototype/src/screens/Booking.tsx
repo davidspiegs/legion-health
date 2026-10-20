@@ -31,6 +31,7 @@ import {
   formatTime,
   getProvider,
   getSlot,
+  normalizeConditions,
   providers,
   slots,
   validateBirth,
@@ -98,13 +99,13 @@ export function BookingScreens(props: ScreenProps) {
       event.operation === "account.created" &&
       event.outcome === "success",
   );
-  const selectedFocus = (
-    {
-      "Focus & attention": "ADHD",
-      "Anxiety & stress": "Anxiety",
-      "Low mood": "Depression",
-    } as Record<string, string>
-  )[state.topic];
+  const selectedConditions = normalizeConditions(state.conditions);
+  const unrepresentedConditions = selectedConditions.filter(
+    (condition) =>
+      condition !== "I'm not sure" &&
+      condition !== "Other" &&
+      !providers.some((item) => item.focuses.includes(condition)),
+  );
   const isUnavailable = (id: string) =>
     state.faultsUsed.includes(`unavailable-slot:${id}`);
   const selectedTimeAvailable = !!state.slotId && !isUnavailable(state.slotId);
@@ -266,9 +267,25 @@ export function BookingScreens(props: ScreenProps) {
           <CreditCard size={19} aria-hidden="true" />
           <span>{price}</span>
         </div>
+        {unrepresentedConditions.length ? (
+          <Notice>
+            These profiles don’t list {unrepresentedConditions.join(" or ")}. We
+            can help confirm the right experience for you.
+            <button
+              className="booking-text-button"
+              type="button"
+              onClick={props.openHelp}
+            >
+              Ask our care team
+            </button>
+          </Notice>
+        ) : null}
         <div className="provider-list">
           {providers.map((item) => {
             const selected = item.id === state.providerId;
+            const sharedFocuses = item.focuses.filter((focus) =>
+              selectedConditions.includes(focus),
+            );
             const available = slots.filter(
               (slot) => slot.providerId === item.id && !isUnavailable(slot.id),
             );
@@ -305,12 +322,21 @@ export function BookingScreens(props: ScreenProps) {
                       {[...item.focuses]
                         .sort(
                           (a, b) =>
-                            Number(b === selectedFocus) -
-                            Number(a === selectedFocus),
+                            Number(selectedConditions.includes(b)) -
+                            Number(selectedConditions.includes(a)),
                         )
                         .slice(0, 2)
                         .map((focus) => (
-                          <span key={focus}>{focus}</span>
+                          <span
+                            key={focus}
+                            aria-label={
+                              selectedConditions.includes(focus)
+                                ? `${focus}, one of the areas you selected`
+                                : undefined
+                            }
+                          >
+                            {focus}
+                          </span>
                         ))}
                     </span>
                   </span>
@@ -320,7 +346,11 @@ export function BookingScreens(props: ScreenProps) {
                 </button>
                 {selected ? (
                   <>
-                    <p className="provider-description">{item.description}</p>
+                    <p className="provider-description">
+                      {sharedFocuses.length
+                        ? `Experience with ${new Intl.ListFormat("en-US", { style: "long", type: "conjunction" }).format(sharedFocuses)}, from the areas you selected.`
+                        : item.description}
+                    </p>
                     <p className="provider-next">
                       <CalendarDays size={16} aria-hidden="true" />
                       Next available {formatDate(available[0], true)}
@@ -547,7 +577,7 @@ export function BookingScreens(props: ScreenProps) {
       <Page
         className="booking-info"
         title="When were you born?"
-        subtitle="This helps us find the right records and verify your identity."
+        subtitle="So your clinician and health records match the right person."
         onSubmit={submit(async () => {
           const issue = validateBirth(profile);
           if (issue) {
@@ -938,13 +968,13 @@ export function BookingScreens(props: ScreenProps) {
             return;
           }
           if (!state.paymentReady) {
-            props.setError("Choose the demo payment method before confirming.");
+            props.setError("Add a payment method before confirming.");
             return;
           }
           if (!state.agreements) {
             invalid(
               "booking-agreements",
-              "Review the example agreements before confirming.",
+              "Review the care and booking details before confirming.",
             );
             return;
           }
@@ -976,9 +1006,7 @@ export function BookingScreens(props: ScreenProps) {
                 Confirm my first visit
               </Button>
             )}
-            <p className="footer-note">
-              Demo booking · no real appointment or charge
-            </p>
+            <p className="footer-note">Test mode · no charge</p>
           </>
         }
       >
@@ -1043,13 +1071,13 @@ export function BookingScreens(props: ScreenProps) {
           <span>
             <strong>
               {state.paymentReady
-                ? "Demo Visa ending in 4242"
-                : "Use a demo payment method"}
+                ? "Visa ending in 4242"
+                : "Add payment method"}
             </strong>
             <small>
               {state.paymentReady
-                ? "Ready · no card details collected"
-                : "Visa 4242 · no real card or charge"}
+                ? "Payment method ready"
+                : "Use test Visa ending in 4242"}
             </small>
           </span>
           {state.paymentReady ? (
@@ -1061,8 +1089,8 @@ export function BookingScreens(props: ScreenProps) {
         <div className="review-policy">
           <Clock3 size={16} />
           <p>
-            Please give 48 hours’ notice to cancel or reschedule. The live
-            service lists a $250 late-cancellation or missed-first-visit fee.
+            Please give 48 hours’ notice to cancel or reschedule. A $250 fee
+            applies to late cancellations or a missed first visit.
           </p>
         </div>
         <label
@@ -1079,10 +1107,8 @@ export function BookingScreens(props: ScreenProps) {
             }}
           />
           <span>
-            <strong>
-              I’ve reviewed the example care and booking agreements
-            </strong>
-            <small>Preview only; this does not create a legal agreement.</small>
+            <strong>I’ve reviewed the care and booking details</strong>
+            <small>Visit format, costs, and cancellation policy</small>
           </span>
         </label>
         <button
@@ -1092,16 +1118,20 @@ export function BookingScreens(props: ScreenProps) {
           onClick={() => setShowAgreements((value) => !value)}
         >
           {showAgreements
-            ? "Hide example agreements"
-            : "Read example agreements"}
+            ? "Hide care and booking details"
+            : "Read care and booking details"}
         </button>
         {showAgreements ? (
           <div className="example-agreements">
-            <h2>Example care and booking agreements</h2>
+            <h2>Your care and booking details</h2>
             <p>
-              A real booking would separately explain telehealth consent,
-              privacy practices, payment authorization, and cancellation terms.
-              This preview does not collect those consents or authorize charges.
+              Your first visit is a 60-minute video conversation. You and your
+              clinician decide on next steps together. Medication is only
+              prescribed when your clinician considers it appropriate.
+            </p>
+            <p>
+              Review the visit cost above and give at least 48 hours’ notice if
+              you need to cancel or reschedule.
             </p>
           </div>
         ) : null}

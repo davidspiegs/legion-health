@@ -1,17 +1,16 @@
+import { useRef } from "react";
 import {
-  Brain,
   HeartHandshake,
   MapPin,
   Monitor,
   ShieldCheck,
-  Sprout,
-  Sun,
-  HelpCircle,
   CreditCard,
   ArrowUpRight,
+  ChevronRight,
 } from "lucide-react";
 import { Button, Choice, Notice, Page, Testimonial } from "../components/ui";
-import type { ScreenProps, Step } from "../model/types";
+import { CONDITION_OPTIONS, toggleCondition } from "../model/fixtures";
+import type { JourneyState, ScreenProps, Step } from "../model/types";
 
 const fitQuestions: {
   id: Step;
@@ -100,6 +99,7 @@ const fitQuestions: {
 
 export function IntakeScreens(p: ScreenProps) {
   const { state, update, go, api, act, busy, setError, openHelp } = p;
+  const choicePending = useRef(false);
   const advance = async (next: Step, stage: string = state.step) => {
     const ok = await act(async () => {
       await api.saveDraft(stage);
@@ -107,11 +107,31 @@ export function IntakeScreens(p: ScreenProps) {
     });
     if (ok) go(next);
   };
+  const chooseAndAdvance = async (patch: Partial<JourneyState>, next: Step) => {
+    // Lock before updating state so rapid taps cannot overwrite an answer in flight.
+    if (busy || choicePending.current) return;
+    choicePending.current = true;
+    setError("");
+    update(patch);
+    try {
+      if (next === "fit-exit" && patch.exitReason === "safety") {
+        // Show urgent resources immediately; saving an answer must never gate access to help.
+        go(next);
+        await api.saveDraft(state.step).catch(() => {
+          // The service records the failure. The answer stays local and support remains available.
+        });
+        return;
+      }
+      await advance(next);
+    } finally {
+      choicePending.current = false;
+    }
+  };
   if (state.step === "welcome")
     return (
       <Page
         title="Find care that feels right"
-        subtitle="A clinician who listens. A plan that makes sense. A next step you can take."
+        subtitle="Find a psychiatric clinician, choose a time, and meet online."
         className="welcome-screen"
         footer={
           <>
@@ -128,11 +148,11 @@ export function IntakeScreens(p: ScreenProps) {
               <HeartHandshake size={25} />
             </span>
             <h2>
-              Real connection.
+              Real connection
               <br />
               From wherever
               <br />
-              you feel at home.
+              you feel at home
             </h2>
             <p>Psychiatric care by video</p>
           </div>
@@ -158,53 +178,42 @@ export function IntakeScreens(p: ScreenProps) {
   if (fit) {
     const selected = state.fit[fit.id];
     return (
-      <Page
-        title={fit.title}
-        subtitle={fit.sub}
-        className="fit-screen"
-        footer={
-          <>
-            <Button
-              disabled={!selected}
-              loading={busy}
-              onClick={async () => {
-                if (selected !== fit.positive) {
-                  update({ exitReason: fit.exit || "review" });
-                  go("fit-exit");
-                  return;
-                }
-                await advance(fit.next, "fit");
-              }}
-            >
-              Continue
-            </Button>
-            <p className="footer-note">
-              A few questions to make sure we can help
-            </p>
-          </>
-        }
-      >
+      <Page title={fit.title} subtitle={fit.sub} className="fit-screen">
+        <p className="answer-instruction">Choose an answer to continue</p>
         <div className="choices">
           {fit.options.map((option) => (
-            <Choice
+            <button
+              type="button"
               key={option.value}
-              label={option.label}
-              selected={selected === option.value}
+              className={`fit-answer ${selected === option.value ? "selected" : ""}`}
+              disabled={busy}
+              aria-busy={busy && selected === option.value}
               onClick={() => {
-                setError("");
-                update({ fit: { ...state.fit, [fit.id]: option.value } });
+                const eligible = option.value === fit.positive;
+                void chooseAndAdvance(
+                  {
+                    fit: { ...state.fit, [fit.id]: option.value },
+                    exitReason: eligible ? "" : fit.exit || "review",
+                  },
+                  eligible ? fit.next : "fit-exit",
+                );
               }}
-            />
+            >
+              <span className="choice-copy">
+                <strong>{option.label}</strong>
+              </span>
+              <ChevronRight size={20} aria-hidden="true" />
+            </button>
           ))}
         </div>
-        <div className="gentle-note">
-          <ShieldCheck size={18} />
-          <p>
-            {fit.id === "fit-safety"
-              ? "Your safety matters more than finishing a form."
-              : "Your answers help us understand whether this service is a fit."}
-          </p>
-        </div>
+        {fit.id === "fit-safety" ? (
+          <div className="gentle-note">
+            <ShieldCheck size={18} />
+            <p>Your safety matters more than finishing a form.</p>
+          </div>
+        ) : (
+          <Testimonial />
+        )}
       </Page>
     );
   }
@@ -221,7 +230,7 @@ export function IntakeScreens(p: ScreenProps) {
       },
       coverage: {
         title: "Let’s clarify your coverage first",
-        body: "Medicare and Medicaid are not supported in this flow. We won’t ask you to pay privately to get around that restriction.",
+        body: "Legion does not currently accept Medicare or Medicaid. A care coordinator can help you find a provider who accepts your coverage.",
       },
       review: {
         title: "You deserve the right level of care",
@@ -289,36 +298,46 @@ export function IntakeScreens(p: ScreenProps) {
   if (state.step === "needs")
     return (
       <Page
-        title="What would you like help with?"
-        subtitle="A starting point is enough. We’ll figure out the rest together."
+        title="What brings you here?"
+        subtitle="Select all that apply. It’s okay if you’re not sure."
         className="needs-screen"
         footer={
           <>
             <Button
-              disabled={!state.topic}
+              disabled={!state.conditions.length}
               loading={busy}
               onClick={() => advance("goal")}
             >
               Continue
             </Button>
-            <p className="footer-note">Your progress is saved on this device</p>
           </>
         }
       >
-        <div className="choices">
-          {[
-            { label: "Focus & attention", icon: Brain },
-            { label: "Anxiety & stress", icon: Sprout },
-            { label: "Low mood", icon: Sun },
-            { label: "I’m not sure yet", icon: HelpCircle },
-          ].map((item) => (
-            <Choice
-              key={item.label}
-              label={item.label}
-              selected={state.topic === item.label}
-              icon={item.icon}
-              onClick={() => update({ topic: item.label })}
-            />
+        <div
+          className="condition-grid"
+          role="group"
+          aria-label="Conditions you would like help with"
+        >
+          {CONDITION_OPTIONS.map((condition) => (
+            <label
+              key={condition}
+              className={`condition-option ${state.conditions.includes(condition) ? "selected" : ""}`}
+            >
+              <input
+                type="checkbox"
+                name="conditions"
+                value={condition}
+                checked={state.conditions.includes(condition)}
+                disabled={busy}
+                onChange={() => {
+                  setError("");
+                  update({
+                    conditions: toggleCondition(state.conditions, condition),
+                  });
+                }}
+              />
+              <span>{condition}</span>
+            </label>
           ))}
         </div>
         <Testimonial />
@@ -330,19 +349,8 @@ export function IntakeScreens(p: ScreenProps) {
         className="goal-screen"
         title="What would feel most helpful?"
         subtitle="We’ll share your starting point with your clinician."
-        footer={
-          <>
-            <Button
-              disabled={!state.goal}
-              loading={busy}
-              onClick={() => advance("coverage")}
-            >
-              Continue
-            </Button>
-            <p className="footer-note">You can change your mind as you go</p>
-          </>
-        }
       >
+        <p className="answer-instruction">Choose an answer to continue</p>
         <div className="choices">
           {[
             {
@@ -355,12 +363,21 @@ export function IntakeScreens(p: ScreenProps) {
             },
             { label: "Continue my care", detail: "Find ongoing support" },
           ].map((item) => (
-            <Choice
+            <button
+              type="button"
               key={item.label}
-              {...item}
-              selected={state.goal === item.label}
-              onClick={() => update({ goal: item.label })}
-            />
+              className={`fit-answer ${state.goal === item.label ? "selected" : ""}`}
+              disabled={busy}
+              aria-busy={busy && state.goal === item.label}
+              onClick={() =>
+                void chooseAndAdvance({ goal: item.label }, "coverage")
+              }
+            >
+              <span className="choice-copy">
+                <strong>{item.label}</strong>
+              </span>
+              <ChevronRight size={20} aria-hidden="true" />
+            </button>
           ))}
         </div>
         <Notice>
@@ -415,23 +432,11 @@ export function IntakeScreens(p: ScreenProps) {
           />
         </div>
         <div className="price-explainer">
-          {state.coverage === "selfpay" ? (
-            <>
-              <h2>A clear price for your time</h2>
-              <p>
-                Your first visit is 60 minutes. Follow-up visits are priced
-                separately, when you choose to book one.
-              </p>
-            </>
-          ) : (
-            <>
-              <h2>Accepted isn’t the same as covered</h2>
-              <p>
-                After your details, we’ll check eligibility and show an
-                estimate. You’ll review the result before confirming.
-              </p>
-            </>
-          )}
+          <p>
+            {state.coverage === "selfpay"
+              ? "Your first visit is 60 minutes. Follow-ups are $150, when you choose to book one."
+              : "We’ll check your benefits after your details. You’ll review the estimated cost before booking."}
+          </p>
         </div>
       </Page>
     );

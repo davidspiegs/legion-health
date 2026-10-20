@@ -4,7 +4,9 @@ October 20, 2026. This describes the code in `prototype/src`, alongside the [red
 
 ## Implementation boundary
 
-React screens share a typed `JourneyState`. `createMockApi` in [services.ts](../prototype/src/model/services.ts) provides asynchronous service-shaped operations with a short simulated delay. There are no vendor SDKs, service requests, payment charges, notifications, camera captures, or real clinical transactions in these adapters. [Fixtures](../prototype/src/model/fixtures.ts) supply two fictional clinicians, synthetic profile data, fixed October/November 2026 availability, and Central Time formatting that accounts for the daylight-saving change.
+React screens share a typed `JourneyState`. `createMockApi` in [services.ts](../prototype/src/model/services.ts) provides asynchronous service-shaped operations with a short simulated delay, except fit and goal saves use zero added latency for direct answer-to-next-step interaction. Urgent support routing happens before saving. There are no vendor SDKs, service requests, payment charges, notifications, camera captures, or real clinical transactions in these adapters. [Fixtures](../prototype/src/model/fixtures.ts) supply two fictional clinicians, synthetic profile data, fixed October/November 2026 availability, and Central Time formatting that accounts for the daylight-saving change.
+
+The patient view is `/`; full reviewer tools are at `/?review=1`. Both modes offer a separate “Preview controls” dialog outside the patient surface to advance appointment day and conversation phases and send the simulated clinician completion signal. Care screens contain no embedded simulation-control blocks. The patient can therefore follow the whole journey without entering the screen-jump review mode.
 
 | Adapter and exact methods | Implemented behavior | Deliberate limit |
 | --- | --- | --- |
@@ -34,16 +36,19 @@ Choosing a time before personal details does **not** reserve it. After the phone
 | Optional records do not block care | Declining permission does not invoke Metriport; unavailable records can be retried or skipped. Patient corrections remain distinguishable from the fictional source. |
 | Joining, leaving, and reconnecting are not completion | Joining sets `joined` or `interrupted`; leaving can interrupt. Only the simulated clinician operation sets `completed`. |
 | Follow-up does not rewrite the first visit's outcome | Follow-up requires a completed first visit and has its own appointment identity and reminder flag. Reminders cannot target a completed first visit. |
+| Condition choices remain explicit patient input | Native checkboxes save a normalized, allowlisted `conditions` array with multiple selections. No legacy symptom topic is mapped to a diagnosis. |
 
 The available review scenarios are standard, slot taken, coverage pending, records unavailable, payment retry, connection lost, and save retry. Most faults are consumed once to make recovery demonstrable; a taken slot remains unavailable and coverage remains pending until the scenario or payment choice changes. Expired-hold behavior is implemented and covered by a model test, rather than a dedicated scenario menu item.
 
 ## Resume, fixtures, and evidence
 
-`App.tsx` writes the versioned journey to `localStorage` under `legion-first-visit-preview-v1` after state changes and restores it on the same browser/origin. This includes form answers, free text, and saved `careMessages`, so use synthetic data. The message collection is separate from the allowlisted service ledger. Storage errors show a session-only notice. Restart replaces the saved journey with initial state. There is no cross-device resume, encryption layer, server durability, or schema migration beyond the version check.
+`App.tsx` writes the versioned journey to `localStorage` under `legion-first-visit-preview-v1` after state changes and restores it on the same browser/origin. This includes form answers, selected conditions, free text, and saved `careMessages`, so use synthetic data. The message collection is separate from the allowlisted service ledger. Storage errors show a session-only notice. Restart replaces the saved journey with initial state. There is no cross-device resume, encryption layer, or server durability.
+
+Condition migration accepts only explicit selections from ADHD, Depression, Anxiety, Bipolar Disorder, PTSD, “I'm not sure,” and Other. A legacy draft without a `conditions` array, no appointment, and a current goal/coverage/booking step returns to `needs` with its navigation history reset. It does not infer a diagnosis from the old `topic` field or reset an already-booked appointment. This is a narrow compatibility rule, not a general data-migration framework.
 
 Chapter links and “Explore every screen” deliberately load **review fixtures** with prerequisite states. They replace the current review path; they do not prove that the skipped steps were completed. Fixture ledger entries identify loaded appointments/encounters as `review.fixture`; the sample account marker is explicitly described as fictional. A fixture showing a completed visit must never enter a measured completion cohort.
 
-The 14 [model tests](../prototype/src/model/services.test.ts) cover duplicate operations, expiry, conflict recovery, payment retry, insurance gating, records permission, rescheduling, encounter authority, follow-up reminders targeted to their own appointment ID, local message persistence and duplicate sends, event-value exclusions, and date/phone helpers. They are executable with `npm test` from `prototype/`. This document records code/test coverage; it does not claim a browser walkthrough or physical-device validation was performed. Rendered QA and executed-check results should be reported separately.
+The 16 [model tests](../prototype/src/model/services.test.ts) cover explicit multi-condition persistence and restoration, duplicate operations, expiry, conflict recovery, payment retry, insurance gating, records permission, rescheduling, encounter authority, follow-up reminders targeted to their own appointment ID, local message persistence and duplicate sends, event-value exclusions, and date/phone helpers. They are executable with `npm test` from `prototype/`. This document records code/test coverage; it does not claim a browser walkthrough or physical-device validation was performed. Rendered QA and executed-check results should be reported separately.
 
 ## Event ledger and future measurement
 

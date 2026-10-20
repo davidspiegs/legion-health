@@ -10,6 +10,8 @@ import {
   formatTime,
   formatPhone,
   validateBirth,
+  normalizeConditions,
+  toggleCondition,
 } from "./fixtures";
 import type { JourneyState } from "./types";
 
@@ -34,6 +36,41 @@ async function book(h: ReturnType<typeof harness>) {
   await h.api.setupPayment();
   return h.api.confirm();
 }
+
+test("multiple conditions survive save failure, resume, and booking without entering the service log", async () => {
+  const selected = toggleCondition(toggleCondition([], "ADHD"), "Anxiety");
+  const h = harness({ conditions: selected, scenario: "save-retry" });
+  await assert.rejects(h.api.saveDraft("conditions"), /try again/);
+  assert.deepEqual(h.state.conditions, ["ADHD", "Anxiety"]);
+  await h.api.saveDraft("conditions");
+
+  const resumed = harness(JSON.parse(JSON.stringify(h.state)));
+  resumed.update({
+    conditions: toggleCondition(resumed.state.conditions, "Depression"),
+  });
+  await resumed.api.saveDraft("conditions");
+  await book(resumed);
+  assert.deepEqual(resumed.state.conditions, ["ADHD", "Depression", "Anxiety"]);
+  assert.equal(resumed.state.appointment?.status, "confirmed");
+  const events = JSON.stringify(resumed.state.events);
+  for (const condition of resumed.state.conditions) {
+    assert.equal(events.includes(condition), false);
+  }
+});
+
+test("condition restoration accepts only explicit selections and does not diagnose legacy symptom topics", () => {
+  assert.deepEqual(normalizeConditions(undefined), []);
+  assert.deepEqual(normalizeConditions("Focus & attention"), []);
+  assert.deepEqual(
+    normalizeConditions(["ADHD", "ADHD", "Unknown label", "PTSD"]),
+    ["ADHD", "PTSD"],
+  );
+  assert.deepEqual(toggleCondition(["ADHD", "Anxiety"], "ADHD"), ["Anxiety"]);
+  assert.deepEqual(toggleCondition(["I'm not sure"], "Other"), [
+    "I'm not sure",
+    "Other",
+  ]);
+});
 
 test("reservation is not confirmation, repeat requests reuse the hold, concurrent confirmation creates one appointment", async () => {
   const h = harness({ profile: { ...sampleProfile }, agreements: true });
@@ -262,6 +299,7 @@ test("reminder scheduling targets the upcoming follow-up and never the completed
 test("events never contain patient fields, clinical content, payer details, or message text", async () => {
   const secret = "PRIVATE-CONTENT-7654321";
   const h = harness({
+    conditions: ["ADHD", "Anxiety", secret],
     topic: secret,
     goal: secret,
     payer: secret,
@@ -280,6 +318,8 @@ test("events never contain patient fields, clinical content, payer details, or m
   const serialized = JSON.stringify(h.state.events);
   for (const value of [
     secret,
+    "ADHD",
+    "Anxiety",
     sampleProfile.firstName,
     sampleProfile.lastName,
     sampleProfile.email,

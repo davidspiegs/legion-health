@@ -1,5 +1,33 @@
 import type { JourneyState, Profile, Provider, Slot } from "./types";
 
+// Exact choices observed in Legion's current intake, including its two open-ended routes.
+export const CONDITION_OPTIONS = [
+  "ADHD",
+  "Depression",
+  "Anxiety",
+  "Bipolar Disorder",
+  "PTSD",
+  "I'm not sure",
+  "Other",
+] as const;
+
+/** Only restore explicit condition selections; never infer a diagnosis from a legacy symptom topic. */
+export function normalizeConditions(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return CONDITION_OPTIONS.filter((condition) => value.includes(condition));
+}
+
+export function toggleCondition(
+  selected: string[],
+  condition: string,
+): string[] {
+  return normalizeConditions(
+    selected.includes(condition)
+      ? selected.filter((item) => item !== condition)
+      : [...selected, condition],
+  );
+}
+
 export const sampleProfile: Profile = {
   firstName: "Alex",
   lastName: "Rivera",
@@ -214,6 +242,7 @@ export function initialState(): JourneyState {
     scenario: "standard",
     fit: {},
     exitReason: "",
+    conditions: [],
     topic: "",
     goal: "",
     coverage: "selfpay",

@@ -115,8 +115,10 @@ export const FLOW: FlowEntry[] = [
     id: "needs",
     title: "What brings you here?",
     phase: "fit",
-    description: "Choose a topic without repeating a diagnostic intake.",
-    integration: "Mock draft profile; no clinical answers in analytics",
+    description:
+      "Select every relevant condition from Legion’s existing intake choices, with unsure and other options.",
+    integration:
+      "Multiple condition selections saved to the draft; no clinical answers in analytics",
   },
   {
     id: "goal",

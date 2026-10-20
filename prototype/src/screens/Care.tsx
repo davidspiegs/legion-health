@@ -3,6 +3,7 @@ import {
   CalendarDays,
   Check,
   CheckCheck,
+  ChevronDown,
   ChevronRight,
   ClipboardList,
   FileText,
@@ -13,7 +14,6 @@ import {
   Mic,
   MicOff,
   PhoneOff,
-  ShieldCheck,
   Sparkles,
   Video,
   VideoOff,
@@ -99,7 +99,7 @@ function costDescription(state: JourneyState, followup = false) {
     return `$${followup ? "150" : "250"} · self-pay`;
   if (followup) return "Insurance · benefits rechecked before your follow-up";
   return state.eligibility.status === "verified"
-    ? `$${state.eligibility.estimate} estimated copay · coverage verified in demo`
+    ? `$${state.eligibility.estimate} estimated copay`
     : "Insurance · your cost is still being confirmed";
 }
 
@@ -228,7 +228,7 @@ export function CareScreens(props: ScreenProps) {
   };
   const statusNote = downloaded ? (
     <p className="care-status" role="status">
-      Calendar file downloaded · demo appointment only
+      Calendar file downloaded
     </p>
   ) : null;
   const returnHome = (
@@ -242,7 +242,7 @@ export function CareScreens(props: ScreenProps) {
         subtitle="Choose your provider and a time before preparing for your visit."
         footer={<Button onClick={() => go("match")}>Find your provider</Button>}
       >
-        <Notice>There’s no confirmed appointment in this demo yet.</Notice>
+        <Notice>You haven’t booked a visit yet.</Notice>
       </Page>
     );
 
@@ -293,9 +293,6 @@ export function CareScreens(props: ScreenProps) {
           Reminders 24 hours and 1 hour before
           <ChevronRight size={15} />
         </button>
-        <p className="care-quiet">
-          Demo confirmation · no real appointment or charge
-        </p>
       </Page>
     );
   }
@@ -353,10 +350,6 @@ export function CareScreens(props: ScreenProps) {
             >
               Allow a records request
             </CheckRow>
-            <p className="care-source">
-              <ShieldCheck size={15} />
-              Metriport connection · simulated with example records
-            </p>
           </>
         ) : (
           <>
@@ -364,7 +357,7 @@ export function CareScreens(props: ScreenProps) {
               <>
                 <div className="care-record">
                   <span className="care-source-label">
-                    Example primary care summary · May 2025
+                    Sample primary care summary · May 2025
                   </span>
                   <h2>Sleep routine discussed</h2>
                   <p>
@@ -372,7 +365,7 @@ export function CareScreens(props: ScreenProps) {
                     habits. Your clinician will confirm what is still relevant.
                   </p>
                   <p className="care-source">
-                    Source: fictional record returned by the Metriport mock
+                    Source: sample primary care record
                   </p>
                 </div>
                 <CheckRow
@@ -451,7 +444,7 @@ export function CareScreens(props: ScreenProps) {
       >
         <div className="care-ai-label">
           <Sparkles size={16} />
-          AI-assisted draft · reviewed by you
+          AI-assisted draft · for your review
         </div>
         <Field
           label="What I’d like help with"
@@ -474,7 +467,7 @@ export function CareScreens(props: ScreenProps) {
             <FileText size={18} />
             <div>
               <strong>Sleep routine discussed</strong>
-              <small>Fictional primary care record · May 2025</small>
+              <small>Sample primary care record · May 2025</small>
               {state.outdatedRecord ? (
                 <span className="care-correction">
                   You flagged this as possibly out of date
@@ -520,7 +513,7 @@ export function CareScreens(props: ScreenProps) {
             <Check size={35} />
           </div>
           <Notice tone="success">
-            Your simulated clinician marked the visit complete.
+            Your clinician marked the visit complete.
           </Notice>
           {state.followupAppointment ? (
             <AppointmentPanel
@@ -610,24 +603,6 @@ export function CareScreens(props: ScreenProps) {
             onClick={() => go("reminders")}
           />
         </div>
-        {!state.visitDay ? (
-          <button
-            type="button"
-            className="care-demo-advance"
-            onClick={() => update({ visitDay: true })}
-          >
-            <Video size={17} />
-            <span>
-              Preview appointment day
-              <small>Demo control · skip ahead in time</small>
-            </span>
-            <ChevronRight size={17} />
-          </button>
-        ) : (
-          <p className="care-quiet">
-            Appointment-day preview · no waiting for the real date
-          </p>
-        )}
       </Page>
     );
   }
@@ -723,9 +698,6 @@ export function CareScreens(props: ScreenProps) {
             here.
           </Notice>
         ) : null}
-        <p className="care-quiet">
-          Preview only. This demo sends no emails or texts.
-        </p>
       </Page>
     );
   }
@@ -734,7 +706,7 @@ export function CareScreens(props: ScreenProps) {
     const ready = (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       if (!videoChecked || !audioChecked) {
-        setError("Try both demo checks before continuing.");
+        setError("Check your camera and sound before continuing.");
         return;
       }
       if (!inTexas) {
@@ -764,7 +736,6 @@ export function CareScreens(props: ScreenProps) {
           >
             {videoChecked ? <Check size={22} /> : <Video size={22} />}
             <strong>{videoChecked ? "Camera ready" : "Check camera"}</strong>
-            <small>Simulated check</small>
           </button>
           <button
             type="button"
@@ -773,7 +744,6 @@ export function CareScreens(props: ScreenProps) {
           >
             {audioChecked ? <Check size={22} /> : <Headphones size={22} />}
             <strong>{audioChecked ? "Sound ready" : "Check sound"}</strong>
-            <small>Simulated check</small>
           </button>
         </div>
         <CheckRow
@@ -797,7 +767,7 @@ export function CareScreens(props: ScreenProps) {
           placeholder="(202) 555-0147"
         />
         <p className="care-quiet">
-          Demo checks only · your camera and microphone stay private
+          Your camera and microphone aren’t activated in this preview
         </p>
       </Page>
     );
@@ -818,7 +788,7 @@ export function CareScreens(props: ScreenProps) {
         subtitle={`${provider.firstName} has your visit details. Take a moment to get comfortable.`}
         footer={
           <Button loading={busy} onClick={join}>
-            Join demo visit
+            Join your visit
           </Button>
         }
       >
@@ -839,9 +809,6 @@ export function CareScreens(props: ScreenProps) {
             ? "Your care brief is ready. You can start with what matters most to you."
             : "You can share your story with your clinician. A care brief is optional."}
         </Notice>
-        <p className="care-quiet">
-          This is a simulated waiting room. No clinician is connected.
-        </p>
       </Page>
     );
   }
@@ -858,13 +825,6 @@ export function CareScreens(props: ScreenProps) {
         await api.reconnect();
         return true;
       });
-    };
-    const finish = async () => {
-      const success = await act(async () => {
-        await api.completeVisit("clinician");
-        return true;
-      });
-      if (success) go("complete");
     };
     const phrases = [
       {
@@ -887,7 +847,7 @@ export function CareScreens(props: ScreenProps) {
       return (
         <Page
           title="Your visit is complete"
-          subtitle="Your clinician has finished the demo encounter."
+          subtitle="Your care plan is ready."
           footer={
             <Button onClick={() => go("complete")}>View your care plan</Button>
           }
@@ -916,9 +876,7 @@ export function CareScreens(props: ScreenProps) {
         subtitle={
           <span className="care-connection">
             <span className={interrupted ? "offline" : ""} />
-            {interrupted
-              ? "Connection interrupted · demo"
-              : "Connected · simulated visit"}
+            {interrupted ? "Connection interrupted" : "Connected"}
           </span>
         }
         footer={
@@ -926,25 +884,12 @@ export function CareScreens(props: ScreenProps) {
             <Button loading={busy} onClick={reconnect}>
               Reconnect to your visit
             </Button>
-          ) : state.visitPhase < 2 ? (
-            <Button
-              onClick={() => update({ visitPhase: state.visitPhase + 1 })}
-            >
-              Continue demo conversation
-            </Button>
-          ) : (
-            <Button loading={busy} onClick={finish}>
-              Finish demo visit
-            </Button>
-          )
+          ) : undefined
         }
       >
         <div className={`care-video ${interrupted ? "interrupted" : ""}`}>
           {provider.photo ? (
-            <img
-              src={provider.photo}
-              alt={`${provider.name}, fictional clinician`}
-            />
+            <img src={provider.photo} alt={provider.name} />
           ) : (
             <div className="care-video-monogram">{provider.initials}</div>
           )}
@@ -954,7 +899,7 @@ export function CareScreens(props: ScreenProps) {
             ) : (
               <VideoOff size={22} />
             )}
-            <small>You · demo</small>
+            <small>You</small>
           </div>
           {interrupted ? (
             <div className="care-video-overlay">
@@ -978,9 +923,7 @@ export function CareScreens(props: ScreenProps) {
           <button
             type="button"
             aria-pressed={!state.micOn}
-            aria-label={
-              state.micOn ? "Mute demo microphone" : "Unmute demo microphone"
-            }
+            aria-label={state.micOn ? "Mute microphone" : "Unmute microphone"}
             onClick={() => update({ micOn: !state.micOn })}
           >
             {state.micOn ? <Mic size={23} /> : <MicOff size={23} />}
@@ -989,9 +932,7 @@ export function CareScreens(props: ScreenProps) {
           <button
             type="button"
             aria-pressed={!state.cameraOn}
-            aria-label={
-              state.cameraOn ? "Turn demo camera off" : "Turn demo camera on"
-            }
+            aria-label={state.cameraOn ? "Turn camera off" : "Turn camera on"}
             onClick={() => update({ cameraOn: !state.cameraOn })}
           >
             {state.cameraOn ? <Video size={23} /> : <VideoOff size={23} />}
@@ -1002,12 +943,6 @@ export function CareScreens(props: ScreenProps) {
             <small>Leave</small>
           </button>
         </div>
-        {!interrupted && state.visitPhase >= 2 ? (
-          <p className="care-quiet">
-            Demo control: send the clinician’s completion signal. A patient’s
-            Leave button never completes a visit.
-          </p>
-        ) : null}
       </Page>
     );
   }
@@ -1050,12 +985,10 @@ export function CareScreens(props: ScreenProps) {
         <div className="care-complete-mark">
           <Check size={32} />
         </div>
-        <p className="care-completion-proof">
-          Marked complete by your simulated clinician
-        </p>
+        <p className="care-completion-proof">Visit completed</p>
         <div className="care-plan">
           <h2>Your care plan</h2>
-          <p>Example clinician-reviewed plan</p>
+          <p>Your next steps</p>
           <button
             type="button"
             className="care-plan-summary"
@@ -1067,17 +1000,13 @@ export function CareScreens(props: ScreenProps) {
               <strong>Keep the conversation going</strong>
               <small>What to bring to your next visit</small>
             </span>
-            <ChevronRight className={showPlan ? "rotated" : ""} size={18} />
+            {showPlan ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
           </button>
           {showPlan ? (
             <div className="care-plan-detail">
               <p>
                 Bring questions or observations you’d like to discuss. Review
                 what felt useful and what you want to focus on next.
-              </p>
-              <p>
-                This is an example plan, not personal medical advice or a
-                prescription.
               </p>
             </div>
           ) : null}
@@ -1093,7 +1022,7 @@ export function CareScreens(props: ScreenProps) {
             <p>
               {state.followupAppointment
                 ? formatSlot(state.followupAppointment.slotId, { short: true })
-                : `In this example, ${provider.firstName} suggests a follow-up in 2 weeks.`}
+                : `Your next visit with ${provider.firstName} can be in 2 weeks.`}
             </p>
             <small>{costDescription(state, true)}</small>
           </div>
@@ -1124,7 +1053,7 @@ export function CareScreens(props: ScreenProps) {
             >
               <span>
                 <Check size={15} />
-                Saved in this preview
+                Saved on this device
               </span>
               <p>{latestMessage.body}</p>
               <small>
@@ -1149,7 +1078,7 @@ export function CareScreens(props: ScreenProps) {
                 setMessageSent(false);
               }}
               placeholder="A question about your next step"
-              enterKeyHint="send"
+              enterKeyHint="done"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -1157,12 +1086,9 @@ export function CareScreens(props: ScreenProps) {
                 }
               }}
             />
-            <p>
-              For non-urgent questions. This demo stores your message locally
-              and sends nothing.
-            </p>
+            <p>For non-urgent questions. Save a draft to come back to later.</p>
             <Button type="submit" variant="secondary" loading={busy}>
-              Save demo message
+              Save draft
             </Button>
           </form>
         </details>
@@ -1198,22 +1124,17 @@ export function CareScreens(props: ScreenProps) {
             onCalendar={() => calendar(state.followupAppointment!)}
           />
           {statusNote}
-          <Notice tone="success">
-            Your demo follow-up is confirmed. Your first visit stays complete.
-          </Notice>
+          <Notice tone="success">Your follow-up is confirmed.</Notice>
           <CareLink
             icon={<Mail size={21} />}
             title="Your follow-up reminders"
             detail={
               state.followupReminderScheduled
-                ? "24 hours and 1 hour before · demo preview"
+                ? "24 hours and 1 hour before"
                 : "Choose your reminder preferences"
             }
             onClick={() => go("reminders")}
           />
-          <p className="care-quiet">
-            No real appointment or charge. Review controls can reset the demo.
-          </p>
         </Page>
       );
     const options = followupSlots.filter(
@@ -1237,7 +1158,7 @@ export function CareScreens(props: ScreenProps) {
         footer={
           <>
             <Button disabled={!followupId} loading={busy} onClick={book}>
-              Confirm demo follow-up
+              Confirm follow-up
             </Button>
             <button
               type="button"
@@ -1389,7 +1310,7 @@ export function CareScreens(props: ScreenProps) {
                 Discuss another provider
               </button>
             </div>
-            <small>Demo only · no message sent or provider changed</small>
+            <small>Start a draft. Nothing changes until you decide.</small>
           </div>
         ) : null}
         <Field
@@ -1400,10 +1321,6 @@ export function CareScreens(props: ScreenProps) {
           placeholder="What stood out for you?"
           enterKeyHint="done"
         />
-        <p className="care-quiet">
-          Saved in this demo only. Feedback never changes your visit’s
-          completion status.
-        </p>
       </Page>
     );
   }

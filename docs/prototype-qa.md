@@ -1,72 +1,66 @@
 # First-visit prototype verification
 
-Verified October 20, 2026. This is a working flow review, not the complete final take-home submission or a production care system.
+Verified October 20, 2026 after the branding and interaction correction. This is a working patient-flow prototype; vendors, people, records, appointments, messages and payments remain simulated.
 
-## Build and contracts
+## Build and behavior
 
-- `npm run build` passes: TypeScript and Vite production build.
-- `npm test` passes: 14 tests, zero failures.
-- Tests cover hold vs confirmation, expiry, duplicate requests, unavailable slots, payment retry, records permission, pending/verified coverage, self-pay bypass, rescheduling, encounter completion authority, follow-up reminders, local message persistence, sanitized events, date validation and Central Time across daylight saving.
-- No browser runtime errors or warnings were returned during the final local check.
+- TypeScript/Vite production build passes. All **16 contract tests pass**.
+- The added tests cover multiple explicit conditions surviving failed saves, resume and booking, allowlist normalization, and exclusion of clinical answers from the service ledger. Existing reservation, insurance, consent, completion-authority and follow-up contracts remain covered.
+- Walked the revised local patient route through all six fit answers, ADHD + Anxiety, goal, self-pay, provider/time, name, birth date, address, email, phone, payment method, confirmation, optional-records decline, care brief, appointment day, device readiness, waiting room, visit and clinician completion.
+- Preview controls advance time and clinician activity outside the patient screen. The default route can reach completion; the full journey review is available separately at `/?review=1`.
+- All fit questions and the goal advance from the answer itself. Fit/goal draft saves have no artificial network delay. Urgent safety routing opens resources before persistence, even on a save failure.
+- Conditions require at least one explicit choice; native checkboxes allow all seven captured options. ADHD + Anxiety remained selected after Back and reload. Matching described only the overlapping clinician focus areas.
+- Continue was measured before and during save: identical text and bounding rectangle (342 × 52 at x24/y758 in the 390 × 844 check), no transform, animation or spinner/arrow swap.
+- Local and hosted console checks returned no errors or warnings.
 
-## Browser execution
+## Responsive and keyboard checks
 
-Browser: Codex in-app Chromium, controlled through CUA. Render captures use the browser screenshot API, saved as JPEG at the reported viewport size. These are browser viewport checks, not physical-device screenshots. The live Legion patient tab was not used or closed during this prototype work.
+Browser: Codex in-app Chromium through CUA. Captures use the tab screenshot API; full-page capture was needed for the full 1440px desktop canvas because viewport-only capture could be limited by the side-panel width. Images were inspected with `view_image` alongside the internal reference.
 
-| Check | Observed result |
+- **390 × 844:** inspected welcome, fit, conditions, matching, confirmed visit and completed visit. The first clinician, relevant specialties, price and available times are visible before scrolling through other providers.
+- **375 × 667:** checked all 31 screens in review mode, which adds a 27px review strip. No horizontal overflow; every footer primary action remained in the viewport. All six fit-question answer sets and the complete seven-option conditions screen fit without content scrolling.
+- Tightened the goal, coverage and phone screens after the initial sweep by removing redundant explanation and excess margins. The patient route has more space than review mode; phone has zero content overflow at 375 × 667. Provider comparison, booking review, detailed preparation and care-plan pages may scroll within the content area while the primary action remains visible.
+- **375 × 390:** approximated the area above an open keyboard. Name and phone inputs stayed visible; the primary action occupied y332–380. Enter moved first name → last name → birth fields → address fields → email → phone → review. Focus moved into the next form without requiring a keyboard-dismiss step.
+- Email uses email input/autocomplete; date and ZIP fields use numeric input modes; phone uses `type=tel`, `inputMode=tel`, `enterKeyHint=go`, national telephone autocomplete and `(202) 555-0147` formatting for the fictional fixture.
+- **1440 × 1000:** inspected the default patient surface with a bounded, unframed content column. Reviewer rails are absent from the default route.
+- Compact testimonials retain pause/play, focus/hover pause and reduced-motion support; short viewports and typing hide the optional quote before removing essential controls. Pause was exercised again on the hosted build. Reduced-motion behavior was verified in the original pass and its implementation remains unchanged.
+
+Not verified: physical iOS/Android keyboard behavior, browser-chrome transitions, screen-reader output, every accessibility text-size setting, real autofill/password managers, or real camera/audio/network behavior. A reduced desktop viewport is not a physical-device test.
+
+## Visual fidelity ledger
+
+The new [brand correction reference](design/brand-correction-reference.png) was generated with the built-in image tool as an internal working reference. It supersedes the first concepts and is not a separately user-approved design. The real brand assets and current intake screenshot are authoritative where a generated reference differs.
+
+| Comparison | Evidence and implemented decision |
 | --- | --- |
-| Full self-pay path | Completed six fit questions, needs/goal, provider/time, name/DOB/address/email/phone, mock account/hold, demo payment and example agreements, confirmed visit |
-| Preparation | Requested fictional records with explicit permission, flagged a record out of date, edited the care brief, approved it with Enter |
-| Attendance | Saved reminder preferences, previewed appointment day, completed simulated camera/sound/location/callback checks, joined the room, advanced the demo conversation, triggered simulated clinician completion |
-| Continuity | Booked a separate follow-up; its reminder screen showed the follow-up date rather than the completed first visit |
-| Calendar | Downloaded and inspected a real `.ics` file: October 22, 2026, 14:00–15:00 UTC, matching 9:00–10:00 AM Central Time |
-| Rescheduling | Changed the existing visit to 11:30 AM; the appointment home reflected the new time |
-| Slot conflict | Details remained saved; lost 9:00 AM slot became disabled and labeled Unavailable; Continue stayed disabled until another time was chosen |
-| Pending benefits | No copay invented; the user could retry, seek help, or explicitly choose the displayed self-pay price |
-| Payment retry | First setup failed visibly; retry succeeded without repeating personal information |
-| Records unavailable | Clear missing-record state; continued to an answer-based care brief |
-| Connection loss | Reconnected to the same visit. Leave returned to an interrupted appointment rather than a completed visit |
-| Save failure | Error preserved the entered email; retry advanced |
-| Low rating | A rating of 2 offered care-team/provider-change draft routes; a local message was saved with Not delivered and remained after reload |
-| Urgent fit answer | Routed to immediate-support guidance instead of advancing booking; final implementation provides `tel:988` and `sms:988` actions |
-| Testimonials | Auto-rotation observed; pause control switched to Play. Reduced-motion emulation disabled automatic playback; emulation was reset afterward |
+| Brand identity | Replaced the invented wordmark with Legion’s public SVG and favicon. The actual SVG takes precedence over the generated symbol |
+| Typography | Bundled the live intake’s Inter variable font; removed Manrope. Main headings use 500 weight, 30px mobile / 32px desktop, with larger body and control text |
+| Palette | White background, source-backed `#3A68E9` action blue, `#000614` text and pale blue support surfaces. No decorative page gradient |
+| Conditions / copy | Exact seven live labels, native square checkboxes, two-column layout, Other spanning the final row. Short selection instruction; no expanded diagnosis essay |
+| Layout | Cardless patient shell, compact functional progress, ordinary question content above a stable bottom action. No review rail or integration explanation in the default patient screen |
+| Button geometry and motion | Full-width 52px Continue; no arrow/spinner exchange, scaling or entrance motion. Only the optional testimonial fades |
+| Small-screen spacing | 375 × 667 conditions fit all options and CTA. On shorter screens the quote disappears; comparison/review pages retain bounded scrolling |
+| Downstream consistency | Booking and care share the same font, colors, 8–12px corners and readable text. Calendar, reminders, waiting, completion and follow-up remain functional |
 
-## Mobile and keyboard
+Intentional differences from the internal concept: the real SVG replaces the generated logo; progress counts reflect actual screen groups; shorter fit-answer wording and an instruction before the choices clarify one-tap navigation; native checkboxes preserve browser accessibility; the small Preview controls link provides simulation access; testimonial attribution says “excerpt” because these are excerpts from one patient. The patient quote text, actual option names and brand assets are not invented. Above-the-fold copy was checked; no unexpected labels or marketing claims were introduced. The welcome subtitle now directly describes finding a clinician, choosing a time and meeting online.
 
-- Main mobile review at **390 × 844**; smaller phone review at **375 × 667**.
-- Examined all 30 primary screens at the smaller size. No horizontal overflow. Ordinary fit/details screens keep their primary action visible; providers, scheduling, review, appointment home, reminders, and expanded care-plan content may scroll within the content region.
-- Goal and inpatient-question spacing were tightened after inspection. The goal screen retains approximately 4px of scrollable padding at 375 × 667; its question, choices, caution and primary action remain visible.
-- A **375 × 390** viewport approximated space remaining above a keyboard. The active last-name field ended at y=312; the action area occupied y=324–390. The phone field ended at y=223 with the same visible action area.
-- Enter/Next was exercised through name → birth → address → email → phone → review. Numeric date/ZIP fields, email input and telephone input use appropriate input modes/autocomplete. Phone text formats as entered; middle editing and punctuation deletion have digit-aware caret handling.
-- Navigation focuses the next input in the layout effect when advancing from typing. The application uses VisualViewport height/offset, scrollable content and a separate action area; optional proof/progress/context yields to typing.
-- **Not verified:** physical iOS Safari or Android Chrome software keyboards, browser chrome transitions, autofill/password-manager variations, screen-reader output, zoom at all accessibility text sizes, or real camera/audio/network behavior. Browser keyboard-sized checks do not establish those behaviors.
+The material defects found in comparison—narrow Continue width, button label movement, an unnecessary mouse-focus outline, tiny secondary text, generic diagnosis categories and review chrome in the patient page—were repaired. The revised screens were visually verified against the actual brand and working reference; no remaining mismatch with the requested corrections was found in the inspected states.
 
-## Visual fidelity review
+Selected current captures in `design/qa/`:
 
-Internal generated concepts were inspected with `view_image`, alongside the rendered mobile captures, before handoff. These concepts were working design references created under the instruction to design and build, not separately user-approved designs.
+- `brand-conditions-mobile.jpg`, `brand-conditions-small.jpg`, `brand-conditions-desktop.jpg`
+- `brand-matching-mobile.jpg`, `brand-confirmed-mobile.jpg`, `brand-completed-mobile.jpg`
+- `brand-keyboard-name.jpg`, `brand-keyboard-phone.jpg`
+- `brand-hosted-conditions-mobile.jpg` (includes Vercel’s own preview toolbar)
 
-| Area | Reference | Rendered result / decision |
-| --- | --- | --- |
-| Intake hierarchy | `design/intake-matching-concept.png` | Large direct question, four clear choices, compact patient quote and bottom action retained. Supporting text and six-chapter progress are more compact to preserve phone space |
-| Matching | `design/intake-matching-concept.png` | Provider, actual focus areas, next time, cost and direct slot choices appear immediately. Removed the concept's implied universal clinical-fit claim; comparison remains factual |
-| Personal details | `design/details-preparation-concept.png` | One logical group per form, email before phone, contextual appointment summary. Corrected concept artifact that placed clinician information in patient review fields; hid optional context during typing |
-| Preparation | `design/details-preparation-concept.png` | Strong blue appointment panel, consistent portrait, calendar/reschedule actions retained. Preparation and reminder tasks open their functional screens rather than competing on one dense page |
-| Visit and completion | `design/visit-completion-concept.png` | Same clinician portrait, calm video room, simple controls and care-plan continuity. Replaced invented call timer with an explicit simulation label; Leave and clinician completion are separate actions |
-| Palette, type and rhythm | All three concepts | True white/cool gray, blue actions, ink headings, Manrope, rounded functional controls. Body/utility sizes are deliberately compact; inputs remain 16px. No cream or headline italics |
-| Motion and accessibility | Functional extension | Short content transitions leave the footer stationary. Carousel has manual controls, pauses for focus, and respects reduced motion |
-| Desktop | Functional extension | 1440 × 1000 review places the compact patient flow between chapter navigation and design/integration context. The patient form is not stretched to desktop width |
-
-Selected captures are in `docs/design/qa/`: welcome, intake, matching, confirmation, visit, completion, keyboard-name, keyboard-phone and desktop-review. The fictional clinician asset is generated; there are no patient photos or invented ratings. Testimonial text is a set of excerpts from one unnamed patient in the captured live journey, not three separate reviews.
-
-## Known boundaries for the next build
-
-The prototype stores data in local browser storage, has fixed example dates, uses fictional providers, and runs asynchronous local adapters. There is no real authentication, backend persistence, AI model call, medical-record access, prescription, payment, notification delivery, or telehealth connection. Server-side authorization, consent/audit controls, idempotency keys, background jobs, clinical review of eligibility rules, and the complete final-assignment deliverables remain work for the larger rebuild. See `prototype-architecture.md`.
+The original recovery, calendar-download, rescheduling and follow-up browser checks are retained in Git history. They were not all repeated as browser checks for this visual correction; their contract tests still pass.
 
 ## Hosted preview
 
-- URL: https://legion-health-assignment-r2jomco6x-davidspiegs-projects.vercel.app
-- Deployment ID: `dpl_CsqwKvGbvJuLVYzriaENm4Jstcw9`
-- Vercel API: READY, preview (`target: null`), no aliases. Authentication protection remains enabled; a signed-out browser may need David's Vercel login.
-- Authenticated root returned HTTP 200 with the expected app and `X-Robots-Tag: noindex, nofollow`.
-- Opened the actual hosted app in the in-app browser; exercised review navigation, provider selection and transition to name entry. No console errors/warnings returned. Saved `design/qa/hosted-matching-mobile.jpg` at 390 × 844, then reset the viewport and restarted the preview for handoff.
-- Deployment correction: Vercel auto-assigned its first project deployment to production despite the explicit preview flag. A separate verified preview was created, and only the unintended first deployment was removed; subsequent inspection confirmed it no longer exists. No existing production project or deployment was touched.
+- [Updated protected preview](https://legion-health-assignment-15bzwyj9z-davidspiegs-projects.vercel.app)
+- [Full journey review](https://legion-health-assignment-15bzwyj9z-davidspiegs-projects.vercel.app/?review=1)
+- Deployment: `dpl_8y25KPyJNFyHWzZNqvm4Smrt3civ`, READY, preview (`target: null`, `productionUrl: null`). Vercel authentication protection remains enabled.
+- Opened the deployed application, exercised all six one-tap fit answers, selected ADHD and Anxiety, paused the quote, and inspected its rendered state. No hosted console warnings or errors returned.
+- Hosted build assets: `index-C30hNftb.css` and `index-Cc0sY6R6.js`.
+
+The actual Legion patient tab was not used, submitted or closed during this correction. No real clinical, payment, messaging or advertising integrations were called by the prototype.

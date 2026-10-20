@@ -1,0 +1,226 @@
+[
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "title": "Find care that feels right",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "lastAnswer": 466.890625,
+    "title": "Will you be in Texas for your visits?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "lastAnswer": 413.6953125,
+    "title": "Are you 18 or older?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "lastAnswer": 541.890625,
+    "title": "Do you have Medicare or Medicaid?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "lastAnswer": 466.890625,
+    "title": "Do you need immediate help to stay safe?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "lastAnswer": 541.890625,
+    "title": "Have you had an inpatient stay in the past year?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "lastAnswer": 466.890625,
+    "title": "Does care by video work for you?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "title": "You deserve the right level of care",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "title": "What brings you here?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 79,
+    "horizontalOverflow": 0,
+    "lastAnswer": 571.890625,
+    "title": "What would feel most helpful?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 67,
+    "horizontalOverflow": 0,
+    "title": "How would you like to pay?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 260,
+    "horizontalOverflow": 0,
+    "title": "Care that fits you",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 209,
+    "horizontalOverflow": 0,
+    "title": "Make time for you",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "title": "What’s your name?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "title": "When were you born?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "title": "Where do you live?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 1,
+    "horizontalOverflow": 0,
+    "title": "Let’s check your coverage",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "title": "What’s your email?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 68,
+    "horizontalOverflow": 0,
+    "title": "What’s your phone number?",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 223,
+    "horizontalOverflow": 0,
+    "title": "Your first step, all set",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 93,
+    "horizontalOverflow": 0,
+    "title": "You’re booked, Alex",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 5,
+    "horizontalOverflow": 0,
+    "title": "Less repeating your story",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 102,
+    "horizontalOverflow": 0,
+    "title": "Your story, ready to share",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 110,
+    "horizontalOverflow": 0,
+    "title": "A good start, together",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 164,
+    "horizontalOverflow": 0,
+    "title": "A little nudge, right on time",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 97,
+    "horizontalOverflow": 0,
+    "title": "Let’s get you settled",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 15,
+    "horizontalOverflow": 0,
+    "title": "You’re in the right place",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "title": "You’re with Maya",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 150,
+    "horizontalOverflow": 0,
+    "title": "Your first visit, complete",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 125,
+    "horizontalOverflow": 0,
+    "title": "Keep the same connection",
+    "viewport": 667
+  },
+  {
+    "actionVisible": true,
+    "contentOverflow": 0,
+    "horizontalOverflow": 0,
+    "title": "How did your visit feel?",
+    "viewport": 667
+  }
+]

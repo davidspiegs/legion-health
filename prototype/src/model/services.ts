@@ -28,8 +28,8 @@ export function createMockApi({
 }: MockApiOptions): MockApi {
   let sequence = 0;
   const inFlight = new Map<string, Promise<unknown>>();
-  const delay = () =>
-    new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+  const delay = (ms = delayMs) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
   const emit = (
     service: ServiceName,
     operation: string,
@@ -72,12 +72,13 @@ export function createMockApi({
       outcome: ServiceEvent["outcome"];
       detail: string;
     },
+    latency = delayMs,
   ): Promise<T> {
     const existing = inFlight.get(key);
     if (existing) return existing as Promise<T>;
     const task = (async () => {
       emit(service, operation, "pending", "Simulated request started");
-      await delay();
+      await delay(latency);
       try {
         const result = await work();
         const event = resultEvent?.(result);
@@ -118,7 +119,7 @@ export function createMockApi({
   };
 
   return {
-    saveDraft(_stage) {
+    saveDraft(stage) {
       return run(
         "saveDraft",
         "Profile",
@@ -130,6 +131,8 @@ export function createMockApi({
               "We couldn’t save that yet. Your answers are still here—try again.",
             );
         },
+        undefined,
+        stage.startsWith("fit-") || stage === "goal" ? 0 : delayMs,
       );
     },
     getProviders() {

@@ -6,7 +6,7 @@ Proposed October 20, 2026. This is the scope for a working flow prototype for Da
 
 | Phase | Screens and patient decisions | Service boundary |
 | --- | --- | --- |
-| Find care | Welcome → six compact fit questions → what brings you here → preferred support → insurance or self-pay → two useful provider choices → time selection | Eligibility routing; durable draft; directory and availability |
+| Find care | Welcome → six compact fit questions → select one or more conditions → preferred support → insurance or self-pay → two useful provider choices → time selection | Eligibility routing; local draft; directory and availability |
 | Your details | Name → birth date → address → coverage details if insured → email → phone and optional SMS preference → refresh availability and acquire a hold | Profile; Sohar pending/verified/unresolved result; authentication; scheduling |
 | Confirm | Review provider, time, time zone, price and example agreements → simulated payment method → confirmation; recover if the hold expires | Scheduling; payment setup; appointment authority |
 | Prepare | Confirmation and calendar → records permission → records/goal review → editable, source-linked care brief → appointment home and reminder previews | Metriport; simulated AI summarization; reminder scheduling |
@@ -19,6 +19,8 @@ A time selected before personal information is a preference. After the final con
 
 - A complete path through the first completed visit and optional follow-up.
 - Helpful fit exits; urgent support guidance instead of a conversion CTA when appropriate. No autonomous diagnosis or prescribing.
+- Fit answers and the preferred-support choice advance directly, without a second Continue tap or an artificial save delay. Urgent resources appear immediately even if the draft save fails.
+- Seven explicit condition choices support multiple selections: ADHD, Depression, Anxiety, Bipolar Disorder, PTSD, “I'm not sure,” and Other. These are patient selections, not inferred or confirmed diagnoses.
 - Provider comparison, explicit Central Time display, nearby alternatives if a time is taken, and rescheduling without erasing intake.
 - Logical personal information steps, contact last, email before phone, visible labels, autocomplete, correct input modes, US phone formatting, and field validation.
 - Keyboard-aware layout: the active field and Continue remain reachable within the visual viewport; Enter/Next/Done submits or advances. Optional proof yields to typing. Never clip required content to enforce a screenshot height.
@@ -31,25 +33,28 @@ A time selected before personal information is a preference. After the final con
 
 ## Visual and interaction direction
 
-**Visual thesis:** clear daylight, confident blue, humane typography, and a recognizable clinician make a clinical process feel calm and manageable.
+**Visual thesis:** use Legion's existing identity with a clear mobile hierarchy, calm spacing, and a recognizable clinician.
 
-The working visual concepts are in `docs/design/`: intake/matching, details/preparation, and visit/completion. They were generated using the built-in image tool as internal design references under David's instruction to design and build; they are not user-approved final designs.
+The current internal visual reference is [brand-correction-reference.png](design/brand-correction-reference.png), superseding the earlier concepts in `docs/design/`. It is a generated working reference, not a user-approved final design.
 
-**Content plan:** one immediate question or decision per ordinary screen; provider and appointment context where it helps; the next action anchored at the bottom; longer comparison/review content allowed to scroll. Desktop presents the same patient flow with a review rail, not a stretched mobile form.
+**Content plan:** one immediate question or decision per ordinary screen; provider and appointment context where it helps; the next action anchored at the bottom; longer comparison/review content allowed to scroll. The default `/` route is the patient experience without review rails. `/?review=1` adds chapter navigation, scenarios, and integration inspection.
 
-**Interaction thesis:** short directional transitions establish continuity; selected controls give immediate feedback; a compact testimonial rotates slowly only when space and attention permit. Reduced motion removes automatic rotation and nonessential transitions. Loading states describe actual mock operations, not theatrical matching checklists.
+**Interaction thesis:** direct answer selection and stable controls keep the task moving. Shared buttons retain their label and dimensions while busy, without arrows, spinners, or button motion. The compact testimonial can rotate every 7.5 seconds when space and attention permit; it pauses on focus, hover, or its pause control and does not rotate with reduced motion enabled. It yields to short viewports and typing.
 
 ### Design system and implementation inventory
 
-- True white background `#FFFFFF`; cool gray canvas `#F4F6F9`; ink `#152D43`; blue action `#3865E9`; pale blue `#EEF3FF`. No cream or headline italics.
-- Manrope with 31px default screen headings (29px on compact views and 25px while typing), a 36px welcome heading, 13px primary body/subtitle text, and 16px form inputs. Supporting text is typically 10–12px, with some 9px metadata; this compact scale is the implemented review treatment and still needs physical-device and large-text legibility review. Mobile gutters are 24px, or 20px on narrow devices.
-- 52–56px controls, 14px button/input corners; open layout around questions. Cards are reserved for selectable choices, provider comparison, and appointment context.
+- White background; Legion blue `#3A68E9`, ink `#000614`, muted text `#657082`, and pale blue `#EEF2FC`.
+- Bundled Inter from Legion's live app. Screen headings are 32px by default and 30px on mobile, weight 500, with smaller short-viewport/keyboard treatments; form inputs stay 16px. Mobile gutters are 24px, or 20px on narrow devices. Physical-device and large-text legibility still need review.
+- Shared primary buttons have a stable 52px minimum height and 8px corners, with a compact 48px keyboard treatment. Cards are reserved for selectable choices, provider comparison, and appointment context.
 - Lucide outline icons at consistent 20–24px, 1.8–2px stroke; icons indicate meaning, not decoration.
-- Code-native wordmark, headings, forms, controls and status. One generated fictional clinician portrait is used consistently across matching, booking and the simulated visit.
+- Legion's public SVG logo is bundled at `/brand/legion-logo.svg`, alongside the local Inter font. One generated fictional clinician portrait is used consistently across matching, booking and the simulated visit.
 - Components: app shell/progress, Page with a scrolling main region and separate action area, buttons, choice rows, fields, notices, appointment context, testimonial strip, accessible review/help dialogs.
 - Full-screen mobile shell uses dynamic/visual viewport height. At keyboard-open sizes, progress and optional proof collapse before essential fields or actions. Large text and unusually short viewports can scroll rather than clip.
 - Public testimonial excerpts come from the captured current flow, attributed to the same unnamed Legion patient; rotation does not imply multiple independent reviews. No invented ratings.
-- Functional extensions beyond the concepts: six fit screens and exits, coverage states, validation, calendar download, rescheduling, review drawer, scenario switches, integration log, reminder preferences, and reconnect recovery. These are required by the requested journey. Concept artifacts that incorrectly place clinician data in patient fields or add unnecessary separators are corrected in the implementation.
+- Condition choices use native checkboxes and persist as a `conditions` array. Older single-topic drafts are not converted into diagnoses; eligible unfinished drafts return to the condition screen for an explicit selection.
+- “Preview controls” lives outside the patient surface. Its dialog advances appointment day, the simulated conversation, and clinician completion in either mode, so the default patient flow can be reviewed end to end without embedding simulation controls in the care screens.
+
+Brand references are Legion's [public logo](https://app.legionhealth.com/legion-logo-dark-text.svg) and its live [base stylesheet](https://app.legionhealth.com/_next/static/css/cf04015137e5e14a.css) and [application stylesheet](https://app.legionhealth.com/_next/static/css/c50624e23d0abf09.css). These identify the source of the identity assets and styling; the redesigned layout remains this prototype's work.
 
 Implementation references: the [W3C carousel tutorial](https://www.w3.org/WAI/tutorials/carousels/) provides the reference for understandable rotation controls and user control; [MDN `enterkeyhint`](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/enterkeyhint) documents keyboard action hints; and the [Visual Viewport API](https://developer.mozilla.org/en-US/docs/Web/API/Visual_Viewport_API) supports adapting the shell when a mobile keyboard changes the visible area. These mechanisms do not replace device testing. The urgent-support exit links to [988's explanation of what to expect](https://988lifeline.org/get-help/what-to-expect/); it does not simulate a crisis service or claim a care coordinator has been contacted.
 

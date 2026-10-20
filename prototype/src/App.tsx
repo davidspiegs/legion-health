@@ -16,7 +16,6 @@ import {
   HeartHandshake,
   Layers3,
   RotateCcw,
-  ShieldCheck,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -25,7 +24,12 @@ import { BookingScreens } from "./screens/Booking";
 import { CareScreens } from "./screens/Care";
 import { Button } from "./components/ui";
 import { FLOW, PHASES, type FlowPhase } from "./model/flow";
-import { initialState, sampleProfile, slots } from "./model/fixtures";
+import {
+  initialState,
+  sampleProfile,
+  slots,
+  normalizeConditions,
+} from "./model/fixtures";
 import { createMockApi } from "./model/services";
 import type {
   JourneyState,
@@ -120,12 +124,19 @@ const scenarios: {
 function restore(): JourneyState {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE) || "null");
-    if (saved?.version === 1 && FLOW.some((item) => item.id === saved.step))
+    if (saved?.version === 1 && FLOW.some((item) => item.id === saved.step)) {
+      const needsConditionReview =
+        !Array.isArray(saved.conditions) &&
+        !saved.appointment &&
+        ["goal", "coverage", ...bookingSteps].includes(saved.step);
       return {
         ...initialState(),
         ...saved,
+        conditions: normalizeConditions(saved.conditions),
+        ...(needsConditionReview ? { step: "needs" as Step, history: [] } : {}),
         profile: { ...initialState().profile, ...saved.profile },
       };
+    }
   } catch {
     /* A fresh preview is safe when local storage is unavailable. */
   }
@@ -138,7 +149,7 @@ function reviewFixture(step: Step, scenario: Scenario): JourneyState {
     ...fresh,
     step,
     scenario,
-    topic: "Focus & attention",
+    conditions: ["ADHD"],
     goal: "Understand what’s going on",
     profile: { ...sampleProfile, sms: false },
     providerId: "maya",
@@ -237,12 +248,16 @@ function reviewFixture(step: Step, scenario: Scenario): JourneyState {
 }
 
 export default function App() {
+  const reviewMode =
+    new URLSearchParams(window.location.search).get("review") === "1";
   const [state, setState] = useState<JourneyState>(restore);
   const stateRef = useRef(state);
   const [busy, setBusy] = useState(false),
     busyRef = useRef(false);
   const [error, setError] = useState("");
-  const [panel, setPanel] = useState<"flow" | "scenarios" | "services">("flow");
+  const [panel, setPanel] = useState<
+    "flow" | "scenarios" | "services" | "simulation"
+  >("flow");
   const [typing, setTyping] = useState(false);
   const [storageAvailable, setStorageAvailable] = useState(true);
   const review = useRef<HTMLDialogElement>(null),
@@ -353,7 +368,7 @@ export default function App() {
     };
   }, []);
   useLayoutEffect(() => {
-    document.title = `${FLOW.find((item) => item.id === state.step)?.title || "Your care"} · Legion preview`;
+    document.title = `${FLOW.find((item) => item.id === state.step)?.title || "Your care"} · Legion Health`;
     const main = app.current?.querySelector(".screen-main");
     if (main) main.scrollTop = 0;
     const field = app.current?.querySelector<HTMLInputElement>(
@@ -368,18 +383,40 @@ export default function App() {
   }, [state.step]);
   const current = FLOW.find((item) => item.id === state.step)!;
   const phase = PHASES.findIndex((item) => item.id === current.phase);
-  const phaseSteps = FLOW.filter(
-    (item) =>
-      item.phase === current.phase &&
-      item.id !== "fit-exit" &&
-      item.id !== "insurance" &&
-      item.id !== "welcome",
+  const progressGroups: { label: string; steps: Step[] }[] = [
+    {
+      label: "Fit check",
+      steps: [
+        "fit-state",
+        "fit-age",
+        "fit-coverage",
+        "fit-safety",
+        "fit-history",
+        "fit-virtual",
+      ],
+    },
+    { label: "Your care", steps: ["needs", "goal", "coverage"] },
+    { label: "Your clinician", steps: ["match", "slots"] },
+    {
+      label: "Your details",
+      steps: [
+        "name",
+        "birth",
+        "address",
+        ...(state.coverage === "insurance" ? ["insurance" as Step] : []),
+        "email",
+        "phone",
+        "review",
+      ],
+    },
+  ];
+  const progressGroup = progressGroups.find((group) =>
+    group.steps.includes(state.step),
   );
-  const progressIndex = Math.max(
-    0,
-    phaseSteps.findIndex((item) => item.id === state.step),
-  );
-  function openReview(tab: "flow" | "scenarios" | "services" = "flow") {
+  const progressIndex = progressGroup?.steps.indexOf(state.step) ?? 0;
+  function openReview(
+    tab: "flow" | "scenarios" | "services" | "simulation" = "flow",
+  ) {
     setPanel(tab);
     review.current?.showModal();
   }
@@ -418,87 +455,87 @@ export default function App() {
     <IntakeScreens key={state.step} {...props} />
   );
   return (
-    <div className={`workspace ${typing ? "is-typing" : ""}`}>
-      <aside className="review-rail">
-        <a
-          className="project-link"
-          href="https://github.com/davidspiegs/legion-health-assignment/blob/assignment/journey-audit/docs/redesigned-journey.md"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <Layers3 size={18} /> Journey rationale <ArrowUpRight size={15} />
-        </a>
-        <div className="rail-intro">
-          <span className="rail-mark">
-            <HeartHandshake size={23} />
-          </span>
-          <h2>
-            From first step
-            <br />
-            to first visit
-          </h2>
-          <p>
-            A thoughtful path into care.
-            <br />
-            Made for the phone in your hand.
-          </p>
-        </div>
-        <nav className="chapter-nav" aria-label="Review journey chapters">
-          {PHASES.map((item, i) => (
-            <button
-              disabled={busy}
-              className={phase === i ? "active" : ""}
-              key={item.id}
-              onClick={() => jump(phaseEntry[item.id])}
-            >
-              <span className="chapter-number">
-                {phase > i ? <Check size={14} /> : i + 1}
-              </span>
-              <span>{item.title}</span>
-              {phase === i ? <ChevronRight size={16} /> : null}
-            </button>
-          ))}
-        </nav>
-        <div className="rail-tools">
-          <button onClick={() => openReview("flow")}>
-            <GitBranch size={17} /> Explore every screen
-          </button>
-          <button onClick={() => openReview("scenarios")}>
-            <SlidersHorizontal size={17} /> Try a recovery scenario
-          </button>
-        </div>
-        <p className="rail-footnote">
-          Interactive design prototype
-          <br />
-          Fictional people, appointments & services
-        </p>
-      </aside>
-      <main className="preview-stage">
-        <div className="patient-app" ref={app} aria-busy={busy}>
-          <div className="preview-banner">
-            <span>
-              <i />
-              Interactive preview
+    <div
+      className={`workspace ${reviewMode ? "review-mode" : "patient-mode"} ${typing ? "is-typing" : ""}`}
+    >
+      {reviewMode ? (
+        <aside className="review-rail">
+          <a
+            className="project-link"
+            href="https://github.com/davidspiegs/legion-health-assignment/blob/assignment/journey-audit/docs/redesigned-journey.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Layers3 size={18} /> Journey rationale <ArrowUpRight size={15} />
+          </a>
+          <div className="rail-intro">
+            <span className="rail-mark">
+              <HeartHandshake size={23} />
             </span>
-            <button onClick={() => openReview()}>
-              Review flow <Layers3 size={12} />
+            <h2>
+              From first step
+              <br />
+              to first visit
+            </h2>
+            <p>
+              A thoughtful path into care.
+              <br />
+              Made for the phone in your hand.
+            </p>
+          </div>
+          <nav className="chapter-nav" aria-label="Review journey chapters">
+            {PHASES.map((item, i) => (
+              <button
+                disabled={busy}
+                className={phase === i ? "active" : ""}
+                key={item.id}
+                onClick={() => jump(phaseEntry[item.id])}
+              >
+                <span className="chapter-number">
+                  {phase > i ? <Check size={14} /> : i + 1}
+                </span>
+                <span>{item.title}</span>
+                {phase === i ? <ChevronRight size={16} /> : null}
+              </button>
+            ))}
+          </nav>
+          <div className="rail-tools">
+            <button onClick={() => openReview("flow")}>
+              <GitBranch size={17} /> Explore every screen
+            </button>
+            <button onClick={() => openReview("scenarios")}>
+              <SlidersHorizontal size={17} /> Try a recovery scenario
             </button>
           </div>
+          <p className="rail-footnote">
+            Interactive design prototype
+            <br />
+            Fictional people, appointments & services
+          </p>
+        </aside>
+      ) : null}
+      <main className="preview-stage">
+        <div className="patient-app" ref={app} aria-busy={busy}>
+          {reviewMode ? (
+            <div className="preview-banner">
+              <span>
+                <i />
+                Interactive preview
+              </span>
+              <button onClick={() => openReview()}>
+                Review flow <Layers3 size={12} />
+              </button>
+            </div>
+          ) : null}
           <header className="app-header">
             <div className="header-left">
-              {state.history.length > 0 ? (
-                <button
-                  className="icon-button back"
-                  aria-label="Go back"
-                  disabled={busy}
-                  onClick={back}
-                >
-                  <ArrowLeft size={20} />
-                </button>
-              ) : null}
-              <span className="wordmark">
-                legion<span>health</span>
-              </span>
+              <img
+                className="brand-logo"
+                src="/brand/legion-logo.svg"
+                alt="Legion Health"
+                width="132"
+                height="35"
+              />
             </div>
             <button
               className="help-button"
@@ -509,26 +546,39 @@ export default function App() {
           </header>
           {state.step !== "welcome" ? (
             <div className="journey-progress">
-              <div>
-                <span>{PHASES[phase].title}</span>
-                <small>{phase + 1} of 6 chapters</small>
+              <div className="progress-label">
+                <span>
+                  {state.history.length > 0 ? (
+                    <button
+                      className="icon-button back"
+                      aria-label="Go back"
+                      disabled={busy}
+                      onClick={back}
+                    >
+                      <ArrowLeft size={18} />
+                    </button>
+                  ) : null}
+                  {progressGroup?.label || PHASES[phase].title}
+                </span>
+                {progressGroup ? (
+                  <small>
+                    {progressIndex + 1} of {progressGroup.steps.length}
+                  </small>
+                ) : null}
               </div>
-              <div
-                className="progress-track"
-                aria-label={`${PHASES[phase].title}, chapter ${phase + 1} of 6`}
-              >
-                {PHASES.map((item, i) => (
-                  <span key={item.id} className={phase >= i ? "filled" : ""}>
-                    {i === phase ? (
-                      <i
-                        style={{
-                          width: `${Math.max(12, ((progressIndex + 1) / phaseSteps.length) * 100)}%`,
-                        }}
-                      />
-                    ) : null}
-                  </span>
-                ))}
-              </div>
+              {progressGroup ? (
+                <div
+                  className="progress-track"
+                  aria-label={`${progressGroup.label}, step ${progressIndex + 1} of ${progressGroup.steps.length}`}
+                >
+                  {progressGroup.steps.map((step, i) => (
+                    <span
+                      key={step}
+                      className={i <= progressIndex ? "filled" : ""}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
           {error ? (
@@ -551,44 +601,48 @@ export default function App() {
           ) : null}
           {screen}
         </div>
-        <p className="stage-note">
-          <ShieldCheck size={13} /> A local simulation. No appointments,
-          messages, or payments are sent.
-        </p>
-      </main>
-      <aside className="context-rail">
-        <span className="context-icon">
-          <GitBranch size={20} />
-        </span>
-        <h3>The intention</h3>
-        <p>{current.description}</p>
-        <div className="context-service">
-          <span>Behind this moment</span>
-          <p>{current.integration}</p>
-          <button onClick={() => openReview("services")}>
-            Inspect mock activity <ArrowUpRight size={14} />
+        <div className="stage-note">
+          <button onClick={() => openReview("simulation")}>
+            Preview controls
           </button>
+          <span> · no real appointments or charges</span>
         </div>
-        <div className="context-milestone">
-          <span
-            className={
-              state.appointment?.status === "completed"
-                ? "milestone-dot complete"
-                : "milestone-dot"
-            }
-          />
-          <p>
-            {state.appointment?.status === "completed"
-              ? "First visit completed"
-              : "The goal is a completed first visit"}
-          </p>
-          <small>
-            {state.appointment?.status === "completed"
-              ? "The next step is continuity of care."
-              : "Booking is one step along the way."}
-          </small>
-        </div>
-      </aside>
+      </main>
+      {reviewMode ? (
+        <aside className="context-rail">
+          <span className="context-icon">
+            <GitBranch size={20} />
+          </span>
+          <h3>The intention</h3>
+          <p>{current.description}</p>
+          <div className="context-service">
+            <span>Behind this moment</span>
+            <p>{current.integration}</p>
+            <button onClick={() => openReview("services")}>
+              Inspect mock activity <ArrowUpRight size={14} />
+            </button>
+          </div>
+          <div className="context-milestone">
+            <span
+              className={
+                state.appointment?.status === "completed"
+                  ? "milestone-dot complete"
+                  : "milestone-dot"
+              }
+            />
+            <p>
+              {state.appointment?.status === "completed"
+                ? "First visit completed"
+                : "The goal is a completed first visit"}
+            </p>
+            <small>
+              {state.appointment?.status === "completed"
+                ? "The next step is continuity of care."
+                : "Booking is one step along the way."}
+            </small>
+          </div>
+        </aside>
+      ) : null}
       <dialog
         ref={review}
         className="review-dialog"
@@ -598,8 +652,11 @@ export default function App() {
       >
         <div className="dialog-heading">
           <div>
-            <span className="dialog-kicker">Prototype review</span>
-            <h2>Explore the journey</h2>
+            <h2>
+              {panel === "simulation"
+                ? "Preview controls"
+                : "Explore the journey"}
+            </h2>
           </div>
           <button
             className="icon-button"
@@ -614,22 +671,100 @@ export default function App() {
           role="tablist"
           aria-label="Review controls"
         >
-          {(["flow", "scenarios", "services"] as const).map((tab) => (
+          {(reviewMode
+            ? (["simulation", "flow", "scenarios", "services"] as const)
+            : (["simulation"] as const)
+          ).map((tab) => (
             <button
               key={tab}
               role="tab"
               aria-selected={panel === tab}
               onClick={() => setPanel(tab)}
             >
-              {tab === "flow"
-                ? "The flow"
-                : tab === "scenarios"
-                  ? "Recovery"
-                  : "Mock activity"}
+              {tab === "simulation"
+                ? "Simulation"
+                : tab === "flow"
+                  ? "The flow"
+                  : tab === "scenarios"
+                    ? "Recovery"
+                    : "Mock activity"}
             </button>
           ))}
         </div>
         <div className="dialog-content">
+          {panel === "simulation" ? (
+            <section className="simulation-panel">
+              <p className="dialog-note">
+                This environment uses fictional appointments and local services.
+                These controls let you advance time and simulate clinician
+                actions while keeping the patient experience intact.
+              </p>
+              {!state.appointment ? (
+                <p>Complete the booking flow to preview appointment day.</p>
+              ) : null}
+              {state.appointment &&
+              ["confirmed", "interrupted"].includes(
+                state.appointment.status,
+              ) ? (
+                <Button
+                  disabled={busy}
+                  onClick={() => {
+                    update({ visitDay: true });
+                    go("visit-home");
+                    review.current?.close();
+                  }}
+                >
+                  Advance to appointment day
+                </Button>
+              ) : null}
+              {state.appointment?.status === "joined" &&
+              state.step === "visit" &&
+              state.visitPhase < 2 ? (
+                <Button
+                  onClick={() => {
+                    update({ visitPhase: state.visitPhase + 1 });
+                    review.current?.close();
+                  }}
+                >
+                  Advance the conversation
+                </Button>
+              ) : null}
+              {state.appointment?.status === "joined" &&
+              state.step === "visit" &&
+              state.visitPhase >= 2 ? (
+                <Button
+                  loading={busy}
+                  onClick={async () => {
+                    const ok = await act(async () => {
+                      await api.completeVisit("clinician");
+                      return true;
+                    });
+                    if (ok) {
+                      go("complete");
+                      review.current?.close();
+                    }
+                  }}
+                >
+                  Clinician completes visit
+                </Button>
+              ) : null}
+              {state.appointment?.status === "completed" ? (
+                <p>
+                  Your first visit is complete. Continue to the care plan and
+                  follow-up in the patient flow.
+                </p>
+              ) : null}
+              <a
+                className="review-mode-link"
+                href={reviewMode ? "/" : "/?review=1"}
+              >
+                {reviewMode
+                  ? "Return to the patient experience"
+                  : "Open the full journey review"}
+                <ArrowUpRight size={15} />
+              </a>
+            </section>
+          ) : null}
           {panel === "flow" ? (
             <>
               <p className="dialog-note">

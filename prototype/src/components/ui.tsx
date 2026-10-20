@@ -7,7 +7,6 @@ import {
   type FormEvent,
 } from "react";
 import {
-  ArrowRight,
   Check,
   ChevronRight,
   CalendarDays,
@@ -34,12 +33,9 @@ export function Button({
       {...props}
       className={`button ${variant} ${className}`}
       disabled={loading || props.disabled}
+      aria-busy={loading || undefined}
     >
-      {loading ? <span className="spinner" aria-hidden="true" /> : null}
       <span>{children}</span>
-      {variant === "primary" && !loading ? (
-        <ArrowRight size={19} aria-hidden="true" />
-      ) : null}
     </button>
   );
 }
@@ -281,22 +277,7 @@ export function Testimonial() {
         </button>
       </div>
       <div className="quote-bottom">
-        <span>Legion patient · excerpt</span>
-        <div className="quote-dots">
-          {quotes.map((_, i) => (
-            <button
-              type="button"
-              key={i}
-              className={index === i ? "active" : ""}
-              aria-label={`Read testimonial excerpt ${i + 1}`}
-              aria-pressed={index === i}
-              onClick={() => {
-                setIndex(i);
-                setPaused(true);
-              }}
-            />
-          ))}
-        </div>
+        <span>Legion Health patient · excerpt</span>
       </div>
     </aside>
   );
