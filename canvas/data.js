@@ -16,7 +16,8 @@ window.JOURNEY = {
   "measurementNotes": [
     "Historical funnel data and current interface observations are separate evidence sources.",
     "Full-page screenshot stitching can reposition sticky elements. Header placement partway down some match and insurance self-pay captures is a capture caveat, not evidence of a live UI defect.",
-    "Screens were observed October 20, 2026 in Chrome. Mobile images are responsive viewport tests (390 × 844), not physical-device captures.",
+    "The original 30 screenshots were observed October 20, 2026 in Chrome and stop at blank Basic Info. Mobile images are responsive viewport tests (390 × 844), not physical-device captures.",
+    "A supplementary October 20 Incognito audit reached payment after David personally reserved and signed up. No new screenshot was captured; payment remains unpaid and appointment confirmation is not established.",
     "All clinical and insurance selections belong to the authorized assignment scenario, not David’s health or insurance history.",
     "Page milestones use automatic $pageview. Action milestones use the explicit events specified in the brief.",
     "Loss is shown beneath the screen where the outgoing transition begins. It records non-progression within the same session, not a causal effect of the screen.",
@@ -24,7 +25,7 @@ window.JOURNEY = {
     "No device breakdown is supplied. These rates do not establish mobile-specific performance.",
     "Payment-page reach is not payment success; a reservation is not a completed visit.",
     "No first-visit-completed milestone is included in the supplied telemetry.",
-    "Canonical events are documented in the brief, not verified by this live walkthrough. Raw event volume is not the funnel denominator."
+    "Canonical event lists below reproduce the brief. The supplementary audit observed additional live events, including granular fit tracking; the supplied historical funnel still has no question-level rates. Raw event volume is not the funnel denominator."
   ],
   "overview": [
     {"label":"Start sessions","value":"5,898","detail":"Ordered browser sessions reaching /portal/join"},
@@ -41,7 +42,7 @@ window.JOURNEY = {
       "title": "Start",
       "path": "/portal/join",
       "url": "https://app.legionhealth.com/portal/join",
-      "description": "The entry URL initialized an anonymous session and automatically advanced to the fit check.",
+      "description": "The original capture showed an anonymous-session message before the fit check. The supplementary fresh-session audit distinguishes browser activity from user/profile creation after fit.",
       "desktop": {
         "src": null,
         "width": null,
@@ -61,8 +62,9 @@ window.JOURNEY = {
       "loss": {"count":408,"percent":6.9,"to":"Fit check","note":"5,898 start sessions → 5,490 fit-check sessions."},
       "events": ["portal.page.join","portal.onboarding.started"],
       "observations": [
-        "Opening /portal/join in Chrome showed “Creating anonymous session,” then automatically redirected to /portal/join/fit.",
-        "No persistent start-screen screenshot is available. Historical start-page telemetry remains a separate milestone."
+        "In the original capture walkthrough, opening /portal/join in Chrome showed “Creating anonymous session,” then automatically redirected to /portal/join/fit.",
+        "No persistent start-screen screenshot is available. Historical start-page telemetry remains a separate milestone.",
+        "The supplementary fresh Incognito audit initially returned no user; onboarding.createAnonymousUser created a user and profile after fit, before conditions. See the Technical audit lane for the distinct runtime evidence."
       ],
       "hypotheses": ["Research whether the entry experience makes the care offering, eligibility, and next steps understandable before the patient begins."],
       "status": "Entry redirect observed in Chrome",
@@ -246,7 +248,8 @@ window.JOURNEY = {
         "Captured all six questions and the completion state on /portal/join/fit.",
         "Assignment scenario answers: Texas—Yes; Medicare / Medicaid—No; current harm risk—No; inpatient mental-health or substance-use stay in the past year—No; age 18 or older—Yes; virtual-only care—Yes.",
         "These are walkthrough scenario answers, not David’s health, age, or insurance history.",
-        "The supplied funnel has route-level loss only; it cannot assign a drop-off rate to any of these individual questions."
+        "The supplied funnel has route-level loss only; it cannot assign a drop-off rate to any of these individual questions.",
+        "The supplementary Incognito audit observed live tracking for all six fit questions. This corrects any inference that missing question-level data in the brief means the production events do not exist."
       ],
       "hypotheses": ["Investigate the split between appropriate eligibility exits and avoidable difficulty or uncertainty.","The 34.8% non-progression rate cannot establish whether the fit-check design caused exits."],
       "mobileObservations": ["The testimonial appears above the questions. In question 1, the Yes/No controls sit near the bottom of the 844-pixel viewport.", "No question-level drop-off data is supplied; the 34.8% belongs to the entire fit → conditions transition."],
@@ -256,7 +259,7 @@ window.JOURNEY = {
         {"label":"Sessions reaching screen","value":"5,490","detail":"93.1% of start sessions"},
         {"label":"Continue to conditions","value":"65.2%","detail":"3,578 / 5,490 sessions"},
         {"label":"Do not reach conditions","value":"1,912 · 34.8%","detail":"Outgoing loss belongs to fit → conditions"},
-        {"label":"Measurement gap","value":"No fit-submit event","detail":"No separate fit-submit action was observed in the brief"}
+        {"label":"Supplied telemetry gap","value":"No per-question rates","detail":"Live granular fit events exist; historical question-level rates were not supplied"}
       ],
       "milestones": [
         {
@@ -552,7 +555,8 @@ window.JOURNEY = {
         "A matching checklist remains visible above the provider cards in the captured result states. Its presence does not establish how the underlying matching logic operates.",
         "Selected the displayed October 28, 1:00 PM slot for Doose Jennifer Onarinde.",
         "Enabled the optional earlier-appointment preference to inspect it, then disabled it before advancing.",
-        "Clicking Book appointment moved the anonymous user to /portal/join/patient. No account, payment, or completed appointment was confirmed."
+        "In the original capture walkthrough, clicking Book appointment moved the anonymous user to /portal/join/patient. Those captures did not confirm account creation, payment, or appointment completion.",
+        "In the supplementary Incognito audit, David personally clicked Book appointment. A successful reservation response was observed; it required payment setup to confirm and does not establish a completed appointment."
       ],
       "hypotheses": [
         "Investigate provider fit, availability, cost clarity, and interaction difficulty as separate possible explanations for non-selection.",
@@ -603,7 +607,7 @@ window.JOURNEY = {
       "title": "Patient details & account",
       "path": "/portal/join/patient",
       "url": "https://app.legionhealth.com/portal/join/patient",
-      "description": "A blank patient-details form reached after the Book appointment action, before account creation.",
+      "description": "The original capture is a blank patient-details form reached after Book appointment, before signup. The supplementary audit later observed David complete signup and reach payment.",
       "desktop": {
         "src": "assets/desktop-patient.jpg",
         "label": "Patient details · blank form",
@@ -634,13 +638,14 @@ window.JOURNEY = {
         "Captured the blank patient-details form after advancing from provider selection.",
         "The form includes name, email, phone, date-of-birth and referral fields plus three agreement checkbox groups. Requiredness and validation of each field were not tested.",
         "No chosen provider, appointment time, or price is visible in the full-page blank-form capture.",
-        "David chose to stop the live walkthrough at Basic Info. No personal details or agreements were submitted.",
-        "No account creation, payment, or completed appointment is confirmed by the captured evidence."
+        "David chose to stop the original screenshot walkthrough at Basic Info. No personal details or agreements were submitted during that capture.",
+        "The original screenshots do not confirm account creation, payment, or a completed appointment.",
+        "During the supplementary Incognito audit, David personally entered signup details and created the account. user.onboardUser succeeded and the UI advanced to payment; no new screenshot or personal values were added to this board."
       ],
       "hypotheses": ["Investigate required effort, trust, validation, and continuity at account creation. The 20.4% non-progression rate does not identify which, if any, explains the loss."],
       "mobileObservations": ["The blank form is 1,556 pixels tall; Save my info & Continue is below the initial viewport. The mobile progress indicator shows a step number and percentage but omits desktop stage names."],
       "mobileHypotheses": ["Retain appointment and cost context while asking for personal information. Test whether acquisition attribution can be optional or asked later."],
-      "status": "Observed · agreed walkthrough endpoint",
+      "status": "Original screenshot endpoint · supplementary signup observed",
       "metrics": [
         {"label":"Sessions reaching screen","value":"1,763","detail":"29.9% of start sessions"},
         {"label":"Patient details → account created","value":"360 lost · 20.4%","detail":"79.6% continue · 1,403 / 1,763"},
@@ -678,26 +683,26 @@ window.JOURNEY = {
         "src": null,
         "width": null,
         "height": null,
-        "status": "Not captured · beyond agreed scope",
-        "note": "David chose to stop the live walkthrough at Basic Info. Payment remains unobserved; historical page-reach metrics are retained."
+        "status": "Observed later · no screenshot",
+        "note": "The original screenshots stop at Basic Info. The supplementary October 20 Incognito audit observed payment after David personally reserved and signed up. No payment screenshot was captured and no payment was submitted."
       },
       "mobile": {
         "src": null,
         "width": null,
         "height": null,
-        "status": "Not captured · beyond agreed scope",
-        "note": "No payment screenshot or responsive observation: the live walkthrough ends at Basic Info by David's choice. Historical page-reach metrics do not establish payment success."
+        "status": "No mobile capture",
+        "note": "No payment screenshot or responsive payment observation was captured. Payment was observed later in the supplementary desktop Incognito audit, after David personally signed up. Historical page-reach metrics do not establish payment success."
       },
       "reach": 1403,
       "fromStart": 23.8,
       "loss": {"count":null,"percent":null,"to":"Subsequent outcome not measured","note":"No payment-success or first-visit-completed milestone is supplied. Unknown must not be displayed as zero."},
       "events": ["portal.page.join.payment"],
-      "observations": [],
+      "observations": ["The supplementary October 20 Incognito audit reached /portal/join/payment after David personally reserved and completed signup; the UI reported Account created.","Stripe payment UI loaded, but payment remains unpaid. No payment confirmation or completed appointment is established.","No new payment screenshot was captured. Detailed runtime findings are documented in the Technical audit lane and its linked technical-audit and runtime-service-evidence documents."],
       "hypotheses": ["Research the handoff from payment or billing setup to a confirmed appointment, readiness for the visit, and completed care."],
-      "status": "Unobserved · beyond agreed walkthrough endpoint",
+      "status": "Supplementary observation · unpaid · no screenshot",
       "metrics": [
         {"label":"Sessions reaching screen","value":"1,403","detail":"23.8% of start sessions"},
-        {"label":"Successful payment","value":"Unknown","detail":"No dedicated payment-success event was observed on this page"},
+        {"label":"Successful payment","value":"Unknown","detail":"No success milestone supplied; no payment submitted in the supplementary audit"},
         {"label":"First visit completed","value":"Unknown","detail":"The supplied dataset stops before the assignment's endpoint"}
       ],
       "milestones": [

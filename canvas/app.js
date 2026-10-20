@@ -1,4 +1,4 @@
-/* Local, dependency-free evidence viewer. data.js is the only content source. */
+/* Local, dependency-free evidence viewer. Content lives in data.js and audit-data.js. */
 (() => {
   "use strict";
 
@@ -130,6 +130,24 @@
     $("#funnel-body").innerHTML = rows.map((row, index) => `<tr class="${[1, 5, 8].includes(index) ? "loss-large" : ""}"><td><span class="funnel-name">${String(index + 1).padStart(2, "0")} · ${escape(row[0])}</span><span class="funnel-route">${escape(row[1])}</span></td><td class="funnel-strong">${escape(number(row[2]))}</td><td>${escape(percent(row[3]))}</td><td>${escape(percent(row[4]))}</td><td${[1, 5, 8].includes(index) ? ' class="funnel-strong"' : ""}>${escape(row[5])}${row[6] ? `<span class="funnel-route">→ ${escape(row[6])}</span>` : ""}</td></tr>`).join("");
   }
 
+  function renderAudit() {
+    const audit = window.AUDIT || {};
+    const evidenceLabels = { runtime: "Runtime observation", source: "Client-code evidence", brief: "Assignment-confirmed", hypothesis: "Hypothesis", unknown: "Not verified" };
+    const badge = value => {
+      const kind = Object.hasOwn(evidenceLabels, value) ? value : "unknown";
+      return `<span class="audit-badge ${kind}">${evidenceLabels[kind]}</span>`;
+    };
+    $("#audit-status").textContent = audit.status || "Audit in progress";
+    $("#audit-date").textContent = audit.capturedAt || "";
+    if (audit.summary) $("#audit-summary").textContent = audit.summary;
+    const findings = asArray(audit.findings);
+    $("#audit-findings").innerHTML = findings.length ? findings.map((item, index) => `<article class="audit-finding"><div class="audit-finding-top"><span>${String(index + 1).padStart(2, "0")}</span>${badge(item.evidence)}</div><h3>${escape(item.title)}</h3><p>${escape(item.body)}</p></article>`).join("") : `<div class="audit-empty"><strong>Audit in progress</strong><p>Findings will appear here after the fresh-session review. No runtime service conclusions have been added yet.</p></div>`;
+    const services = asArray(audit.services);
+    $("#audit-services").innerHTML = services.length ? services.map(item => `<tr><th scope="row"><strong>${escape(item.name)}</strong>${item.role ? `<p>${escape(item.role)}</p>` : ""}</th><td>${escape(item.stage || "Not verified")}</td><td>${badge(item.evidence)}${item.detail ? `<p>${escape(item.detail)}</p>` : ""}${asArray(item.endpoints).map(endpoint => `<code>${escape(endpoint)}</code>`).join("")}</td><td>${escape(item.mock || "To be assessed")}</td><td>${escape(item.unknown || "No additional question recorded")}</td></tr>`).join("") : `<tr><td colspan="5" class="audit-table-empty">Audit in progress · Service identification and evidence are pending.</td></tr>`;
+    const boundaries = asArray(audit.boundaries).length ? audit.boundaries : ["The existing screenshots and historical funnel remain separate evidence sources.", "No vendor runtime claim is made until its supporting evidence is recorded.", "The live walkthrough stops at Basic Info, before submission."];
+    $("#audit-boundaries").innerHTML = boundaries.map(item => `<li>${escape(item)}</li>`).join("");
+  }
+
   function render() {
     document.title = `${data.title || "Legion Health — current journey"} | Evidence board`;
     if (data.capturedAt) $("#capture-date").textContent = data.capturedAt;
@@ -153,6 +171,7 @@
     renderFunnel();
     $("#follow-through-items").innerHTML = asArray(data.followThrough).map((item, index) => `<article class="follow-through-item"><span class="follow-number">${String(index + 1).padStart(2, "0")} / BEYOND THE OBSERVED FLOW</span><h3>${escape(item.title)}</h3><p>${escape(item.description)}</p><span class="status-label">${escape(item.status || "Not observed")}</span></article>`).join("");
     $("#recommendations").innerHTML = asArray(data.recommendations).map(item => `<article class="recommendation"><h4>${escape(item.title)}</h4><p>${escape(item.body || item.description)}</p></article>`).join("");
+    renderAudit();
     $("#loading-state").hidden = true;
   }
 
@@ -298,7 +317,9 @@
     const box = viewport.getBoundingClientRect();
     if (rect.left >= box.left + 15 && rect.right <= box.right - 15 && rect.top >= box.top + 15 && rect.bottom <= box.bottom - 15) return;
     const stage = element.closest(".stage-card");
+    const lane = element.closest(".board-lane");
     if (stage) markLane(stage.dataset.lane);
+    else if (lane) markLane(lane.id);
     // Reveal the focused control itself. Returning to the top of a tall card
     // leaves its lower controls outside the visible canvas.
     const margin = 24;
@@ -315,7 +336,8 @@
 
   render();
   renderTransform();
-  goToLane("desktop", null, false);
+  const initialLane = location.hash.slice(1);
+  goToLane(document.getElementById(initialLane)?.classList.contains("board-lane") ? initialLane : "desktop", null, false);
   buildMinimap();
   const resizeObserver = new ResizeObserver(() => buildMinimap());
   resizeObserver.observe(world);
@@ -374,7 +396,7 @@
 
   viewport.addEventListener("pointerdown", event => {
     if (event.button !== 0 && event.button !== 1) return;
-    if (!state.space && event.target.closest("button,a,select,.stage-body")) return;
+    if (!state.space && event.target.closest("button,a,select,.stage-body,.audit-table,.audit-finding,.audit-boundaries")) return;
     cancelAnimationFrame(animation);
     state.dragging = true;
     state.pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: state.x, startY: state.y, moved: false };

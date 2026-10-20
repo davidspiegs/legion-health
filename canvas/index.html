@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light">
     <title>Legion Health — current journey</title>
-    <link rel="stylesheet" href="styles.css?v=chrome-captures-1">
-    <script src="data.js?v=basic-info-boundary" defer></script>
-    <script src="app.js?v=chrome-captures-1" defer></script>
+    <link rel="stylesheet" href="styles.css?v=technical-audit-1">
+    <script src="data.js?v=technical-audit-1" defer></script>
+    <script src="audit-data.js?v=technical-audit-1" defer></script>
+    <script src="app.js?v=technical-audit-1" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -22,6 +23,7 @@
             <button type="button" data-jump="mobile" aria-pressed="false">Mobile</button>
             <button type="button" data-jump="funnel" aria-pressed="false">Funnel</button>
             <button type="button" data-jump="follow-through" aria-pressed="false">Through first visit</button>
+            <button type="button" data-jump="technical-audit" aria-pressed="false">Technical audit</button>
           </nav>
           <span class="toolbar-divider"></span>
           <label class="stage-picker"><span class="sr-only">Jump to a screen</span><select id="stage-select"><option value="">Jump to screen…</option></select></label>
@@ -77,6 +79,18 @@
           <div id="recommendations" class="recommendation-grid"></div>
           <p class="board-footer">Legion Health · Current journey review <span>Captured evidence, historical context, and hypotheses are intentionally labeled throughout.</span></p>
         </section>
+        <section id="technical-audit" class="board-lane analysis-lane audit-lane" aria-labelledby="audit-title">
+          <div class="lane-heading">
+            <div><p class="eyebrow">05 / UX and integration evidence</p><h2 id="audit-title">What powers the journey?</h2><p class="lane-intro" id="audit-summary">Audit in progress. Browser observations, assignment-confirmed services, and proposed mocks will be distinguished below.</p></div>
+            <div class="audit-status"><span id="audit-status">Audit in progress</span><small id="audit-date"></small></div>
+          </div>
+          <div class="audit-legend" aria-label="Evidence types"><span class="audit-badge runtime">Runtime observation</span><span class="audit-badge source">Client-code evidence</span><span class="audit-badge brief">Assignment-confirmed</span><span class="audit-badge hypothesis">Hypothesis</span><span class="audit-badge unknown">Not verified</span></div>
+          <div id="audit-findings" class="audit-findings"></div>
+          <div class="audit-table-heading"><div><p class="eyebrow">Service map</p><h3>Observed connections and mock boundaries</h3></div><p>Browser visibility can stop at Legion’s API.<br>A named dependency is not proof of a live vendor call.</p></div>
+          <div class="audit-table-surface"><table class="audit-table"><caption class="sr-only">Services, evidence, proposed prototype mocks, and unresolved questions</caption><colgroup><col class="audit-col-service"><col class="audit-col-stage"><col class="audit-col-evidence"><col class="audit-col-mock"><col class="audit-col-unknown"></colgroup><thead><tr><th scope="col">Service / capability</th><th scope="col">Journey stage</th><th scope="col">Evidence</th><th scope="col">Proposed mock</th><th scope="col">Still unknown</th></tr></thead><tbody id="audit-services"></tbody></table></div>
+          <div class="audit-bottom"><aside class="audit-boundaries"><p class="eyebrow">Interpretation boundaries</p><ul id="audit-boundaries"></ul></aside><div class="audit-documents"><p class="eyebrow">Read the detailed findings</p><a href="../docs/technical-audit.md" target="_blank" rel="noopener noreferrer"><span>Technical audit</span><small>Request evidence, identity, scheduling, and other services</small><i aria-hidden="true">↗</i></a><a href="../docs/ux-priorities.md" target="_blank" rel="noopener noreferrer"><span>UX priorities</span><small>Mobile friction and measurement recommendations</small><i aria-hidden="true">↗</i></a><a href="../docs/integration-options.md" target="_blank" rel="noopener noreferrer"><span>Integration options</span><small>Vendor capabilities and prototype tradeoffs</small><i aria-hidden="true">↗</i></a></div></div>
+          <p class="board-footer">Legion Health · Focused audit <span>Findings inform the prototype; this board does not implement a new onboarding flow.</span></p>
+        </section>
       </div>
       <div id="loading-state" class="loading-state"><span class="brand-mark">L</span><h2>Journey evidence is loading</h2><p>If the board stays empty, confirm that <code>data.js</code> is next to this file.</p></div>
     </main>
@@ -92,8 +106,8 @@
 
     <dialog id="help-dialog" class="help-dialog">
       <div class="help-heading"><h2>Move around the canvas</h2><button type="button" class="dialog-close" data-close="help-dialog" aria-label="Close help">×</button></div>
-      <dl><div><dt>Pan</dt><dd>Drag the background, scroll, or hold <kbd>Space</kbd> and drag anywhere.</dd></div><div><dt>Zoom</dt><dd>Pinch, hold <kbd>Ctrl</kbd> / <kbd>⌘</kbd> while scrolling, or use <kbd>+</kbd> and <kbd>−</kbd>.</dd></div><div><dt>Read a screen</dt><dd>Click its image to open the full capture and annotations.</dd></div><div><dt>Jump</dt><dd>Use Desktop, Mobile, Funnel, or the screen selector above.</dd></div><div><dt>Reset / fit</dt><dd><kbd>0</kbd> resets zoom. <kbd>F</kbd> fits the whole board.</dd></div><div><dt>Keyboard</dt><dd><kbd>Tab</kbd> moves through screens and controls. Arrow keys pan the board. <kbd>Esc</kbd> closes an inspector.</dd></div></dl>
-      <p class="help-note">All captures remain intact. A missing capture is labeled as unobserved; no existing screens have been reconstructed.</p>
+      <dl><div><dt>Pan</dt><dd>Drag the background, scroll, or hold <kbd>Space</kbd> and drag anywhere.</dd></div><div><dt>Zoom</dt><dd>Pinch, hold <kbd>Ctrl</kbd> / <kbd>⌘</kbd> while scrolling, or use <kbd>+</kbd> and <kbd>−</kbd>.</dd></div><div><dt>Read a screen</dt><dd>Click its image to open the full capture and annotations.</dd></div><div><dt>Jump</dt><dd>Use the section tabs, including Technical audit, or the screen selector above.</dd></div><div><dt>Reset / fit</dt><dd><kbd>0</kbd> resets zoom. <kbd>F</kbd> fits the whole board.</dd></div><div><dt>Keyboard</dt><dd><kbd>Tab</kbd> moves through screens and controls. Arrow keys pan the board. <kbd>Esc</kbd> closes an inspector.</dd></div></dl>
+      <p class="help-note">All captures remain intact. Missing captures are labeled explicitly; supplemental observations do not substitute for screenshots. No existing screens have been reconstructed.</p>
     </dialog>
   </body>
 </html>

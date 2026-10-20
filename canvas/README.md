@@ -4,18 +4,20 @@ Open `index.html` directly in Chrome. The board uses plain HTML, CSS, and JavaSc
 
 The canvas is a research artifact, not the proposed onboarding prototype.
 
+The original **30 screenshots** remain unchanged and stop at the blank **Basic Info** form. A supplementary **October 20, 2026 Chrome Incognito audit** reached payment after David personally reserved and signed up. Payment remains unpaid; there is no new payment screenshot, so the board uses an explicit missing-capture placeholder. See [technical audit](../docs/technical-audit.md) and [runtime service evidence](../docs/runtime-service-evidence.md) for the later findings.
+
 ## Navigation
 
 - Drag the board background to pan, or hold Space and drag anywhere.
 - Scroll to pan; pinch or hold Ctrl / Command while scrolling to zoom.
-- Use the section buttons to jump between desktop, mobile, the historical funnel, and the journey through the first completed visit.
+- Use the section buttons to jump between desktop, mobile, the historical funnel, the journey through the first completed visit, and the Technical audit.
 - Use the screen selector to jump to any route in the current desktop or mobile lane.
 - Click a screenshot to open its capture and annotations. Extra captures appear as a labeled visual gallery below the primary screenshot, so every recorded screen state is discoverable on the board.
 - In the inspector, use the arrows to move between captures and **Actual size** to read the original image at full resolution. Frame-specific status, notes, and source URLs follow the selected capture.
 - `+` / `−` zoom, `0` resets zoom, `F` fits the board, and `?` opens help.
 - The overview in the lower-right corner supports direct navigation.
 
-All screenshots retain their original proportions. Missing screenshots appear as explicitly unobserved placeholders. Device comparisons use the same supplied aggregate funnel; the assignment provides no device-segmented conversion data.
+All screenshots retain their original proportions. Missing screenshots appear as explicit placeholders; a page can be observed without a captured image, as with the supplementary payment observation. Device comparisons use the same supplied aggregate funnel; the assignment provides no device-segmented conversion data.
 
 ## Content contract
 
@@ -93,3 +95,6 @@ The funnel preserves the assignment's eleven ordered milestones and conversion v
 - `loss` names a measured transition. It does not claim the current screen caused abandonment.
 - All historical counts are ordered same-session milestone reach, not people or raw event volume.
 - A reservation is not a completed appointment. Payment-page reach is not successful payment. First-visit completion is outside the supplied historical funnel.
+- The brief does not supply granular fit-question events or rates, but the supplementary production audit observed live tracking for all six questions. Keep the historical-data gap distinct from the existence of current instrumentation.
+- The original entry message refers to an anonymous session. In the fresh audit, application user/profile creation occurred after fit and before conditions; browser session, anonymous profile, identified account, and clinical patient record are separate concepts.
+- Supplementary runtime findings are labeled separately from the original screenshots and do not change the historical funnel figures. `audit-data.js` supplies the Technical audit lane through `window.AUDIT`.
