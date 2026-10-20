@@ -10,7 +10,8 @@ The canvas is a research artifact, not the proposed onboarding prototype.
 - Scroll to pan; pinch or hold Ctrl / Command while scrolling to zoom.
 - Use the section buttons to jump between desktop, mobile, the historical funnel, and the journey through the first completed visit.
 - Use the screen selector to jump to any route in the current desktop or mobile lane.
-- Click a screenshot to open its capture and annotations. Extra captures appear below the primary screenshot.
+- Click a screenshot to open its capture and annotations. Extra captures appear as a labeled visual gallery below the primary screenshot, so every recorded screen state is discoverable on the board.
+- In the inspector, use the arrows to move between captures and **Actual size** to read the original image at full resolution. Frame-specific status, notes, and source URLs follow the selected capture.
 - `+` / `−` zoom, `0` resets zoom, `F` fits the board, and `?` opens help.
 - The overview in the lower-right corner supports direct navigation.
 
@@ -40,7 +41,15 @@ window.JOURNEY = {
       height: 900,
       status: "Observed",
       note: "",
-      frames: [{ src: "assets/start-expanded.png", label: "Expanded state", width: 1440, height: 900 }],
+      frames: [{
+        src: "assets/start-expanded.png",
+        label: "Expanded state",
+        width: 1440,
+        height: 900,
+        status: "Observed in Chrome",
+        note: "Optional observation specific to this capture.",
+        url: "https://app.legionhealth.com/portal/join"
+      }],
       observations: [],
       hypotheses: []
     },
@@ -72,6 +81,8 @@ window.JOURNEY = {
 ```
 
 Optional `stage.metrics` entries (`{label, value, detail}`) replace the two standard reach metrics. Screens can specify their primary capture in `src` and additional states in `frames`, or put all captures in `frames`.
+
+`frames` supports any number of distinct captures. The primary capture remains large; every additional capture appears in a two-column gallery with its own label, optional status, and note. Captures with duplicate `src` values are shown once. Frame-specific `status` and `url` override the lane status and stage URL in the inspector; absent fields fall back to that shared context. The primary capture also accepts `label` and `url` at the `desktop` or `mobile` level.
 
 The funnel preserves the assignment's eleven ordered milestones and conversion values, while displaying outgoing loss toward the next named milestone to match the screen annotations. An optional `funnel` array can override it using objects with `title`, `path` or `event`, `reach`, `conversion`, `fromStart`, and `loss` (a formatted string or `{count, percent, to}`). Unknown post-payment loss is explicitly labeled, not shown as zero.
 

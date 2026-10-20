@@ -20,7 +20,7 @@
   const mapContent = $("#minimap-content");
   const mapWindow = $("#minimap-window");
   const screenDialog = $("#screen-dialog");
-  const state = { x: 0, y: 0, scale: 0.9, min: 0.06, max: 2, lane: "desktop", dragging: false, space: false, pointer: null, mapScale: 1, mapOffsetX: 9, mapOffsetY: 9 };
+  const state = { x: 0, y: 0, scale: 0.9, min: 0.06, max: 2, lane: "desktop", dragging: false, space: false, pointer: null, suppressClickUntil: 0, mapScale: 1, mapOffsetX: 9, mapOffsetY: 9 };
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let animation = 0;
   let mapFrame = 0;
@@ -29,10 +29,12 @@
   function captureFrames(stage, lane) {
     const capture = stage[lane] || {};
     const frames = [];
-    if (capture.src) frames.push({ src: capture.src, label: capture.label || "Primary capture", width: capture.width, height: capture.height });
+    if (capture.src) frames.push({ src: capture.src, label: capture.label || "Primary capture", width: capture.width, height: capture.height, note: capture.note, status: capture.status, url: capture.url });
     for (const frame of asArray(capture.frames)) {
       if (!frame?.src) continue;
-      if (!frames.some(item => item.src === frame.src)) frames.push(frame);
+      const existing = frames.find(item => item.src === frame.src);
+      if (existing) Object.assign(existing, frame);
+      else frames.push(frame);
     }
     return frames;
   }
@@ -69,18 +71,38 @@
     </div>`;
   }
 
+  function frameGalleryHTML(stage, lane, frames) {
+    if (frames.length < 2) return "";
+    return `<div class="capture-gallery">
+      <div class="capture-gallery-heading"><span>More screen states</span><span>${frames.length - 1} additional captures</span></div>
+      <div class="frame-grid">${frames.slice(1).map((frame, index) => `<figure class="frame-preview">
+        <button type="button" class="frame-image-button" data-inspect="${escape(stage.id)}" data-lane="${lane}" data-frame="${index + 1}" aria-label="Inspect ${escape(frame.label || `capture ${index + 2}`)}, ${lane}">
+          <img src="${escape(frame.src)}" alt="${escape(frame.label || `Capture ${index + 2}`)} — actual ${lane} screen"${frame.width ? ` width="${Number(frame.width)}"` : ""}${frame.height ? ` height="${Number(frame.height)}"` : ""} draggable="false" loading="eager">
+          <span class="frame-open" aria-hidden="true">Inspect ↗</span>
+        </button>
+        <figcaption><button type="button" class="frame-title" data-inspect="${escape(stage.id)}" data-lane="${lane}" data-frame="${index + 1}"><span>${String(index + 2).padStart(2, "0")}</span>${escape(frame.label || `Capture ${index + 2}`)}</button>
+          ${frame.status ? `<span class="frame-status">${escape(frame.status)}</span>` : ""}
+          ${frame.note ? `<p class="frame-note">${escape(frame.note)}</p>` : ""}
+          ${frame.url && frame.url !== stage.url ? `<a class="frame-source" href="${escape(safeURL(frame.url))}" target="_blank" rel="noopener noreferrer">${escape(frame.url)} ↗</a>` : ""}
+        </figcaption>
+      </figure>`).join("")}</div><p class="gallery-metric-note">Route metrics and documented action milestones appear below these captures.</p>
+    </div>`;
+  }
+
   function stageHTML(stage, index, lane) {
     const capture = stage[lane] || {};
     const frames = captureFrames(stage, lane);
     const first = frames[0];
     const dimensions = first?.width && first?.height ? `${first.width} × ${first.height}` : lane === "mobile" ? "Mobile viewport" : "Desktop viewport";
-    const status = capture.status || stage.status || (first ? "Observed" : "Not observed");
+    const status = first?.status || capture.status || stage.status || (first ? "Observed" : "Not observed");
     const image = first ? `<button type="button" class="screen-button" data-inspect="${escape(stage.id)}" data-lane="${lane}" aria-label="Inspect ${escape(stage.title)}, ${lane}"><img src="${escape(first.src)}" alt="${escape(stage.title)} — actual ${lane} capture"${first.width ? ` width="${Number(first.width)}"` : ""}${first.height ? ` height="${Number(first.height)}"` : ""} draggable="false" loading="eager"></button>` : `<div class="capture-empty"><span class="capture-empty-symbol" aria-hidden="true">⌑</span><strong>No captured screen</strong><p>${escape(capture.note || "This step was not reached during the live review. No reconstruction is shown.")}</p></div>`;
     return `<article class="stage-card ${lane === "mobile" ? "mobile-card" : ""}" id="${lane}-${escape(stage.id)}" data-stage-id="${escape(stage.id)}" data-lane="${lane}" tabindex="0" aria-label="${escape(stage.title)}, ${lane}">
       <div class="stage-head"><span class="stage-number">${escape(stage.number || index + 1)}</span><div><h3>${escape(stage.title)}</h3><a href="${escape(safeURL(stage.url))}" class="stage-path" target="_blank" rel="noopener noreferrer">${escape(stage.path || stage.url || "")} ↗</a></div></div>
       <div class="capture-wrap"><div class="capture-topline"><span class="capture-status ${first ? "" : "unobserved"}">${escape(status)}</span><span>${escape(first ? dimensions : "Evidence boundary")}</span></div>${image}</div>
-      ${frames.length > 1 ? `<div class="frame-thumbnails">${frames.map((frame, frameIndex) => `<button type="button" class="frame-thumbnail" data-inspect="${escape(stage.id)}" data-lane="${lane}" data-frame="${frameIndex}"><span>${String(frameIndex + 1).padStart(2, "0")}</span>${escape(frame.label || `Capture ${frameIndex + 1}`)}</button>`).join("")}</div>` : ""}
-      ${capture.note && first ? `<p class="capture-note">${escape(capture.note)}</p>` : ""}
+      ${first && frames.length > 1 ? `<button type="button" class="primary-frame-label frame-title" data-inspect="${escape(stage.id)}" data-lane="${lane}" data-frame="0"><span>01</span>${escape(first.label || "Primary capture")}</button>` : ""}
+      ${(first?.note || capture.note) && first ? `<p class="capture-note">${escape(first.note || capture.note)}</p>` : ""}
+      ${first?.url && first.url !== stage.url ? `<a class="primary-frame-source frame-source" href="${escape(safeURL(first.url))}" target="_blank" rel="noopener noreferrer">${escape(first.url)} ↗</a>` : ""}
+      ${frameGalleryHTML(stage, lane, frames)}
       ${detailsHTML(stage, lane)}
     </article>`;
   }
@@ -240,11 +262,17 @@
     const image = $("#inspection-image");
     image.src = frame.src;
     image.alt = `${inspector.stage.title} — ${inspector.lane} — ${frame.label || "capture"}`;
+    const frameURL = frame.url || inspector.stage.url;
+    const frameStatus = frame.status || inspector.stage[inspector.lane]?.status || "Live capture";
+    $("#dialog-lane").textContent = `${inspector.lane} · ${frameStatus}`;
+    $("#dialog-source").href = safeURL(frameURL);
     $("#frame-caption").textContent = `${inspector.index + 1} / ${inspector.frames.length} · ${frame.label || "Primary capture"}${frame.width && frame.height ? ` · ${frame.width} × ${frame.height}` : ""}`;
+    $("#inspection-frame-evidence").innerHTML = `<p class="stage-evidence-label">This capture · ${inspector.index + 1} of ${inspector.frames.length}</p><h3>${escape(frame.label || "Primary capture")}</h3>${frame.note ? `<p>${escape(frame.note)}</p>` : ""}<a href="${escape(safeURL(frameURL))}" target="_blank" rel="noopener noreferrer">${escape(frameURL || "")} ↗</a>`;
     $("#frame-prev").disabled = inspector.index === 0;
     $("#frame-next").disabled = inspector.index === inspector.frames.length - 1;
     $(".inspection-scroll").classList.toggle("mobile", inspector.lane === "mobile");
     $(".inspection-scroll").scrollTop = 0;
+    $(".inspection-scroll").scrollLeft = 0;
   }
 
   function inspect(stageId, lane, frameIndex = 0) {
@@ -259,7 +287,7 @@
     $("#dialog-lane").textContent = `${lane} · ${stage[lane]?.status || "Live capture"}`;
     $("#dialog-title").textContent = stage.title;
     $("#dialog-source").href = safeURL(stage.url);
-    $("#inspection-details").innerHTML = detailsHTML(stage, lane, true);
+    $("#inspection-details").innerHTML = `<div id="inspection-frame-evidence" class="frame-evidence"></div>${detailsHTML(stage, lane, true)}`;
     updateInspectorFrame();
     if (!screenDialog.open) screenDialog.showModal();
     $("#inspection-details").scrollTop = 0;
@@ -270,7 +298,19 @@
     const box = viewport.getBoundingClientRect();
     if (rect.left >= box.left + 15 && rect.right <= box.right - 15 && rect.top >= box.top + 15 && rect.bottom <= box.bottom - 15) return;
     const stage = element.closest(".stage-card");
-    if (stage) goToLane(stage.dataset.lane, stage.dataset.stageId);
+    if (stage) markLane(stage.dataset.lane);
+    // Reveal the focused control itself. Returning to the top of a tall card
+    // leaves its lower controls outside the visible canvas.
+    const margin = 24;
+    let dx = 0;
+    let dy = 0;
+    if (rect.width > box.width - margin * 2) dx = box.left + margin - rect.left;
+    else if (rect.left < box.left + margin) dx = box.left + margin - rect.left;
+    else if (rect.right > box.right - margin) dx = box.right - margin - rect.right;
+    if (rect.height > box.height - margin * 2) dy = box.top + margin - rect.top;
+    else if (rect.top < box.top + margin) dy = box.top + margin - rect.top;
+    else if (rect.bottom > box.bottom - margin) dy = box.bottom - margin - rect.bottom;
+    moveTo(state.x + dx, state.y + dy);
   }
 
   render();
@@ -282,6 +322,14 @@
   resizeObserver.observe(viewport);
   $$("img", world).forEach(image => image.addEventListener("load", buildMinimap, { once: true }));
 
+  // A Space-drag can start on a screenshot or link. Its pointerup must not
+  // activate that control after the canvas has moved.
+  document.addEventListener("click", event => {
+    if (event.detail > 0 && performance.now() < state.suppressClickUntil) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
   document.addEventListener("click", event => {
     const inspectButton = event.target.closest("[data-inspect]");
     if (inspectButton) inspect(inspectButton.dataset.inspect, inspectButton.dataset.lane, Number(inspectButton.dataset.frame || 0));
@@ -329,19 +377,25 @@
     if (!state.space && event.target.closest("button,a,select,.stage-body")) return;
     cancelAnimationFrame(animation);
     state.dragging = true;
-    state.pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: state.x, startY: state.y };
+    state.pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: state.x, startY: state.y, moved: false };
     viewport.setPointerCapture(event.pointerId);
     viewport.classList.add("panning");
     event.preventDefault();
   });
   viewport.addEventListener("pointermove", event => {
     if (!state.dragging || state.pointer?.id !== event.pointerId) return;
+    if (Math.hypot(event.clientX - state.pointer.x, event.clientY - state.pointer.y) > 4) state.pointer.moved = true;
     state.x = state.pointer.startX + event.clientX - state.pointer.x;
     state.y = state.pointer.startY + event.clientY - state.pointer.y;
     clampPosition();
     renderTransform();
   });
-  const endPan = () => { state.dragging = false; state.pointer = null; viewport.classList.remove("panning"); };
+  const endPan = () => {
+    if (state.pointer?.moved) state.suppressClickUntil = performance.now() + 400;
+    state.dragging = false;
+    state.pointer = null;
+    viewport.classList.remove("panning");
+  };
   viewport.addEventListener("pointerup", endPan);
   viewport.addEventListener("pointercancel", endPan);
   viewport.addEventListener("lostpointercapture", endPan);

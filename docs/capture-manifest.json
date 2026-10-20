@@ -1,0 +1,227 @@
+[
+  {
+    "key": "fit-1",
+    "url": "https://app.legionhealth.com/portal/join/fit",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 870,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1305,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "fit-2",
+    "url": "https://app.legionhealth.com/portal/join/fit",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 921,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1405,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "fit-3",
+    "url": "https://app.legionhealth.com/portal/join/fit",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 921,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1361,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "fit-4",
+    "url": "https://app.legionhealth.com/portal/join/fit",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 925,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1385,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "fit-5",
+    "url": "https://app.legionhealth.com/portal/join/fit",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 897,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1317,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "fit-6",
+    "url": "https://app.legionhealth.com/portal/join/fit",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 897,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1361,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "fit-complete",
+    "url": "https://app.legionhealth.com/portal/join/fit",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 961,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1489,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "conditions",
+    "url": "https://app.legionhealth.com/portal/join/conditions",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 1141,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1662,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "insurance-options",
+    "url": "https://app.legionhealth.com/portal/join/insurance",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 1161,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1427,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "insurance-self-pay",
+    "url": "https://app.legionhealth.com/portal/join/insurance",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 1259,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1565,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "needs",
+    "url": "https://app.legionhealth.com/portal/join/needs",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 836,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1296,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "match",
+    "url": "https://app.legionhealth.com/portal/join/match",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 3129,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 3901,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "match-selected",
+    "url": "https://app.legionhealth.com/portal/join/match",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 3280,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 4107,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "match-earlier",
+    "url": "https://app.legionhealth.com/portal/join/match",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 3492,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 4343,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "key": "patient",
+    "url": "https://app.legionhealth.com/portal/join/patient",
+    "desktop": {
+      "height": 749,
+      "pageHeight": 1125,
+      "width": 1440
+    },
+    "mobile": {
+      "height": 844,
+      "pageHeight": 1556,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  }
+]

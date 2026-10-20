@@ -1,27 +1,34 @@
 # Capture status
 
-As of October 20, 2026, the live Chrome walkthrough is pending the browser connection. Chrome is running locally but is absent from the browser tool inventory; native Chrome access timed out. David chose to connect Chrome.
+**Observed October 20, 2026 in Chrome.** The walkthrough reached the blank patient-details form. Payment and the later journey remain unobserved pending David's help with the account step.
 
-## Preliminary observation
+## Capture method
 
-Before that choice, the connected Opera browser was used for a brief preflight:
+- Desktop viewport: **1,440 × 749 CSS pixels**.
+- Responsive viewport: **390 × 844 CSS pixels**. These are Chrome viewport tests, not physical-mobile-device tests.
+- All 30 screenshots are full-page captures. Their image dimensions are viewport width × `pageHeight` in [capture-manifest.json](capture-manifest.json); all 30 dimensions were checked against the image files.
+- Full-page stitching can reposition sticky elements. Some insurance self-pay and match captures show the sticky header partway down; that capture artifact must not be reported as a live UI defect.
+- The clinical and insurance selections below are the authorized **assignment scenario**, not David's health or insurance history. No real patient details appear in these captured forms.
 
-- Navigating to `https://app.legionhealth.com/portal/join` redirected to `/portal/join/conditions`.
-- This was an existing browser profile. Whether prior progress caused that redirect has not been established.
-- A full-page Conditions screenshot was saved at `canvas/assets/desktop-conditions.png`. The browser viewport was 1,380 × 716 CSS pixels; the screenshot is 1,380 × 1,093.
-- Direct navigation to the brief's `/portal/join/fit` route showed question 1 of 6, asking whether the prospective patient is based in Texas.
-- No fit-check answers, clinical answers, contact details, account submissions, payments, or appointments were submitted.
+## Observed journey
 
-The canvas labels the Conditions screenshot **Preliminary · Opera**. All other desktop captures and all mobile captures remain explicitly unobserved.
+| Route | Captured states per viewport | Verified observation |
+| --- | ---: | --- |
+| `/portal/join` | 0 | Displayed “Creating anonymous session,” then automatically redirected to `/portal/join/fit`. No persistent start screen was captured. |
+| `/portal/join/fit` | 7 | Six questions and a completion state on the same route. Scenario answers: Texas—Yes; Medicare / Medicaid—No; current harm risk—No; inpatient mental-health or substance-use stay in the past year—No; age 18 or older—Yes; virtual-only care—Yes. |
+| `/portal/join/conditions` | 1 | ADHD selected for the assignment scenario. Condition cards expand with medication and testing information. |
+| `/portal/join/insurance` | 2 | Insurance options, followed by the selected No Insurance state showing self-pay prices of $250 for intake and $150 for follow-ups. No real insurance information supplied or verified. |
+| `/portal/join/needs` | 1 | Selected the scenario for an existing diagnosis and medication support. |
+| `/portal/join/match` | 3 | Initial results, a selected provider/time, and optional earlier-appointment preferences. Three initial providers, all PMHNPs, with an indication of 37 more; earliest displayed availability was October 21 at capture. A matching checklist remains above the results. |
+| `/portal/join/patient` | 1 | Blank form reached after Book appointment, including date-of-birth and referral fields plus three agreement checkbox groups. Field requiredness and validation were not tested. |
+| `/portal/join/payment` | 0 | Not yet captured; David was asked to complete the personal details and agreements, then stop at payment. |
 
-## Continue when Chrome is connected
+At provider selection, the displayed **October 28, 1:00 PM** slot for **Doose Jennifer Onarinde** was selected. The optional earlier-appointment preference was enabled for inspection, then disabled before advancing. Clicking **Book appointment** moved the anonymous user to the patient-details form. This does not establish a confirmed appointment; no account, payment, or completed appointment was confirmed by the captured evidence.
 
-1. Start at the entry URL and record actual routing in Chrome.
-2. Capture every reachable desktop screen, including fit-check questions and important intermediate states.
-3. Capture corresponding mobile-width layouts, with viewport dimensions recorded.
-4. Continue through provider choice and patient details as practical. Ask David for contact details or account help at the actual blocker.
-5. Preserve the distinction between observed UI, historical aggregate telemetry, and hypotheses.
-6. Record downstream boundaries; do not fabricate unobserved screens or completion evidence.
-7. Update the board, verify navigation and image inspection, then pause for David's feedback before building the prototype.
+The board references the verified Chrome JPGs in `canvas/assets/`, including all within-route captures. The obsolete preliminary PNG is unreferenced.
 
-The private repository and assignment branch are already initialized. No prototype or Vercel deployment has been started.
+## Evidence boundaries and next step
+
+The board keeps current UI observations separate from the brief's historical aggregate telemetry: rolling 30 days ending **August 29, 2026**, ordered browser-session milestones, all devices. The supplied data does not identify causes of drop-off, mobile-specific conversion, losses between individual fit questions, payment success, or first-visit completion.
+
+After the account handoff, capture any reachable payment and downstream states, record remaining boundaries, and finish the visual review. Then pause for David's feedback before building the redesigned prototype. No prototype or Vercel deployment has been started.
