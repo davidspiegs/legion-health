@@ -7,3 +7,6 @@ node_modules/
 dist/
 .cache/
 *.har
+
+# TypeScript incremental build cache
+*.tsbuildinfo
