@@ -18,7 +18,7 @@ The walkthrough uses an assignment scenario: an eligible adult in Texas seeking 
 | Selected time | Choosing a time reveals a booking button and an optional earlier-appointment preference. Enabling that preference offers current, any, or specific providers plus a free-text availability field. | Does the patient understand when a time is held versus confirmed, and what automatic rescheduling would do? |
 | Patient details | The form asks for name, email, phone, birth date, referral source, and three consent groups. It includes treatment/controlled-substance policies and recording/AI transcription consent. | Which information is needed now, how are choices explained, and how well does account creation recover from interruption? |
 
-Selecting the booking control advanced the anonymous walkthrough to patient details. This does not establish a confirmed appointment, account creation, payment, or completed visit. The walkthrough paused before submission of patient details and agreements.
+Selecting the booking control advanced the anonymous walkthrough to patient details. This does not establish a confirmed appointment, account creation, payment, or completed visit. David chose to stop the live walkthrough at Basic Info, before submission of patient details and agreements.
 
 ## Mobile observations
 

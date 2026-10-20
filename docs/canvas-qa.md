@@ -10,6 +10,6 @@ Verified October 20, 2026 against the locally served canvas in Chrome.
 - JavaScript syntax checks and `git diff --check` passed.
 - Extra fit, insurance, and match states appear as clickable images on the board as well as in the inspector.
 
-The blank patient form remains the live walkthrough boundary pending user input. No payment success, confirmed appointment, completed visit, or physical-device usability outcome is claimed.
+The blank patient form is the agreed live walkthrough endpoint: David chose to stop at Basic Info. No payment success, confirmed appointment, completed visit, or physical-device usability outcome is claimed.
 
 Full-page source screenshots may reposition sticky headers when captured from a scrolled state. That limitation is documented rather than classified as a Legion interface defect.

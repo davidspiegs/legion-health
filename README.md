@@ -15,4 +15,4 @@ The board contains desktop and responsive mobile captures, documented route/even
 - [Capture status and evidence boundaries](docs/capture-status.md)
 - [Complete telemetry reference](docs/telemetry-reference.md)
 
-Current captures reach the blank patient-details form. The later prototype will be built after feedback on the canvas.
+The live walkthrough ends at the blank Basic Info / patient-details form, as agreed with David. The later prototype will be built after feedback on the canvas.

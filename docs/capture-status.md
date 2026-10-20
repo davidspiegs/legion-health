@@ -1,6 +1,6 @@
 # Capture status
 
-**Observed October 20, 2026 in Chrome.** The walkthrough reached the blank patient-details form. Payment and the later journey remain unobserved pending David's help with the account step.
+**Observed October 20, 2026 in Chrome.** David chose to stop the live walkthrough at the blank Basic Info / patient-details form. Payment and the later journey remain unobserved.
 
 ## Capture method
 
@@ -21,7 +21,7 @@
 | `/portal/join/needs` | 1 | Selected the scenario for an existing diagnosis and medication support. |
 | `/portal/join/match` | 3 | Initial results, a selected provider/time, and optional earlier-appointment preferences. Three initial providers, all PMHNPs, with an indication of 37 more; earliest displayed availability was October 21 at capture. A matching checklist remains above the results. |
 | `/portal/join/patient` | 1 | Blank form reached after Book appointment, including date-of-birth and referral fields plus three agreement checkbox groups. Field requiredness and validation were not tested. |
-| `/portal/join/payment` | 0 | Not yet captured; David was asked to complete the personal details and agreements, then stop at payment. |
+| `/portal/join/payment` | 0 | Unobserved; beyond the agreed Basic Info stopping point. |
 
 At provider selection, the displayed **October 28, 1:00 PM** slot for **Doose Jennifer Onarinde** was selected. The optional earlier-appointment preference was enabled for inspection, then disabled before advancing. Clicking **Book appointment** moved the anonymous user to the patient-details form. This does not establish a confirmed appointment; no account, payment, or completed appointment was confirmed by the captured evidence.
 
@@ -31,4 +31,4 @@ The board references the verified Chrome JPGs in `canvas/assets/`, including all
 
 The board keeps current UI observations separate from the brief's historical aggregate telemetry: rolling 30 days ending **August 29, 2026**, ordered browser-session milestones, all devices. The supplied data does not identify causes of drop-off, mobile-specific conversion, losses between individual fit questions, payment success, or first-visit completion.
 
-After the account handoff, capture any reachable payment and downstream states, record remaining boundaries, and finish the visual review. Then pause for David's feedback before building the redesigned prototype. No prototype or Vercel deployment has been started.
+The live walkthrough is finished at the agreed Basic Info boundary. Await David's canvas feedback before building the redesigned prototype. No prototype or Vercel deployment has been started.

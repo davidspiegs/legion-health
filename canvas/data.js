@@ -634,13 +634,13 @@ window.JOURNEY = {
         "Captured the blank patient-details form after advancing from provider selection.",
         "The form includes name, email, phone, date-of-birth and referral fields plus three agreement checkbox groups. Requiredness and validation of each field were not tested.",
         "No chosen provider, appointment time, or price is visible in the full-page blank-form capture.",
-        "The walkthrough paused here for David to complete the required personal details and agreements, with instructions to stop at payment.",
+        "David chose to stop the live walkthrough at Basic Info. No personal details or agreements were submitted.",
         "No account creation, payment, or completed appointment is confirmed by the captured evidence."
       ],
       "hypotheses": ["Investigate required effort, trust, validation, and continuity at account creation. The 20.4% non-progression rate does not identify which, if any, explains the loss."],
       "mobileObservations": ["The blank form is 1,556 pixels tall; Save my info & Continue is below the initial viewport. The mobile progress indicator shows a step number and percentage but omits desktop stage names."],
       "mobileHypotheses": ["Retain appointment and cost context while asking for personal information. Test whether acquisition attribution can be optional or asked later."],
-      "status": "Blank form observed · user help requested",
+      "status": "Observed · agreed walkthrough endpoint",
       "metrics": [
         {"label":"Sessions reaching screen","value":"1,763","detail":"29.9% of start sessions"},
         {"label":"Patient details → account created","value":"360 lost · 20.4%","detail":"79.6% continue · 1,403 / 1,763"},
@@ -678,15 +678,15 @@ window.JOURNEY = {
         "src": null,
         "width": null,
         "height": null,
-        "status": "Not captured · awaiting account step",
-        "note": "The walkthrough paused at the blank patient-details form. Payment has not yet been captured; user help was requested to complete account details and stop here."
+        "status": "Not captured · beyond agreed scope",
+        "note": "David chose to stop the live walkthrough at Basic Info. Payment remains unobserved; historical page-reach metrics are retained."
       },
       "mobile": {
         "src": null,
         "width": null,
         "height": null,
-        "status": "Not captured · awaiting account step",
-        "note": "No payment screenshot or responsive observation yet. Historical page-reach metrics remain available, but do not establish payment success."
+        "status": "Not captured · beyond agreed scope",
+        "note": "No payment screenshot or responsive observation: the live walkthrough ends at Basic Info by David's choice. Historical page-reach metrics do not establish payment success."
       },
       "reach": 1403,
       "fromStart": 23.8,
@@ -694,7 +694,7 @@ window.JOURNEY = {
       "events": ["portal.page.join.payment"],
       "observations": [],
       "hypotheses": ["Research the handoff from payment or billing setup to a confirmed appointment, readiness for the visit, and completed care."],
-      "status": "Not yet reached · pending user help",
+      "status": "Unobserved · beyond agreed walkthrough endpoint",
       "metrics": [
         {"label":"Sessions reaching screen","value":"1,403","detail":"23.8% of start sessions"},
         {"label":"Successful payment","value":"Unknown","detail":"No dedicated payment-success event was observed on this page"},
@@ -890,6 +890,6 @@ window.JOURNEY = {
     }
   ],
   "captureMethod": "Full-page Chrome screenshots at a 1,440 × 749 desktop viewport and a 390 × 844 responsive viewport. Responsive captures are viewport tests, not physical-mobile-device tests.",
-  "captureBoundary": "Observed from entry through the blank patient-details form. Payment and the subsequent journey remain uncaptured pending user help with account details.",
+  "captureBoundary": "Observed from entry through the blank patient-details form. David chose to stop the live walkthrough at Basic Info; payment and the subsequent journey remain unobserved.",
   "scenario": "Authorized assignment walkthrough: Texas adult seeking virtual care; scenario fit-check answers, ADHD selection, self-pay, and an existing-diagnosis medication-support need. These selections do not represent David’s health or insurance history."
 };
