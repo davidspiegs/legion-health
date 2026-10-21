@@ -1,3 +1,4 @@
+import { PHARMACY_NCPDP_ID } from "../model/fixtures";
 import type { Scenario } from "../model/types";
 import { deriveTranscript } from "./engine";
 import { fitsPreference, inventory, match } from "./inventory";
@@ -149,6 +150,7 @@ function bookedState(s: ChatJourney): ChatJourney {
 function preparedState(s: ChatJourney): ChatJourney {
   return {
     ...s,
+    pharmacy: { ...RECORDS_FIXTURE.pharmacy, ncpdpId: PHARMACY_NCPDP_ID },
     healthReviewed: true,
     recordsPermission: true,
     recordsStatus: "ready",
@@ -163,8 +165,6 @@ function preparedState(s: ChatJourney): ChatJourney {
       pharmacy: "suggested",
       pcp: "share",
       pcpName: "Dr. Lee at Austin Family Medicine",
-      baselineIntro: "start",
-      baseline: { gad1: 2, gad2: 2, phq1: 1, phq2: 1 },
       noteDone: true,
       briefApproved: true,
       idCheck: "later",

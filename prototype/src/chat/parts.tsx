@@ -111,6 +111,8 @@ export function QuickActions({
   useEffect(() => {
     const el = row.current;
     if (!el) return;
+    // When an action leaves the row (like one just used), the row starts from the beginning again.
+    el.scrollTo({ left: 0 });
     const update = () => {
       const before = el.scrollLeft > 4;
       const after = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;

@@ -15,7 +15,9 @@ import {
   Check,
   CircleAlert,
   CreditCard,
+  FileHeart,
   FileText,
+  FlaskConical,
   IdCard,
   LoaderCircle,
   LockKeyhole,
@@ -30,7 +32,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { formatPhone, validateBirth } from "../model/fixtures";
-import { receipt, runBenefits, type ChatContext } from "./agent";
+import { clinicianFirst, receipt, runBenefits, type ChatContext } from "./agent";
+import { addAsk } from "./assistant";
 import { ASSISTANT, PREVIEW } from "./env";
 import type {
   CardMap,
@@ -2020,6 +2023,198 @@ export const FORM_CARDS: CardMap = {
   agreements: (props) => <AgreementsCard {...props} />,
 };
 
+/* ============================================================== MyChart */
+
+type ChartStep = "consent" | "connecting" | "done" | "failed";
+
+/** The clinic in the patient's records, or the one in the fictional chart. */
+const chartOrganization = (s: ChatJourney) =>
+  s.chat.recordsFound?.sources.find((source) => source.kind === "clinic")?.name ?? "Austin Family Medicine";
+
+const counted = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/** Bringing the chart from another doctor's MyChart, any time before the visit. Never a required step. */
+function ChartSheet({ state, ctx, close, data }: SheetProps) {
+  const organization = state.chartImport?.organization ?? chartOrganization(state);
+  const first = clinicianFirst(state.appointment!.providerId);
+  const [step, setStep] = useState<ChartStep>(state.chartImport ? "done" : "consent");
+  const [error, setError] = useState("");
+  const heading = useRef<HTMLHeadingElement>(null);
+  const opened = useRef(true);
+
+  // Each new step moves focus to its heading, so screen readers hear where they are.
+  useEffect(() => {
+    if (opened.current) {
+      opened.current = false;
+      return;
+    }
+    heading.current?.focus({ preventScroll: true });
+  }, [step]);
+
+  const connect = () => {
+    setStep("connecting");
+    setError("");
+    void ctx.api.importChart(organization).then(
+      (chart) => {
+        receipt(ctx, `Imported your chart from ${chart.organization}`, "Epic MyChart (simulated)", "You");
+        addAsk(ctx, data || "ready", {
+          question: "",
+          answer: `I brought in your chart from ${chart.organization}: ${counted(chart.conditions.length, "condition")}, ${counted(chart.medications.length, "medication")}, ${counted(chart.labResults, "lab result")} and ${counted(chart.visitNotes, "visit note")}. ${first} will see it before your visit.`,
+        });
+        setStep("done");
+      },
+      (issue: unknown) => {
+        setError(issue instanceof Error ? issue.message : "MyChart didn’t connect. Try again in a moment.");
+        setStep("failed");
+      },
+    );
+  };
+
+  const title = (text: string) => (
+    <h3 ref={heading} tabIndex={-1}>
+      {text}
+    </h3>
+  );
+
+  const chart = state.chartImport;
+  let body: ReactNode;
+  let foot: ReactNode;
+  if (step === "consent") {
+    body = (
+      <>
+        <div className="fm-id-intro">
+          <span className="fm-id-hero" aria-hidden="true">
+            <FileHeart size={28} strokeWidth={1.8} />
+          </span>
+          <div className="fm-id-head">
+            {title("Bring your chart from MyChart")}
+            <p>
+              If {organization} or another doctor’s office uses MyChart, you can share your chart with {first}{" "}
+              before your visit. You’ll sign in to MyChart and choose what to share.
+            </p>
+          </div>
+        </div>
+        <ul className="fm-id-steps">
+          <li>
+            <span className="fm-id-step-icon" aria-hidden="true">
+              <Pill size={18} strokeWidth={2} />
+            </span>
+            <span>
+              <strong>Conditions, medications and allergies</strong>
+              <span>What your other doctors have on file</span>
+            </span>
+          </li>
+          <li>
+            <span className="fm-id-step-icon" aria-hidden="true">
+              <FlaskConical size={18} strokeWidth={2} />
+            </span>
+            <span>
+              <strong>Lab results</strong>
+              <span>Your recent results</span>
+            </span>
+          </li>
+          <li>
+            <span className="fm-id-step-icon" aria-hidden="true">
+              <FileText size={18} strokeWidth={2} />
+            </span>
+            <span>
+              <strong>Visit notes</strong>
+              <span>Summaries from past visits</span>
+            </span>
+          </li>
+        </ul>
+        <p className="fm-note fm-center">Preview: no MyChart account is used, and nothing leaves your browser.</p>
+      </>
+    );
+    foot = (
+      <div className="fm-pair">
+        <button type="button" className="fm-secondary" onClick={close}>
+          Not now
+        </button>
+        <button type="button" className="fm-primary" onClick={connect}>
+          Connect MyChart
+        </button>
+      </div>
+    );
+  } else if (step === "connecting") {
+    body = (
+      <div className="fm-id-center">
+        <span className="fm-id-badge" aria-hidden="true">
+          <LoaderCircle size={30} className="fm-spin" />
+        </span>
+        {title("Connecting to MyChart")}
+        <p>Signing in and sharing your chart from {organization}. This takes a few seconds.</p>
+        <span className="fm-id-shimmer" aria-hidden="true" />
+      </div>
+    );
+    foot = null;
+  } else if (step === "failed") {
+    body = (
+      <div className="fm-id-center">
+        <span className="fm-id-badge" aria-hidden="true">
+          <CircleAlert size={30} strokeWidth={2.2} />
+        </span>
+        {title("MyChart didn’t connect")}
+        <p role="alert">{error}</p>
+      </div>
+    );
+    foot = (
+      <div className="fm-pair">
+        <button type="button" className="fm-secondary" onClick={close}>
+          Not now
+        </button>
+        <button type="button" className="fm-primary" onClick={connect}>
+          Try again
+        </button>
+      </div>
+    );
+  } else {
+    body = (
+      <div className="fm-id-center">
+        <span className="fm-id-badge is-done" aria-hidden="true">
+          <Check size={32} strokeWidth={2.8} />
+        </span>
+        {title("Your chart is in")}
+        <p>{first} will see it with your visit brief.</p>
+        {chart ? (
+          <ul className="fm-chart-facts">
+            <li>
+              <strong>Conditions</strong>
+              {chart.conditions.join(", ")}
+            </li>
+            <li>
+              <strong>Medications</strong>
+              {chart.medications.join(", ")}
+            </li>
+            <li>
+              <strong>Allergies</strong>
+              {chart.allergies.join(", ")}
+            </li>
+            <li>
+              <strong>From {chart.organization}</strong>
+              {counted(chart.labResults, "lab result")} and {counted(chart.visitNotes, "visit note")}
+            </li>
+          </ul>
+        ) : null}
+      </div>
+    );
+    foot = (
+      <button type="button" className="fm-primary" onClick={close}>
+        Done
+      </button>
+    );
+  }
+
+  return (
+    <div className="fm-sheet fm-idcheck">
+      <div className={`fm-step ${step === "consent" ? "" : "is-result"}`} key={step}>
+        {body}
+      </div>
+      {foot ? <SheetFoot>{foot}</SheetFoot> : null}
+    </div>
+  );
+}
+
 export const FORM_WIDGETS: WidgetMap = {
   agreements: (props) => <AgreementsWidget {...props} />,
   payment: (props) => <PaymentWidget {...props} />,
@@ -2033,4 +2228,5 @@ export const FORM_SHEETS: SheetMap = {
   // The shell's title is fixed per sheet, so each agreement names itself in the body.
   read: { title: "Agreements", render: (props) => <ReadSheet {...props} /> },
   idcheck: { title: "Verify your ID", render: (props) => <IdCheckSheet {...props} /> },
+  chart: { title: "Bring your chart", render: (props) => <ChartSheet {...props} /> },
 };

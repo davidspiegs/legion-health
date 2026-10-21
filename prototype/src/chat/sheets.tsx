@@ -1746,9 +1746,21 @@ const SCENARIOS: { value: Scenario; title: string; where: string; moment?: Momen
     moment: "booked",
   },
   { value: "id-unreadable", title: "ID photo can’t be read", where: "When you verify your photo ID", moment: "booked" },
+  {
+    value: "mychart-unavailable",
+    title: "MyChart doesn’t connect",
+    where: "When you bring your chart from MyChart",
+    moment: "booked",
+  },
   { value: "clinician-late", title: "Clinician running late", where: "In the waiting room", moment: "visit-day" },
   { value: "connection-lost", title: "Visit disconnects", where: "During the visit", moment: "visit-day" },
   { value: "care-plan-delayed", title: "Plan takes longer", where: "After the visit", moment: "visit-day" },
+  {
+    value: "prescription-failed",
+    title: "Refill doesn’t reach the pharmacy",
+    where: "When your clinician sends your refill after the visit",
+    moment: "visit-day",
+  },
   {
     value: "share-failed",
     title: "Summary doesn’t send",

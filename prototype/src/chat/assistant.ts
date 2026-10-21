@@ -4,6 +4,7 @@ import {
   CalendarPlus,
   CalendarSync,
   ClipboardList,
+  FileHeart,
   LifeBuoy,
   MessageSquareText,
   Pill,
@@ -41,6 +42,7 @@ export type QuickId =
   | "plan"
   | "followup"
   | "rx"
+  | "chart"
   | "preview-day"
   | "preview-checkin";
 
@@ -85,6 +87,7 @@ export function quickActions(s: ChatJourney): QuickAction[] {
       ? { id: "join", label: "Join my visit", icon: Video }
       : { id: "when", label: "When is my visit?", icon: CalendarClock },
     { id: "reschedule", label: "Reschedule", icon: CalendarSync },
+    ...(s.chartImport ? [] : [{ id: "chart" as const, label: "Import from MyChart", icon: FileHeart }]),
     ...(s.chat.prep !== "yes" && !s.visitDay ? [{ id: "prep" as const, label: "Help me get ready", icon: Sparkles }] : []),
     message,
     { id: "billing", label: "What will I pay?", icon: Receipt },

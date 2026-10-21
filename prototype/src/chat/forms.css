@@ -1845,3 +1845,29 @@
     transform: none;
   }
 }
+
+/* What came in from MyChart, listed under the confirmation. */
+.fm-chart-facts {
+  list-style: none;
+  width: 100%;
+  margin: 18px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+.fm-chart-facts li {
+  display: grid;
+  gap: 2px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  background: var(--fm-wash);
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--fm-soft-text);
+}
+.fm-chart-facts strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}

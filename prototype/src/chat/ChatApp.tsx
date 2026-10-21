@@ -35,8 +35,10 @@ import {
 import { registerCards, renderCard } from "./cards";
 import { SCRIPT } from "./script";
 import {
+  addTask,
   clinicianFirst,
   matchInputs,
+  receipt,
   runBenefits,
   runMatch,
   runRecords,
@@ -520,6 +522,28 @@ function ChatApp() {
     return () => cancelAnimationFrame(frame);
   }, [editing, reduced]);
 
+  // Once the plan is signed, the simulated clinician refills a medication the patient said they still
+  // take, through DoseSpot to the pharmacy they saved. Anything new is decided in the visit itself.
+  useEffect(() => {
+    const s = stateRef.current;
+    const med = s.chat.recordsFound?.medication;
+    if (s.carePlan.status !== "published" || s.prescriptions?.length || !s.pharmacy) return;
+    if (!med || s.chat.medication !== "taking" || !s.appointment) return;
+    const first = clinicianFirst(s.appointment.providerId);
+    const drug = med.name.toLowerCase();
+    void ctx.api.sendPrescription({ medication: `${med.name} ${med.dose}`, supply: "30-day refill" }).then(
+      (rx) =>
+        rx.status === "sent"
+          ? receipt(ctx, `${first} sent your ${drug} refill to ${rx.pharmacy}`, "DoseSpot (simulated)", "Your clinician")
+          : addTask(
+              ctx,
+              { kind: "care-team", title: `Resend the ${drug} refill to ${rx.pharmacy}`, due: "Today" },
+              "Asked the care team to resend your prescription",
+            ),
+      () => undefined,
+    );
+  }, [state.carePlan.status, ctx]);
+
   // Leaving the visit room: when whatever opened it is gone, focus goes to what's next in the dock.
   const roomWasOpen = useRef(false);
   useEffect(() => {
@@ -618,6 +642,9 @@ function ChatApp() {
         break;
       case "message":
         setSheet({ name: "message" });
+        break;
+      case "chart":
+        setSheet({ name: "chart", data: anchorNow() });
         break;
       case "rx":
         setSheet({ name: "message", data: "rx" });
@@ -988,9 +1015,11 @@ function AskRow({
     : undefined;
   return (
     <div className="thread-item ask-item">
-      <div className="msg from-patient enter">
-        <div className="bubble">{ask.question}</div>
-      </div>
+      {ask.question ? (
+        <div className="msg from-patient enter">
+          <div className="bubble">{ask.question}</div>
+        </div>
+      ) : null}
       {ask.status === "thinking" ? (
         <TypingBubble />
       ) : ask.answer ? (

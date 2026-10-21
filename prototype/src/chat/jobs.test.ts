@@ -26,6 +26,7 @@ import {
 } from "./agent";
 import { fitsPreference, inventory } from "./inventory";
 import { reconcile } from "./reconcile";
+import { SCRIPT } from "./script";
 import { DISCOVERED_PLAN } from "../model/fixtures";
 import { PREVIEW_CODE, initialChatJourney, type ChatJourney, type ChatState } from "./state";
 
@@ -488,4 +489,48 @@ test("the ID check and the summary share can fail once and then go through, and 
   const share = patient({ scenario: "share-failed" });
   await assert.rejects(share.ctx.api.shareVisitSummary(), /didn’t accept/);
   assert.ok((await share.ctx.api.shareVisitSummary()).sentAt);
+});
+
+test("a missed plan asks for the member ID right away, and checking with it confirms the plan", async () => {
+  const p = patient({ scenario: "coverage-not-found", coverage: "insurance", payer: "Aetna", memberId: "" });
+  await runBenefits(p.ctx);
+  const node = SCRIPT.find((item) => item.id === "benefits")!;
+  assert.equal(node.input!(p.state)?.kind, "text", "the member ID is asked for, not a retry");
+  await assert.rejects(async () => node.submit!("??", p.ctx), /member ID/);
+  await node.submit!("w2n 482 17", p.ctx);
+  assert.equal(p.state.memberId, "W2N48217");
+  assert.equal(p.state.chat.jobs.benefits?.status, "done");
+
+  const noCard = patient({ scenario: "coverage-not-found", coverage: "insurance", payer: "Aetna", memberId: "" });
+  await runBenefits(noCard.ctx);
+  await node.submit!("__nocard", noCard.ctx);
+  const input = node.input!(noCard.state);
+  assert.equal(input?.kind, "single");
+  assert.deepEqual(
+    input?.kind === "single" ? input.options.map((option) => option.value) : [],
+    ["__memberid", "selfpay", "person"],
+    "without the card: enter it after all, pay yourself, or get help",
+  );
+});
+
+test("DoseSpot saves the pharmacy and sends a refill, and a refill the pharmacy didn't confirm is resent", async () => {
+  const p = patient({ scenario: "prescription-failed" });
+  await assert.rejects(p.ctx.api.sendPrescription({ medication: "Sertraline 50 mg daily", supply: "30-day refill" }), /pharmacy/);
+  const saved = await p.ctx.api.savePharmacy({ name: "CVS Pharmacy", address: "2508 S Congress Ave, Austin" });
+  assert.ok(saved.ncpdpId);
+  const failed = await p.ctx.api.sendPrescription({ medication: "Sertraline 50 mg daily", supply: "30-day refill" });
+  assert.equal(failed.status, "failed");
+  const resent = await p.ctx.api.sendPrescription({ medication: "Sertraline 50 mg daily", supply: "30-day refill" });
+  assert.equal(resent.status, "sent");
+  assert.equal(p.state.prescriptions?.length, 1, "a resend replaces the copy that didn't arrive");
+  assert.equal(p.state.prescriptions?.[0].pharmacy, "CVS Pharmacy, 2508 S Congress Ave");
+});
+
+test("a MyChart import can fail once, then brings in the chart", async () => {
+  const p = patient({ scenario: "mychart-unavailable" });
+  await assert.rejects(p.ctx.api.importChart("Austin Family Medicine"), /didn’t connect/);
+  const chart = await p.ctx.api.importChart("Austin Family Medicine");
+  assert.equal(chart.organization, "Austin Family Medicine");
+  assert.ok(chart.conditions.length && chart.medications.length);
+  assert.equal(p.state.chartImport?.organization, "Austin Family Medicine");
 });

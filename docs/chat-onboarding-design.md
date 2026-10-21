@@ -108,9 +108,10 @@ The patient experience stays the same as autonomy changes: same guide, same rece
 | Source | Role in this design | Status |
 | --- | --- | --- |
 | Verified 1-Click Signup | Phone plus birth date returns name, address and sex for confirmation | Simulated; optional per brief |
-| Sohar | Discovery (name, birth date, state) finds payer and member ID; verification returns network status, copay and deductible | Simulated; in use at Legion |
+| Sohar | Discovery (name, birth date, state) finds payer and member ID; verification returns network status, copay and deductible. When discovery misses, Wren asks right away for the member ID from the card, with self-pay and care-team help as alternatives | Simulated; in use at Legion |
 | Metriport | Records from health networks, pharmacies and labs, with permission | Simulated; in use at Legion |
-| DoseSpot | Pharmacy on file and medication history for the clinician; prescriptions remain the clinician's action | Pharmacy confirmation built; prescribing not shown |
+| DoseSpot | Saves the patient's pharmacy before the visit. After the clinician signs the plan, a refill of a medication the patient still takes goes to that pharmacy; one the pharmacy doesn't confirm goes to the care team to resend | Simulated; existing at Legion |
+| Epic MyChart | The patient can bring their chart (conditions, medications, allergies, labs, visit notes) anytime before the visit, from one quick action; it joins the visit brief. Never a required step | Simulated |
 | Persona | Photo ID and selfie, offered only when a controlled medication is discussed | Simulated; optional per brief |
 | Stripe | Card on file (SetupIntent-shaped), bank authentication, nothing charged today | Simulated |
 | Healthie | Likely upstream scheduling and records (from the audit) | Behind the scheduling adapter |

@@ -56,7 +56,9 @@ export type Scenario =
   | "coverage-not-found"
   | "calendars-unavailable"
   | "id-unreadable"
-  | "share-failed";
+  | "share-failed"
+  | "prescription-failed"
+  | "mychart-unavailable";
 export type Coverage = "selfpay" | "insurance";
 export type ServiceName =
   | "Profile"
@@ -72,7 +74,9 @@ export type ServiceName =
   | "Care team"
   | "Verified"
   | "Persona"
-  | "Clinician directory";
+  | "Clinician directory"
+  | "DoseSpot"
+  | "Epic MyChart";
 export interface Profile {
   firstName: string;
   lastName: string;
@@ -169,6 +173,32 @@ export interface CareMessage {
   status: "sending" | "delivered" | "failed";
   replyTo?: string;
 }
+/** The patient's pharmacy for e-prescribing, saved in DoseSpot (simulated). */
+export interface Pharmacy {
+  name: string;
+  address: string;
+  ncpdpId: string;
+}
+/** A prescription the clinician sent through DoseSpot (simulated). */
+export interface Prescription {
+  id: string;
+  medication: string;
+  supply: string;
+  pharmacy: string;
+  /** Failed means the pharmacy didn't confirm it; the care team resends it. */
+  status: "sent" | "failed";
+  at: string;
+}
+/** A chart the patient shared from Epic MyChart (simulated). */
+export interface ChartImport {
+  organization: string;
+  importedAt: string;
+  conditions: string[];
+  medications: string[];
+  allergies: string[];
+  labResults: number;
+  visitNotes: number;
+}
 export interface JourneyState {
   version: 1;
   step: Step;
@@ -217,6 +247,9 @@ export interface JourneyState {
     publishedAt?: string;
     followupWeeks: number;
   };
+  pharmacy?: Pharmacy | null;
+  prescriptions?: Prescription[];
+  chartImport?: ChartImport | null;
   appointment: Appointment | null;
   followupAppointment: Appointment | null;
   bookingMode: "first" | "reschedule" | "followup";
@@ -306,6 +339,12 @@ export interface MockApi {
   verifyPhotoId(): Promise<PhotoIdResult>;
   /** Sends the visit summary to the patient's doctor over the health network (Metriport, simulated). */
   shareVisitSummary(): Promise<{ sentAt: string }>;
+  /** Saves the patient's pharmacy for prescriptions (DoseSpot, simulated). */
+  savePharmacy(pharmacy: { name: string; address: string }): Promise<Pharmacy>;
+  /** Sends a prescription to the saved pharmacy (DoseSpot, simulated). */
+  sendPrescription(request: { medication: string; supply: string }): Promise<Prescription>;
+  /** Imports the chart the patient chose to share in MyChart (Epic MyChart, simulated). */
+  importChart(organization: string): Promise<ChartImport>;
 }
 export interface ScreenProps {
   state: JourneyState;

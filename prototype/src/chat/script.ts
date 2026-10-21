@@ -912,9 +912,17 @@ const benefits: Node = {
       blocks.push(
         say(
           "failed",
-          `${s.payer || "Your plan"} couldn’t find a plan with these details. Is your coverage under someone else’s name, like a parent or spouse?`,
+          !missedPlan(s)
+            ? `${s.payer || "Your plan"} didn’t answer just now. Let’s try that again.`
+            : !s.payer
+              ? "I couldn’t find your plan from your details. You can add it with the member ID from your card."
+              : s.chat.jobs.benefits?.note === "unmatched"
+                ? `${s.payer} couldn’t match those details. What’s the member ID on your card?`
+                : `I couldn’t find your ${s.payer} plan from your details. What’s the member ID on your card?`,
         ),
       );
+    if (status === "failed" && missedPlan(s) && s.payer && s.chat.memberIdSkipped)
+      blocks.push(say("nocard", "No problem. You can pay yourself for now, or someone on the care team can help find your plan."));
     return blocks;
   },
   input: (s) => {
@@ -937,6 +945,29 @@ const benefits: Node = {
           { value: "use", label: "Use this plan", primary: true },
         ],
       };
+    if (status === "failed" && missedPlan(s)) {
+      if (s.payer && !s.chat.memberIdSkipped)
+        return {
+          kind: "text",
+          mode: "text",
+          label: "Member ID",
+          placeholder: "Member ID from your card",
+          submit: "Check my plan",
+          maxLength: 24,
+          autoComplete: "off",
+          alternate: { label: "I don’t have my card", value: "__nocard" },
+          footnote: "It’s on the front of your insurance card, often labeled ID or Member ID.",
+        };
+      return {
+        kind: "single",
+        layout: "stack",
+        options: [
+          s.payer ? { value: "__memberid", label: "Enter my member ID" } : { value: "different", label: "Add my insurance" },
+          { value: "selfpay", label: "Pay myself instead", detail: "$250 first visit" },
+          { value: "person", label: "Have the care team help" },
+        ],
+      };
+    }
     if (status === "pending" || status === "failed")
       return {
         kind: "single",
@@ -952,6 +983,10 @@ const benefits: Node = {
   answer: (s) => (s.chat.benefitsAccepted ? { text: "Use this plan", editable: false } : null),
   submit: async (value, ctx) => {
     if (value === "use") return ctx.update({ chat: { benefitsAccepted: true } });
+    if (value === "__nocard" || value === "__memberid") {
+      ctx.update({ chat: { memberIdSkipped: value === "__nocard" } });
+      return false;
+    }
     if (value === "selfpay") {
       ctx.update({ coverage: "selfpay", chat: { benefitsChoice: "selfpay", payMethod: "selfpay" } });
       receipt(ctx, "Switched to self-pay at your request", "You", "You");
@@ -984,6 +1019,19 @@ const benefits: Node = {
       receipt(ctx, `Let go of your time so you can choose a clinician in network with ${s.payer}`, "You", "You");
       return;
     }
+    // After a miss, what's typed is the member ID from the card, and the plan is checked with it.
+    if (value !== "retry" && missedPlan(ctx.get())) {
+      const memberId = String(value).replace(/\s+/g, "").toUpperCase();
+      if (!/^[A-Z0-9-]{4,20}$/.test(memberId)) throw new Error("Enter the member ID from your card, using letters and numbers.");
+      ctx.update({
+        memberId,
+        scenario: "standard",
+        chat: { memberIdSkipped: false, benefits: null, jobs: { ...ctx.get().chat.jobs, benefits: undefined } },
+      });
+      receipt(ctx, "Added the member ID from your card", "You", "You");
+      await runBenefits(ctx);
+      return;
+    }
     // A retry asks the plan again; the preview's fault is consumed the first time.
     ctx.update({ scenario: "standard", chat: { jobs: { ...ctx.get().chat.jobs, benefits: undefined } } });
     await runBenefits(ctx);
@@ -991,6 +1039,12 @@ const benefits: Node = {
 };
 
 const outOfNetwork = (s: ChatJourney) => s.chat.benefits?.network === "out-of-network";
+
+/** No plan or member ID could be matched from what the patient gave, as opposed to an error. */
+const missedPlan = (s: ChatJourney) => {
+  const job = s.chat.jobs.benefits;
+  return job?.status === "failed" && (job.note === "not-found" || job.note === "unmatched");
+};
 
 const agreements: Node = {
   id: "agreements",
@@ -1289,7 +1343,17 @@ const pharmacy: Node = {
     s.chat.pharmacy === "other"
       ? [say("ack", "No problem. Your clinician can set it with you during the visit.")]
       : [],
-  submit: (value, ctx) => ctx.update({ chat: { pharmacy: value as ChatState["pharmacy"] } }),
+  submit: async (value, ctx) => {
+    const found = ctx.get().chat.recordsFound?.pharmacy;
+    ctx.update({ pharmacy: value === "suggested" ? ctx.get().pharmacy : null, chat: { pharmacy: value as ChatState["pharmacy"] } });
+    if (value !== "suggested" || !found) return;
+    // DoseSpot keeps the pharmacy, so a prescription after the visit goes straight there.
+    await ctx.api.savePharmacy(found).then(
+      (saved) =>
+        receipt(ctx, `Saved ${saved.name}, ${saved.address.split(",")[0]} as your pharmacy for prescriptions`, "DoseSpot (simulated)"),
+      () => undefined,
+    );
+  },
 };
 
 const PCP: Record<string, string> = {
@@ -1471,6 +1535,10 @@ const ready: Node = {
         : s.profile.sms
           ? `You’re ready. I’ll text you ${reminderTimes(s)} your visit. You can reply to reschedule.`
           : `You’re ready. Texts are off, so your reminders come by email ${reminderTimes(s)} your visit.`,
+    ),
+    say(
+      "mychart",
+      `Anytime before your visit, you can also bring your chart from MyChart, and I’ll share it with ${clinicianFirst(s.appointment!.providerId)}.`,
     ),
   ],
   input: (s) =>

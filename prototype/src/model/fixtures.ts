@@ -375,3 +375,15 @@ export const VERIFIED_RECORD = {
 
 /** What insurance discovery finds when the patient doesn't know their plan or member ID. */
 export const DISCOVERED_PLAN = { payer: "Blue Cross Blue Shield of Texas", memberId: "W2N48217" };
+
+/** The pharmacy's NCPDP ID in DoseSpot (fictional). */
+export const PHARMACY_NCPDP_ID = "4512783";
+
+/** The fictional chart Epic MyChart shares for the preview persona. */
+export const MYCHART_CHART = {
+  conditions: ["Generalized anxiety disorder", "Seasonal allergies"],
+  medications: ["Sertraline 50 mg daily", "Cetirizine 10 mg as needed"],
+  allergies: ["Penicillin (rash)"],
+  labResults: 6,
+  visitNotes: 3,
+};

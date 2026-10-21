@@ -1480,6 +1480,7 @@ function Plan({ state }: CardProps) {
   const signed = onClock(state, state.carePlan.publishedAt) ?? state.appointment?.start ?? null;
   const followup = followupOf(state);
   const steps = planSteps(state);
+  const rx = state.prescriptions?.[0];
   return (
     <article className="card-shell vs-plan" aria-label="Your care plan">
       <header className="vs-plan-head">
@@ -1530,8 +1531,23 @@ function Plan({ state }: CardProps) {
           </span>
           <span className="vs-fact-text">
             <span className="vs-fact-label">Prescriptions</span>
-            <span className="vs-fact-value">None today</span>
-            <span className="vs-fact-note">Any medication decision is made with your clinician.</span>
+            {rx ? (
+              <>
+                <span className="vs-fact-value">
+                  {rx.medication}, {rx.supply}
+                </span>
+                <span className="vs-fact-note">
+                  {rx.status === "sent"
+                    ? `Sent to ${rx.pharmacy} through DoseSpot, simulated`
+                    : `Didn’t reach ${rx.pharmacy} yet. Your care team is resending it today.`}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="vs-fact-value">None today</span>
+                <span className="vs-fact-note">Any medication decision is made with your clinician.</span>
+              </>
+            )}
           </span>
         </li>
       </ul>
@@ -1876,32 +1892,14 @@ function allergyRow(s: ChatJourney, who: Who): BriefRow | null {
   return null;
 }
 
-function startingPoint(s: ChatJourney): BriefRow | null {
-  const b = s.chat.baseline;
-  const score = (a: string, z: string) =>
-    typeof b[a] === "number" && typeof b[z] === "number" ? b[a] + b[z] : null;
-  const gad = score("gad1", "gad2");
-  const phq = score("phq1", "phq2");
-  if (gad == null && phq == null) return null;
+/** A chart the patient shared from MyChart before the visit. */
+function chartRow(s: ChatJourney): BriefRow | null {
+  const chart = s.chartImport;
+  if (!chart) return null;
   return {
-    label: "Starting point",
-    source: "Your check-ins",
-    value: (
-      <span className="vs-scores">
-        {gad != null ? (
-          <span>
-            <span>Worry (GAD-2)</span>
-            <span>{gad} of 6</span>
-          </span>
-        ) : null}
-        {phq != null ? (
-          <span>
-            <span>Mood (PHQ-2)</span>
-            <span>{phq} of 6</span>
-          </span>
-        ) : null}
-      </span>
-    ),
+    label: "Records from MyChart",
+    value: `${chart.organization}: ${chart.conditions.join(", ")}, with ${chart.labResults} lab results and ${chart.visitNotes} visit notes`,
+    source: "You shared",
   };
 }
 
@@ -1920,7 +1918,7 @@ function briefRows(s: ChatJourney, who: Who): BriefRow[] {
       : null,
     medicationRow(s, who),
     allergyRow(s, who),
-    startingPoint(s),
+    chartRow(s),
     note ? { label: "Your note", value: `“${note}”`, source: "You wrote" } : null,
   ];
   return rows.filter((row): row is BriefRow => row !== null);

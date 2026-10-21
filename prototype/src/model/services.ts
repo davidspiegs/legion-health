@@ -6,6 +6,8 @@ import {
   followupSlots,
   validateBirth,
   DISCOVERED_PLAN,
+  MYCHART_CHART,
+  PHARMACY_NCPDP_ID,
   PREVIEW_CODE,
   VERIFIED_RECORD,
 } from "./fixtures";
@@ -22,6 +24,9 @@ import type {
   IdentityLookup,
   InsuranceDiscovery,
   PhotoIdResult,
+  Pharmacy,
+  Prescription,
+  ChartImport,
 } from "./types";
 import {
   eligibilityInputKey,
@@ -1354,6 +1359,66 @@ export function createMockApi({
         },
         undefined,
         pace(900),
+      );
+    },
+    savePharmacy({ name, address }) {
+      return run<Pharmacy>(
+        "pharmacy.save",
+        "DoseSpot",
+        "pharmacy.saved",
+        "Simulated pharmacy saved for e-prescribing",
+        () => {
+          const pharmacy = { name, address, ncpdpId: PHARMACY_NCPDP_ID };
+          update({ pharmacy });
+          return pharmacy;
+        },
+        undefined,
+        pace(600),
+      );
+    },
+    sendPrescription({ medication, supply }) {
+      return run<Prescription>(
+        `prescription.send:${medication}`,
+        "DoseSpot",
+        "prescription.sent",
+        "Simulated prescription sent to the pharmacy",
+        () => {
+          const { pharmacy } = getState();
+          if (!pharmacy) throw new Error("Choose a pharmacy before a prescription can be sent.");
+          const prescription: Prescription = {
+            id: `rx-${Date.now()}`,
+            medication,
+            supply,
+            pharmacy: `${pharmacy.name}, ${pharmacy.address.split(",")[0]}`,
+            status: consumeFault("prescription-failed") ? "failed" : "sent",
+            at: new Date().toISOString(),
+          };
+          // A resend replaces the copy the pharmacy didn't confirm.
+          const others = (getState().prescriptions ?? []).filter((item) => item.medication !== medication);
+          update({ prescriptions: [...others, prescription] });
+          return prescription;
+        },
+        (result) =>
+          result.status === "sent"
+            ? { outcome: "success", detail: "Simulated prescription sent to the pharmacy" }
+            : { outcome: "error", detail: "Simulated pharmacy didn’t confirm the prescription" },
+        pace(900),
+      );
+    },
+    importChart(organization) {
+      return run<ChartImport>(
+        "chart.import",
+        "Epic MyChart",
+        "chart.imported",
+        "Fictional chart shared with the patient’s permission",
+        () => {
+          if (consumeFault("mychart-unavailable")) throw new Error("MyChart didn’t connect. Try again in a moment.");
+          const chartImport: ChartImport = { organization, importedAt: new Date().toISOString(), ...MYCHART_CHART };
+          update({ chartImport });
+          return chartImport;
+        },
+        undefined,
+        pace(1600),
       );
     },
   };

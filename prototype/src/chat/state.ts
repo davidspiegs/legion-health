@@ -148,6 +148,8 @@ export interface ChatState {
   emailEntered: boolean;
   benefits: Benefits | null;
   benefitsAccepted: boolean;
+  /** After a missed plan lookup, the patient said they don't have their card with them. */
+  memberIdSkipped: boolean;
   benefitsChoice: "" | "selfpay";
   aiNotes: boolean;
   controlledAck: boolean;
@@ -250,6 +252,7 @@ export function initialChat(): ChatState {
     emailEntered: false,
     benefits: null,
     benefitsAccepted: false,
+    memberIdSkipped: false,
     benefitsChoice: "",
     aiNotes: false,
     controlledAck: false,
