@@ -15,6 +15,7 @@ import { runBenefits, setAgentPace, type ChatContext, type ChatPatch } from "./a
 import { PREVIEW_CODE, initialChatJourney, type ChatJourney } from "./state";
 import { inventory } from "./inventory";
 import { momentState } from "./moments";
+import { SCREEN } from "./safety";
 
 setAgentPace(0);
 inventory();
@@ -108,55 +109,35 @@ function assertStopped(p: ReturnType<typeof patient>, card: string, { afterBooki
   if (!afterBooking) assert.equal(p.state.appointment, null, "nothing is booked");
 }
 
-test("risk language in the patient's own words asks about safety right away instead of ending the conversation", async () => {
+test("risk language in the patient's own words shows the crisis lines and the conversation goes on", async () => {
   const words = "honestly some days I want to die and I can't focus";
-  const safe = patient();
-  await safe.say("hello", "start");
-  await safe.say("story", "__words");
-  await safe.say("story", words);
-  assert.equal(safe.active(), "story-safe", "safety comes before anything else");
-  assert.ok(safe.cards().includes("support-line"), "988 and 911 are on screen");
-  assert.ok(safe.state.chat.flags.includes("risk-language-in-story"));
-  assert.equal(safe.state.chat.riskEvents[0]?.text, words, "the exact words are kept for the clinician");
-  await safe.say("story-safe", "safe");
-  assert.equal(safe.active(), "story-confirm", "the conversation goes on");
-
-  const unsafe = patient();
-  await unsafe.say("hello", "start");
-  await unsafe.say("story", "__words");
-  await unsafe.say("story", words);
-  await unsafe.say("story-safe", "unsafe");
-  assertStopped(unsafe, "crisis");
-  assert.ok(unsafe.state.chat.flags.includes("safe-now-unsafe"));
-  await assert.rejects(async () => node("story-safe").submit!("safe", unsafe.ctx), /can’t be changed/);
-  assert.equal(unsafe.state.chat.safeNow.story, "unsafe", "an unsafe answer can't be taken back in chat");
+  const p = patient();
+  await p.say("hello", "start");
+  await p.say("story", "__words");
+  await p.say("story", words);
+  assert.ok(p.cards().includes("support-line"), "988 and 911 are on screen");
+  assert.equal(p.state.chat.riskEvents[0]?.text, words, "the exact words are kept for the clinician");
+  assert.equal(p.active(), "story-confirm", "no extra questions; the fit check's safety question comes later");
 });
 
-test("the safety question pauses booking only when the patient isn't safe, and never lowers an answer", async () => {
+test("the safety question matches the live fit check: yes or not sure stops with crisis resources", async () => {
   const unsafe = patient();
   await intoScreen(unsafe);
+  assert.deepEqual(
+    node("screen-now").input!(unsafe.state)!,
+    { kind: "single", layout: "stack", options: SCREEN[0].options },
+  );
   await unsafe.say("screen-now", "unsafe");
   assertStopped(unsafe, "crisis");
-  assert.ok(unsafe.state.chat.flags.includes("screen-high"));
-  assert.ok(unsafe.state.chat.tasks.some((task) => task.due === "Today"), "a person reviews it today");
-  await assert.rejects(async () => node("screen-now").submit!("no", unsafe.ctx), /can’t be changed/);
-  assert.equal(unsafe.state.chat.screen.now, "unsafe");
+  // Like the funnel's back button, the answer can be changed, and booking goes on.
+  await node("screen-now").submit!("no", unsafe.ctx);
+  assert.equal(unsafe.state.chat.screen.now, "no");
+  assert.equal(unsafe.active(), "hospital");
 
-  const thoughts = patient();
-  await intoScreen(thoughts);
-  await thoughts.say("screen-now", "thoughts");
-  assert.equal(thoughts.active(), "hospital", "thoughts without immediate danger continue to booking");
-  assert.ok(thoughts.cards().includes("support-line"));
-  assert.ok(thoughts.state.chat.flags.includes("screen-moderate"));
-  assert.ok(thoughts.state.chat.tasks.some((task) => task.due === "Within 1 business day"));
-
-  // Raising an answer later is allowed, and the earlier flag stays.
-  const raised = patient();
-  await intoScreen(raised);
-  await raised.say("screen-now", "no");
-  await node("screen-now").submit!("thoughts", raised.ctx);
-  assert.ok(raised.state.chat.flags.includes("screen-moderate"));
-  await assert.rejects(async () => node("screen-now").submit!("no", raised.ctx), /can’t be changed/);
+  const safe = patient();
+  await intoScreen(safe);
+  await safe.say("screen-now", "no");
+  assert.equal(safe.active(), "hospital");
 });
 
 test("service-fit exits are warm stops, not dead ends", async () => {
@@ -235,7 +216,6 @@ test("risk language in a note after booking keeps the visit on and brings in the
   await p.say("medication", "none");
   await p.say("allergy", "none");
   await p.say("pcp", "none");
-  await p.say("baseline", "skip");
   await p.say("note", "I keep thinking about ending it all");
   assert.equal(p.transcript().halted, false, "nothing stops after booking");
   assert.ok(p.cards().includes("support-line"));
@@ -302,7 +282,6 @@ test("golden path: an insured patient reaches a clinician-completed first visit"
   await p.ctx.api.completeVisit("clinician");
   await p.ctx.api.publishCarePlan("clinician");
   await p.settle();
-  await p.say("after", "better");
   assert.ok(p.cards().includes("plan"));
   await p.say("followup", "later");
   assert.equal(p.active(), "complete");
@@ -415,7 +394,6 @@ test("a brief can be left unsent, and the visit goes on", async () => {
   await p.say("medication", "none");
   await p.say("allergy", "none");
   await p.say("pcp", "none");
-  await p.say("baseline", "skip");
   await p.say("note", "");
   await p.say("brief", "skip");
   assert.ok(p.state.chat.briefSkipped);
@@ -432,13 +410,5 @@ test("sharing with a primary care doctor names the doctor", async () => {
   await p.say("pcp", "share");
   await p.say("pcp-name", "Dr. Lee at Austin Family Medicine");
   assert.equal(p.state.chat.pcpName, "Dr. Lee at Austin Family Medicine");
-  assert.equal(p.active(), "baseline");
-});
-
-test("feeling worse after the first visit reaches a person", async () => {
-  const p = patient(momentState("complete"));
-  p.ctx.update({ chat: { afterFeeling: "" } });
-  await p.say("after", "worse");
-  assert.ok(p.state.chat.flags.includes("post-visit-worse"));
-  assert.ok(p.state.chat.tasks.some((task) => task.kind === "post-visit" && task.due === "Within 1 business day"));
+  assert.equal(p.active(), "note");
 });

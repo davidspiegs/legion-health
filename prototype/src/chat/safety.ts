@@ -34,19 +34,15 @@ export interface ScreenQuestion {
 export const SCREEN: ScreenQuestion[] = [
   {
     id: "now",
-    ask: "This one matters most. Are you having any thoughts of harming yourself or someone else right now?",
+    // Legion's live fit check, word for word.
+    ask: "Do you need immediate help to stay safe? Are you in immediate danger of harming yourself or someone else?",
     record: (value) =>
-      value === "unsafe"
-        ? "Has thoughts of harming themself or someone else and said they’re not safe right now"
-        : "Has thoughts of harming themself or someone else and said they’re safe right now",
+      value === "unsafe" ? "Said they need immediate help to stay safe, or weren’t sure" : "Said they’re safe right now",
     mine: (value) =>
-      value === "unsafe"
-        ? "you’re having thoughts of harming yourself or someone else, and you’re not safe right now"
-        : "you’ve been having thoughts of harming yourself or someone else, and you’re safe right now",
+      value === "unsafe" ? "you need immediate help to stay safe, or you’re not sure" : "you’re safe right now",
     options: [
-      { value: "no", label: "No" },
-      { value: "thoughts", label: "I have thoughts, but I’m safe" },
-      { value: "unsafe", label: "Yes, and I’m not safe right now" },
+      { value: "no", label: "No, I’m safe right now" },
+      { value: "unsafe", label: "Yes, or I’m not sure" },
     ],
   },
 ];
@@ -63,15 +59,13 @@ export const screenDone = (screen: Screen) => screenItems(screen).every((item) =
 export const isRiskAnswer = (value: string | undefined) => !!value && value !== "no";
 
 /** Answers in order of risk, so a change can only go up. */
-export const RISK_ORDER = ["no", "thoughts", "unsafe"];
+export const RISK_ORDER = ["no", "unsafe"];
 
 export type ScreenLevel = "none" | "moderate" | "high";
 
 /** Proposed dispositions for the safety answer. */
 export function screenLevel(screen: Screen): ScreenLevel {
-  if (screen.now === "unsafe") return "high";
-  if (screen.now === "thoughts") return "moderate";
-  return "none";
+  return screen.now === "unsafe" ? "high" : "none";
 }
 
 /** Reason codes the safety answer adds; they accumulate and are never removed. */

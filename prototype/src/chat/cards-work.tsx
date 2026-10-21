@@ -911,53 +911,6 @@ const SCORES = [
   { name: "Mood", scale: "PHQ-2", items: ["phq1", "phq2"] },
 ];
 
-function BaselineCard({ state }: CardProps) {
-  const answers = state.chat.baseline;
-  return (
-    <section className="card-shell wk-result wk-baseline" aria-label="Your starting point">
-      <h3 className="wk-result-title">Your starting point</h3>
-      <p className="wk-result-sub">Over the last two weeks</p>
-      <ul className="wk-scores">
-        {SCORES.map((score) => {
-          const values = score.items.map((id) => answers[id]);
-          const total = values.every((value) => typeof value === "number")
-            ? values.reduce((sum, value) => sum + value, 0)
-            : null;
-          return (
-            <li key={score.name}>
-              <div className="wk-score-head">
-                <span className="wk-score-name">{score.name}</span>
-                <span className="wk-score-scale">{score.scale}</span>
-                <span className="wk-score-value">
-                  {total == null ? (
-                    "Not answered"
-                  ) : (
-                    <>
-                      <strong>{total}</strong> of 6
-                    </>
-                  )}
-                </span>
-              </div>
-              <span className="wk-meter" aria-hidden="true">
-                {[1, 2, 3, 4, 5, 6].map((segment) => (
-                  <i
-                    key={segment}
-                    className={total != null && segment <= total ? "is-on" : undefined}
-                    style={{ ["--i" as string]: segment }}
-                  />
-                ))}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      <p className="wk-foot">
-        Scores of 3 or more are worth talking through with your clinician. This isn’t a diagnosis.
-      </p>
-    </section>
-  );
-}
-
 interface Sent {
   key: string;
   at: number;
@@ -1087,6 +1040,5 @@ export const WORK_CARDS: CardMap = {
   identity: (props) => <IdentityCard {...props} />,
   benefits: (props) => <BenefitsCard {...props} />,
   "records-found": (props) => <RecordsFoundCard {...props} />,
-  baseline: (props) => <BaselineCard {...props} />,
   "visit-day": (props) => <VisitDayCard {...props} />,
 };

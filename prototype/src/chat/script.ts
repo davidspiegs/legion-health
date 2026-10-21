@@ -74,7 +74,6 @@ function appointmentDay(s: ChatJourney): string {
 const visitLabel = (iso: string) => `${formatDate(iso, true)}, ${formatTime(iso)}`;
 
 /** Risk language was found in this free text at some point; the record of it never goes away. */
-const riskIn = (s: ChatJourney, source: RiskSource) => s.chat.riskEvents.some((event) => event.source === source);
 
 /** Said right after risk language in free text, before anything else. */
 const CARE_FIRST =
@@ -84,7 +83,6 @@ const CARE_FIRST =
 const CARE_BOOKED =
   "Thank you for telling me. I’ve asked your care team to check in with you today, and your visit is still on. If you’re in danger right now, call 911.";
 
-const LOCKED = "This answer can’t be changed here. A Legion clinician can talk it through with you.";
 
 function formatPhoneMasked(raw: string, mask = true): string {
   const d = raw.replace(/\D/g, "");
@@ -239,48 +237,6 @@ function reflection(s: ChatJourney): AgentBlock[] {
   ];
 }
 
-export const SAFE_NOW = { safe: "I’m safe right now", unsafe: "I’m not safe right now" } as const;
-
-/** "Are you safe right now?", asked the moment risk language shows up in the patient's own words. */
-function safeNowCheck(id: string, source: "story" | "other"): Node {
-  return {
-    id,
-    stage: "story",
-    applies: (s) => riskIn(s, source),
-    why: "If you’re not safe right now, the fastest help is a person, not a booking.",
-    say: () => [say("ask", "Are you safe right now?")],
-    input: () => ({
-      kind: "single",
-      layout: "stack",
-      options: [
-        { value: "safe", label: SAFE_NOW.safe },
-        { value: "unsafe", label: SAFE_NOW.unsafe },
-      ],
-    }),
-    value: (s) => s.chat.safeNow[source],
-    answer: (s) => {
-      const answer = s.chat.safeNow[source];
-      // "Not safe" can't be taken back in chat; a person on the care team follows up.
-      return answer ? { text: SAFE_NOW[answer], editable: answer === "safe" && preBooking(s) } : null;
-    },
-    after: (s) =>
-      s.chat.safeNow[source] === "unsafe"
-        ? [card("crisis")]
-        : [say("ack", "Thank you. Let’s keep going. I’ll make sure your clinician sees what you shared.")],
-    halts: (s) => s.chat.safeNow[source] === "unsafe",
-    submit: (value, ctx) => {
-      const s = ctx.get();
-      if (s.chat.safeNow[source] === "unsafe" && value !== "unsafe") throw new Error(LOCKED);
-      ctx.update({
-        exitReason: value === "unsafe" ? "safety" : s.exitReason,
-        chat: { safeNow: { ...s.chat.safeNow, [source]: value as "safe" | "unsafe" } },
-      });
-      if (value === "unsafe") addFlags(ctx, ["safe-now-unsafe"]);
-    },
-  };
-}
-
-const storySafe = safeNowCheck("story-safe", "story");
 
 const storyConfirm: Node = {
   id: "story-confirm",
@@ -330,8 +286,6 @@ const storyOther: Node = {
     if (mentionsCrisis(text)) flagRisk(ctx, "other", text);
   },
 };
-
-const otherSafe = safeNowCheck("other-safe", "other");
 
 const GOALS: ChatOption[] = [
   { value: "Understand what’s going on", label: "Understand what’s going on" },
@@ -446,8 +400,6 @@ const safety: Node = {
   // Named like the clinician view's records of each safety question.
   id: "screen-now",
   stage: "story",
-  // Someone already asked "Are you safe right now?" after their own words isn't asked twice.
-  applies: (s) => !!s.chat.screen.now || !Object.keys(s.chat.safeNow).length,
   why: "Your safety comes before booking anything. Your answer goes only to your care team.",
   say: () => [say("ask", SAFETY_QUESTION.ask)],
   input: () => ({ kind: "single", layout: "stack", options: SAFETY_QUESTION.options }),
@@ -456,28 +408,18 @@ const safety: Node = {
     const value = s.chat.screen.now;
     if (!value) return null;
     const label = SAFETY_QUESTION.options.find((option) => option.value === value)?.label ?? value;
-    // An answer can be raised, never lowered in chat.
-    return { text: label, editable: value !== "unsafe" && preBooking(s) };
+    return { text: label, editable: preBooking(s) };
   },
-  after: (s) =>
-    s.chat.screen.now === "unsafe"
-      ? [card("crisis")]
-      : s.chat.screen.now === "thoughts"
-        ? [
-            say("ack", "Thank you for telling me. I’ll make sure your clinician knows, so you can talk about it together."),
-            card("support-line"),
-          ]
-        : [],
+  // As in the live fit check: needing help now, or not being sure, ends the flow with crisis resources.
+  after: (s) => (s.chat.screen.now === "unsafe" ? [card("crisis")] : []),
   halts: (s) => s.chat.screen.now === "unsafe",
   submit: (value, ctx) => {
     const s = ctx.get();
-    const previous = s.chat.screen.now ?? "no";
-    if (RISK_ORDER.indexOf(String(value)) < RISK_ORDER.indexOf(previous)) throw new Error(LOCKED);
     const screen = { ...s.chat.screen, now: String(value) };
     const level = screenLevel(screen);
     ctx.update({
       fit: { ...s.fit, "fit-safety": level === "none" ? "no" : "yes" },
-      exitReason: level === "high" ? "safety" : s.exitReason,
+      exitReason: level === "high" ? "safety" : s.exitReason === "safety" ? "" : s.exitReason,
       chat: { screen },
     });
     addFlags(ctx, screenFlags(screen));
@@ -1385,68 +1327,10 @@ const pcpName: Node = {
   submit: (value, ctx) => ctx.update({ chat: { pcpName: String(value).trim() } }),
 };
 
-export const BASELINE = [
-  { id: "gad1", text: "feeling nervous, anxious or on edge?" },
-  { id: "gad2", text: "not being able to stop or control worrying?" },
-  { id: "phq1", text: "little interest or pleasure in doing things?" },
-  { id: "phq2", text: "feeling down, depressed or hopeless?" },
-];
-export const FREQUENCY: ChatOption[] = [
-  { value: "0", label: "Not at all" },
-  { value: "1", label: "Several days" },
-  { value: "2", label: "More than half the days" },
-  { value: "3", label: "Nearly every day" },
-];
-
-const baselineIntro: Node = {
-  id: "baseline",
-  stage: "visit",
-  applies: (s) => prepping(s) && !!s.chat.pcp && (s.chat.pcp !== "share" || !!s.chat.pcpName),
-  skip: prepPassed,
-  why: "Short, standard check-ins (PHQ-2 and GAD-2) give your clinician a starting point to compare against later.",
-  say: (s) => [
-    say(
-      "ask",
-      `Four quick check-ins help ${clinicianFirst(s.appointment!.providerId)} see where you’re starting, so you can both tell later if things are improving.`,
-    ),
-  ],
-  input: () => ({
-    kind: "single",
-    options: [
-      { value: "skip", label: "Skip" },
-      { value: "start", label: "Start", primary: true },
-    ],
-  }),
-  answer: (s) =>
-    s.chat.baselineIntro ? { text: s.chat.baselineIntro === "start" ? "Start" : "Skip", editable: false } : null,
-  submit: (value, ctx) => ctx.update({ chat: { baselineIntro: value as ChatState["baselineIntro"] } }),
-};
-
-/** The four check-ins as one compact card in the dock, not four questions in a row. */
-const baselineCheckin: Node = {
-  id: "baseline-checkin",
-  stage: "visit",
-  applies: (s) => prepping(s) && s.chat.baselineIntro === "start",
-  skip: prepPassed,
-  say: () => [],
-  input: () => ({ kind: "widget", widget: "baseline", label: "Answer the check-in" }),
-  answer: (s) =>
-    BASELINE.every((item) => s.chat.baseline[item.id] != null)
-      ? { text: "Done, all four answered", editable: !prepPassed(s) }
-      : null,
-  after: (s) => (BASELINE.every((item) => s.chat.baseline[item.id] != null) ? [card("baseline")] : []),
-  // The card records each answer as it's tapped; finishing it is the answer.
-  submit: () => undefined,
-};
-
-const baselineDone = (s: ChatJourney) =>
-  s.chat.baselineIntro === "skip" ||
-  (s.chat.baselineIntro === "start" && BASELINE.every((item) => s.chat.baseline[item.id] != null));
-
 const note: Node = {
   id: "note",
   stage: "visit",
-  applies: (s) => prepping(s) && baselineDone(s),
+  applies: (s) => prepping(s) && !!s.chat.pcp && (s.chat.pcp !== "share" || !!s.chat.pcpName),
   skip: prepPassed,
   say: (s) => [
     say("ask", `Anything you’d like ${clinicianFirst(s.appointment!.providerId)} to know before you meet? This is optional.`),
@@ -1725,54 +1609,10 @@ const inVisit: Node = {
   answer: (s) => (visitDone(s) ? { text: "", editable: false } : null),
 };
 
-const after: Node = {
-  id: "after",
-  stage: "visit",
-  applies: visitDone,
-  say: (s) => [say("ask", `How are you feeling after talking with ${clinicianFirst(s.appointment!.providerId)}?`)],
-  input: () => ({
-    kind: "single",
-    options: [
-      { value: "worse", label: "Not great" },
-      { value: "same", label: "About the same" },
-      { value: "better", label: "Better" },
-    ],
-  }),
-  answer: (s) =>
-    s.chat.afterFeeling
-      ? { text: { worse: "Not great", same: "About the same", better: "Better" }[s.chat.afterFeeling], editable: true }
-      : null,
-  after: (s) => [
-    say(
-      "ack",
-      s.chat.afterFeeling === "worse"
-        ? "Thank you for being honest. I’ve asked your care team to check in with you within one business day. If you need support right now, Help has people you can reach any time."
-        : s.chat.afterFeeling === "better"
-          ? "I’m glad. Your plan is on its way."
-          : "Thanks for telling me. Your plan is on its way.",
-    ),
-  ],
-  submit: (value, ctx) => {
-    ctx.update({ chat: { afterFeeling: value as ChatState["afterFeeling"] } });
-    if (value !== "worse" || ctx.get().chat.flags.includes("post-visit-worse")) return;
-    addFlags(ctx, ["post-visit-worse"]);
-    addTask(
-      ctx,
-      {
-        kind: "post-visit",
-        title: "Check in after a hard first visit",
-        due: "Within 1 business day",
-        contact: ctx.get().profile.phone || undefined,
-      },
-      "Asked the care team to check in with you",
-    );
-  },
-};
-
 const plan: Node = {
   id: "plan",
   stage: "visit",
-  applies: (s) => visitDone(s) && !!s.chat.afterFeeling,
+  applies: visitDone,
   say: (s) =>
     s.carePlan.status === "published"
       ? [say("ask", `${clinicianFirst(s.appointment!.providerId)} shared your plan.`), card("plan")]
@@ -1827,10 +1667,8 @@ export const SCRIPT: Node[] = [
   hello,
   helloReady,
   story,
-  storySafe,
   storyConfirm,
   storyOther,
-  otherSafe,
   goal,
   quick,
   quickWhich,
@@ -1857,8 +1695,6 @@ export const SCRIPT: Node[] = [
   pharmacy,
   pcp,
   pcpName,
-  baselineIntro,
-  baselineCheckin,
   note,
   brief,
   idCheck,
@@ -1869,7 +1705,6 @@ export const SCRIPT: Node[] = [
   dayAllergies,
   checkin,
   inVisit,
-  after,
   plan,
   followup,
   complete,

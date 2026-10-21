@@ -70,14 +70,13 @@ import { FORM_CARDS, FORM_SHEETS, FORM_WIDGETS } from "./forms";
 import { VISIT_CARDS, VISIT_SHEETS, VISIT_WIDGETS, VisitRoom } from "./visit";
 import { INFO_CARDS, INFO_SHEETS } from "./sheets";
 import { BOOKED_CARDS, downloadCalendar } from "./cards-booked";
-import { BASELINE_WIDGETS } from "./baseline-widget";
 import { ChatBoundary } from "./boundary";
 import "./chat.css";
 import "./cards.css";
 
 registerCards({ ...INFO_CARDS, ...WORK_CARDS, ...CLINICIAN_CARDS, ...FORM_CARDS, ...VISIT_CARDS, ...BOOKED_CARDS });
 const SHEETS: SheetMap = { ...INFO_SHEETS, ...CLINICIAN_SHEETS, ...FORM_SHEETS, ...VISIT_SHEETS };
-const WIDGETS: WidgetMap = { ...FORM_WIDGETS, ...VISIT_WIDGETS, ...BASELINE_WIDGETS };
+const WIDGETS: WidgetMap = { ...FORM_WIDGETS, ...VISIT_WIDGETS };
 
 const STORAGE = STORAGE_KEY;
 

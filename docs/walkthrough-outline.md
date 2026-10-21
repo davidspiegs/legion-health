@@ -11,12 +11,12 @@ Draft for David's recording. Times are targets. Everything shown is the prototyp
 ## Demo: one conversation, the patient taps, Wren does the work (0:30 to 2:45)
 
 1. **A person-like assistant, honestly disclosed.** "Hi, I’m Wren" in a messaging header. The first card says once, plainly, that Wren is an AI, not a person, and that clinicians make every decision (Texas HB 149).
-2. **Story, not screening.** Conditions as Legion's real choices, or "in my own words" with a read-back the patient confirms. Three logistics checks in one tap. One safety question, as in the live flow, with three answers: show "I have thoughts, but I’m safe" (support lines, a clinician flag, care continues), and say that "not safe right now" pauses booking and offers a same-day call from a clinician.
+2. **Story, not screening.** Conditions as Legion's real choices, or "in my own words" with a read-back the patient confirms. Three logistics checks in one tap. The live fit check's safety question, word for word: "Yes, or I’m not sure" ends with crisis resources, as it does today. No screening is added.
 3. **Matching with receipts.** The work card shows how the directory narrowed; the best fit and three real evening times are visible immediately. Tap a time: held, not booked.
 4. **Four typed fields.** Phone, code, birth date, then "Is this you?" from the identity network. Coverage was verified while the patient typed their email: plan, network, $25 estimate, source.
 5. **Agreements in plain language,** unchecked, with AI note-taking as a separate switch. Card on file, nothing charged. Booked is its own step.
 6. **Edit anything.** Change availability from evenings to mornings: matching re-runs, the evening hold is let go with a stated reason, and only the dependent steps are asked again.
-7. **Preparation that's useful and finite.** Records found, a medication and allergy confirmed against the pharmacy record, PHQ-2/GAD-2 baseline, a brief the patient approves (with what the clinician will see, including the safety flag).
+7. **Preparation that's useful and finite.** Records found, a medication and allergy confirmed against the pharmacy record, and a brief the patient approves (with what the clinician will see).
 8. **After booking, Wren stays.** Tap "When is my visit?", type a question, message Maya and watch the care team's reply arrive in the thread.
 9. **Visit day** (Preview: skip). Reminder, check-in, the waiting room, the visit, a clinician-signed plan, follow-up booked, "first visit complete."
 
