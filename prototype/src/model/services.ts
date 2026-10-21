@@ -8,16 +8,19 @@ import {
 } from "./fixtures";
 import type {
   Appointment,
+  Eligibility,
   JourneyState,
   MockApi,
   ServiceEvent,
   ServiceName,
 } from "./types";
+import { eligibilityInputKey } from "./journey-state";
 
 interface MockApiOptions {
   getState: () => JourneyState;
   update: (patch: Partial<JourneyState>) => void;
   delayMs?: number;
+  eligibilityDelayMs?: number;
 }
 
 /** All effects stay in local prototype state. No fetch, vendor SDK, email, or SMS. */
@@ -25,9 +28,15 @@ export function createMockApi({
   getState,
   update,
   delayMs = 450,
+  eligibilityDelayMs = 1250,
 }: MockApiOptions): MockApi {
   let sequence = 0;
   const inFlight = new Map<string, Promise<unknown>>();
+  let eligibilitySequence = 0;
+  let activeEligibility: {
+    fingerprint: string;
+    promise: Promise<Eligibility>;
+  } | null = null;
   const delay = (ms = delayMs) =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
   const emit = (
@@ -149,26 +158,102 @@ export function createMockApi({
       );
     },
     checkEligibility() {
-      if (getState().coverage === "selfpay") {
+      const initial = getState();
+      if (initial.coverage === "selfpay") {
+        eligibilitySequence++;
+        activeEligibility = null;
         const eligibility = { status: "unverified" as const, estimate: null };
         update({ eligibility });
         return Promise.resolve(eligibility);
       }
-      return run(
-        "checkEligibility",
+      if (!initial.payer.trim() || !initial.memberId.trim()) {
+        return Promise.reject(
+          new Error(
+            "Choose your insurer and enter the member ID from your card.",
+          ),
+        );
+      }
+      // This fingerprint stays inside the adapter closure and never enters events.
+      // Results belong to these exact inputs, not whichever fields exist later.
+      const fingerprint = eligibilityInputKey(initial);
+      if (activeEligibility?.fingerprint === fingerprint)
+        return activeEligibility.promise;
+      const request = ++eligibilitySequence;
+      const scenario = initial.scenario;
+      update({ eligibility: { status: "checking", estimate: null } });
+      const promise = run<Eligibility>(
+        `checkEligibility:${request}`,
         "Sohar",
-        "eligibility.checked",
-        "Coverage status returned; no real payer contacted",
+        "eligibility.verification",
+        "Synthetic coverage and benefit result returned; no payer contacted",
         () => {
-          const state = getState();
-          const eligibility =
-            state.scenario === "coverage-pending"
-              ? { status: "pending" as const, estimate: null }
-              : { status: "verified" as const, estimate: 25 };
+          if (
+            request !== eligibilitySequence ||
+            fingerprint !== eligibilityInputKey(getState())
+          ) {
+            if (
+              request === eligibilitySequence &&
+              getState().eligibility.status === "checking"
+            ) {
+              update({ eligibility: { status: "unverified", estimate: null } });
+            }
+            throw new Error(
+              "Your insurance details changed. Check the updated details again.",
+            );
+          }
+          const checkedAt = new Date().toISOString();
+          const eligibility: Eligibility =
+            scenario === "coverage-pending"
+              ? {
+                  status: "pending",
+                  estimate: null,
+                  checkedAt,
+                  networkStatus: "unknown",
+                }
+              : scenario === "coverage-unmatched"
+                ? {
+                    status: "unmatched",
+                    estimate: null,
+                    checkedAt,
+                    networkStatus: "unknown",
+                  }
+                : {
+                    status: "verified",
+                    estimate: 25,
+                    checkedAt,
+                    activeCoverage: true,
+                    networkStatus: "in-network",
+                  };
           update({ eligibility });
           return eligibility;
         },
+        (result) =>
+          result.status === "pending"
+            ? {
+                outcome: "pending",
+                detail:
+                  "Synthetic payer response remains unresolved; no coverage or cost decision",
+              }
+            : result.status === "unmatched"
+              ? {
+                  outcome: "error",
+                  detail:
+                    "Synthetic member details did not match; coverage is unknown",
+                }
+              : {
+                  outcome: "success",
+                  detail:
+                    "Synthetic active coverage and in-network visit estimate returned; not a payment guarantee",
+                },
+        eligibilityDelayMs,
       );
+      activeEligibility = { fingerprint, promise };
+      void promise
+        .finally(() => {
+          if (activeEligibility?.promise === promise) activeEligibility = null;
+        })
+        .catch(() => {});
+      return promise;
     },
     createAccount() {
       if (hasAccount()) return Promise.resolve();

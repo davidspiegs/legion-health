@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open [the patient experience](http://127.0.0.1:5174/). Build with `npm run build`; run the 16 state/integration contract tests with `npm test`.
+Open [the patient experience](http://127.0.0.1:5174/). Build with `npm run build`; run the 33 state, integration, and viewport regression tests with `npm test`.
 
 ## Review
 
@@ -19,13 +19,13 @@ Open [the patient experience](http://127.0.0.1:5174/). Build with `npm run build
 - **Preview controls:** the footer outside the patient surface opens a simulation dialog. After booking, advance to appointment day; during the visit, advance the conversation, then send the simulated clinician completion signal. The full journey is accessible in patient mode.
 - **Full review `/?review=1`:** [open the reviewer view](http://127.0.0.1:5174/?review=1) for chapter navigation and the following tools. Switching modes preserves the current local journey.
 - **The flow:** jump to any screen with explicit fictional fixtures. Jumping replaces the review path; it does not complete skipped steps.
-- **Recovery:** slot contention, pending coverage, unavailable records, payment retry, interrupted visit, and failed save.
+- **Recovery:** slot contention, pending or unmatched coverage, unavailable records, payment retry, interrupted visit, and failed save.
 - **Mock activity:** inspect the sanitized local service ledger.
 - **Use sample details:** fills fictional personal details without accepting agreements or records consent.
 - **Restart preview:** clears this preview's progress.
 
 Progress persists in this browser's local storage. This is not a production patient portal or a secure place for real health information. The app needs no environment variables or vendor accounts.
 
-The interface uses Legion's public logo and locally bundled Inter, white backgrounds, and its blue/ink palette. Shared actions keep a stable label and size while busy. The optional testimonial rotates every 7.5 seconds with pause and reduced-motion support and hides when space or the keyboard requires it. [The current design reference](../docs/design/brand-correction-reference.png) is an internal concept, not an approved final design.
+The interface uses Legion's public logo and locally bundled Inter, white backgrounds, and its blue/ink palette. Shared actions keep a stable label and size while busy. Three authentic captured testimonials rotate every nine seconds, stop after manual selection, respect reduced motion, and hide when space or the keyboard requires it. There is no pause button. Screen content transitions while action buttons remain steady. Insurance accepts any nonempty demo member ID and shows checking, estimated benefits, or an unresolved recovery state. [The current design reference](../docs/design/brand-correction-reference.png) is an internal concept, not an approved final design.
 
 See [journey rationale](../docs/redesigned-journey.md), [architecture and production boundaries](../docs/prototype-architecture.md), and [verification](../docs/prototype-qa.md).

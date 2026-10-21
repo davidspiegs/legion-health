@@ -213,7 +213,7 @@ export function BookingScreens(props: ScreenProps) {
     state.coverage === "selfpay"
       ? "Self-pay · $250 first visit"
       : state.eligibility.status === "verified"
-        ? `Estimated copay · $${state.eligibility.estimate}`
+        ? `Estimated visit cost · $${state.eligibility.estimate}`
         : "Using insurance · cost checked before confirmation";
 
   async function continueFromSlot() {
@@ -718,138 +718,279 @@ export function BookingScreens(props: ScreenProps) {
       </Page>
     );
 
-  if (state.step === "insurance")
+  if (state.step === "insurance") {
+    const status = state.eligibility.status;
+    const checking = status === "checking";
+    const hasResult =
+      status === "verified" || status === "pending" || status === "unmatched";
+    const editDetails = () => {
+      update({ eligibility: { status: "unverified", estimate: null } });
+      requestAnimationFrame(() =>
+        document.getElementById("insurance-member")?.focus(),
+      );
+    };
+    const checkCoverage = async () => {
+      if (!state.payer) {
+        invalid("insurance-payer", "Choose your insurance provider.");
+        return;
+      }
+      if (!state.memberId.trim()) {
+        invalid("insurance-member", "Enter your member ID.");
+        return;
+      }
+      // The lookup replaces the entry form; do not leave an obsolete keyboard over its result.
+      if (document.activeElement instanceof HTMLElement)
+        document.activeElement.blur();
+      const request = act(() => api.checkEligibility());
+      requestAnimationFrame(() => {
+        const content = document.querySelector<HTMLElement>(
+          ".booking-insurance .screen-main",
+        );
+        if (content) content.scrollTop = 0;
+        content
+          ?.querySelector<HTMLElement>("h1")
+          ?.focus({ preventScroll: true });
+      });
+      await request;
+    };
+    const checkedTime = state.eligibility.checkedAt
+      ? new Intl.DateTimeFormat("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        }).format(new Date(state.eligibility.checkedAt))
+      : "just now";
     return (
       <Page
-        className="booking-info booking-insurance"
-        title="Let’s check your coverage"
-        subtitle="A few details from your insurance card help estimate your visit cost."
+        className={`booking-info booking-insurance ${hasResult || checking ? "insurance-result-screen" : ""}`}
+        title={
+          checking
+            ? "Checking your coverage"
+            : status === "verified"
+              ? "Here’s your coverage"
+              : status === "pending"
+                ? "Your check needs more time"
+                : status === "unmatched"
+                  ? "Let’s double-check your details"
+                  : "Let’s check your coverage"
+        }
+        subtitle={
+          checking
+            ? "Looking up your eligibility and benefits for this visit."
+            : status === "verified"
+              ? "Review your estimated cost before you continue."
+              : status === "pending"
+                ? "Your payer hasn’t returned a complete result yet."
+                : status === "unmatched"
+                  ? "We couldn’t match the information on your insurance card."
+                  : "A few details from your insurance card help estimate your visit cost."
+        }
         onSubmit={submit(async () => {
-          if (state.eligibility.status === "verified") {
+          if (checking) return;
+          if (status === "verified") {
             await saveThen("email", "insurance");
             return;
           }
-          if (!state.payer) {
-            invalid("insurance-payer", "Choose your insurance provider.");
+          if (status === "unmatched") {
+            editDetails();
             return;
           }
-          if (!state.memberId.trim()) {
-            invalid("insurance-member", "Enter your member ID.");
-            return;
-          }
-          await act(() => api.checkEligibility());
+          await checkCoverage();
         })}
         footer={
           <>
-            {infoFooter(
-              state.eligibility.status === "verified"
-                ? "Continue"
-                : state.eligibility.status === "pending"
-                  ? "Check again"
-                  : "Check my coverage",
-            )}
-            {state.eligibility.status === "pending" ? (
-              <>
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => {
-                    update({
-                      coverage: "selfpay",
-                      eligibility: { status: "unverified", estimate: null },
-                    });
-                    void saveThen("email", "self-pay-choice");
-                  }}
-                >
-                  Choose self-pay · $250 first visit
-                </Button>
-                <button
-                  className="booking-text-button"
-                  type="button"
-                  onClick={props.openHelp}
-                >
-                  Get help with my coverage
-                </button>
-              </>
+            <Button type="submit" loading={checking || busy}>
+              {checking
+                ? "Checking coverage"
+                : status === "verified"
+                  ? "Continue"
+                  : status === "pending"
+                    ? "Check again"
+                    : status === "unmatched"
+                      ? "Edit insurance details"
+                      : "Check my coverage"}
+            </Button>
+            {status === "pending" || status === "unmatched" ? (
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => {
+                  update({
+                    coverage: "selfpay",
+                    eligibility: { status: "unverified", estimate: null },
+                  });
+                  void saveThen("email", "self-pay-choice");
+                }}
+              >
+                Choose self-pay · $250 first visit
+              </Button>
             ) : null}
           </>
         }
       >
         {context}
-        <div className="booking-fields">
-          <div
-            className={`field ${errors["insurance-payer"] ? "invalid" : ""}`}
-          >
-            <label htmlFor="insurance-payer">Insurance provider</label>
-            <select
-              id="insurance-payer"
-              value={state.payer}
-              aria-invalid={!!errors["insurance-payer"]}
-              aria-describedby={
-                errors["insurance-payer"] ? "insurance-payer-error" : undefined
-              }
-              onChange={(event) =>
-                update({
-                  payer: event.target.value,
-                  eligibility: { status: "unverified", estimate: null },
-                })
-              }
-            >
-              <option value="">Choose your insurance</option>
-              {payerOptions.map((payer) => (
-                <option key={payer}>{payer}</option>
-              ))}
-            </select>
-            {errors["insurance-payer"] ? (
-              <p
-                className="field-error"
-                id="insurance-payer-error"
-                role="alert"
-              >
-                {errors["insurance-payer"]}
-              </p>
-            ) : null}
+        {checking ? (
+          <div className="insurance-checking" role="status" aria-live="polite">
+            <span className="insurance-state-icon">
+              <ShieldCheck size={30} aria-hidden="true" />
+            </span>
+            <h2>Waiting for your coverage result</h2>
+            <p>{state.payer} · video psychiatry visit</p>
+            <div className="insurance-loading-track" aria-hidden="true">
+              <span />
+            </div>
+            <p className="insurance-result-note">
+              Your details are saved. Nothing is booked or charged during this
+              check.
+            </p>
           </div>
-          <Field
-            id="insurance-member"
-            label="Member ID"
-            placeholder="As shown on your card"
-            autoCapitalize="characters"
-            autoComplete="off"
-            enterKeyHint="go"
-            value={state.memberId}
-            error={errors["insurance-member"]}
-            onChange={(event) =>
-              update({
-                memberId: event.target.value,
-                eligibility: { status: "unverified", estimate: null },
-              })
-            }
-          />
-        </div>
-        {state.eligibility.status === "verified" ? (
-          <Notice tone="success">
-            <strong>Estimated copay: ${state.eligibility.estimate}</strong>
-            <span>
-              An estimate based on your benefits. Final cost depends on your
-              plan.
-            </span>
-          </Notice>
-        ) : state.eligibility.status === "pending" ? (
-          <Notice tone="warning">
-            <strong>Your coverage is still being checked</strong>
-            <span>
-              We haven’t verified a copay. Try again, get help, or choose
-              self-pay. Your answers are saved.
-            </span>
-          </Notice>
+        ) : hasResult ? (
+          <div className="insurance-result" aria-live="polite">
+            <div className="insurance-result-heading">
+              <span className="insurance-state-icon">
+                {status === "verified" ? (
+                  <ShieldCheck size={26} />
+                ) : status === "pending" ? (
+                  <Clock3 size={26} />
+                ) : (
+                  <CreditCard size={26} />
+                )}
+              </span>
+              <div>
+                <strong>
+                  {status === "verified"
+                    ? "Active coverage"
+                    : status === "pending"
+                      ? "Coverage pending"
+                      : "No matching result"}
+                </strong>
+                <span>{state.payer}</span>
+              </div>
+            </div>
+            {status === "verified" ? (
+              <>
+                <div className="insurance-estimate">
+                  <span>Estimated first-visit cost</span>
+                  <strong>${state.eligibility.estimate}</strong>
+                  <small>In-network video visit</small>
+                </div>
+                <p className="insurance-result-note">
+                  Based on the benefits returned for this visit. This is an
+                  estimate, not a guarantee of payment; your insurer determines
+                  the final claim.
+                </p>
+                <p className="insurance-check-time">Checked {checkedTime}</p>
+                <button
+                  className="booking-text-button"
+                  type="button"
+                  onClick={editDetails}
+                >
+                  Edit insurance details
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="insurance-result-note">
+                  {status === "pending"
+                    ? "We can’t confirm coverage or a cost yet. You can retry or ask our care team to review it."
+                    : "This doesn’t mean you’re uninsured. Check your name, birth date, insurer, and member ID, then try again."}
+                </p>
+                <div className="insurance-recovery-links">
+                  {status === "pending" ? (
+                    <button
+                      className="booking-text-button"
+                      type="button"
+                      onClick={editDetails}
+                    >
+                      Edit details
+                    </button>
+                  ) : (
+                    <button
+                      className="booking-text-button"
+                      type="button"
+                      onClick={() => void checkCoverage()}
+                    >
+                      Try again
+                    </button>
+                  )}
+                  <button
+                    className="booking-text-button"
+                    type="button"
+                    onClick={props.openHelp}
+                  >
+                    Ask our care team
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         ) : (
-          <p className="booking-small">
-            <ShieldCheck size={15} /> Only used to check your health benefits
-          </p>
+          <>
+            <div className="booking-fields">
+              <div
+                className={`field ${errors["insurance-payer"] ? "invalid" : ""}`}
+              >
+                <label htmlFor="insurance-payer">Insurance provider</label>
+                <select
+                  id="insurance-payer"
+                  value={state.payer}
+                  aria-invalid={!!errors["insurance-payer"]}
+                  aria-describedby={
+                    errors["insurance-payer"]
+                      ? "insurance-payer-error"
+                      : undefined
+                  }
+                  onChange={(event) =>
+                    update({
+                      payer: event.target.value,
+                      eligibility: { status: "unverified", estimate: null },
+                    })
+                  }
+                >
+                  <option value="">Choose your insurance</option>
+                  {payerOptions.map((payer) => (
+                    <option key={payer}>{payer}</option>
+                  ))}
+                </select>
+                {errors["insurance-payer"] ? (
+                  <p
+                    className="field-error"
+                    id="insurance-payer-error"
+                    role="alert"
+                  >
+                    {errors["insurance-payer"]}
+                  </p>
+                ) : null}
+              </div>
+              <Field
+                id="insurance-member"
+                label="Member ID"
+                placeholder="As shown on your card"
+                type="text"
+                inputMode="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                value={state.memberId}
+                error={errors["insurance-member"]}
+                onChange={(event) =>
+                  update({
+                    memberId: event.target.value,
+                    eligibility: { status: "unverified", estimate: null },
+                  })
+                }
+              />
+            </div>
+            <p className="booking-small">
+              <ShieldCheck size={15} /> Used to check your benefits, not to
+              approve care
+            </p>
+          </>
         )}
       </Page>
     );
+  }
 
   if (state.step === "email")
     return (
@@ -1037,7 +1178,7 @@ export function BookingScreens(props: ScreenProps) {
               {state.coverage === "selfpay"
                 ? "Your first visit"
                 : state.eligibility.status === "verified"
-                  ? "Estimated copay"
+                  ? "Estimated visit cost"
                   : "Your visit cost"}
             </span>
             <strong>

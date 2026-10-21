@@ -10,8 +10,6 @@ import {
   Check,
   ChevronRight,
   CalendarDays,
-  Pause,
-  Play,
   type LucideIcon,
 } from "lucide-react";
 import type { JourneyState, Provider } from "../model/types";
@@ -229,16 +227,32 @@ export function AppointmentContext({
     </div>
   );
 }
-const quotes = [
-  "I love my provider!",
-  "She leaves no questions unanswered.",
-  "Friendly staff, very helpful!",
+// Three distinct patient testimonials captured from Legion's current intake.
+// Sources: desktop-patient.jpg, desktop-fit-1.jpg, desktop-insurance-options.jpg in canvas/assets.
+const testimonials = [
+  {
+    quote:
+      "This has been the easiest healthcare I've ever had and I've had therapists for 20+ years.",
+    excerpt: false,
+  },
+  {
+    quote:
+      "I love my provider! She is great to work with, very informative about treatments and medications. She leaves no questions unanswered.",
+    excerpt: true,
+  },
+  {
+    quote:
+      "My symptoms and how they affect my day-to-day life have really been validated.",
+    excerpt: true,
+  },
 ];
 export function Testimonial() {
   const [index, setIndex] = useState(0),
-    [paused, setPaused] = useState(false),
+    [manuallySelected, setManuallySelected] = useState(false),
     [reduce, setReduce] = useState(false),
-    [hover, setHover] = useState(false);
+    [hover, setHover] = useState(false),
+    [focused, setFocused] = useState(false),
+    [hidden, setHidden] = useState(() => document.hidden);
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReduce(media.matches);
@@ -247,37 +261,58 @@ export function Testimonial() {
     return () => media.removeEventListener("change", update);
   }, []);
   useEffect(() => {
-    if (paused || reduce || hover) return;
+    const update = () => setHidden(document.hidden);
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+  useEffect(() => {
+    if (reduce || hover || focused || hidden || manuallySelected) return;
     const timer = window.setInterval(() => {
-      if (!document.hidden) setIndex((i) => (i + 1) % quotes.length);
-    }, 7500);
+      setIndex((i) => (i + 1) % testimonials.length);
+    }, 9000);
     return () => window.clearInterval(timer);
-  }, [paused, reduce, hover]);
+  }, [reduce, hover, focused, hidden, manuallySelected]);
+  const testimonial = testimonials[index];
   return (
     <aside
       className="testimonial"
-      aria-label="Excerpts from a Legion patient testimonial"
+      aria-label="Legion patient experiences"
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      onFocusCapture={() => setPaused(true)}
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setFocused(false);
+        }
+      }}
     >
       <div className="quote-line">
-        <p key={index}>“{quotes[index]}”</p>
-        <button
-          type="button"
-          className="icon-button quote-pause"
-          onPointerDown={(e) => e.preventDefault()}
-          onClick={() => setPaused((p) => !p)}
-          aria-label={
-            paused || reduce ? "Play testimonials" : "Pause testimonials"
-          }
-          disabled={reduce}
-        >
-          {paused || reduce ? <Play size={14} /> : <Pause size={14} />}
-        </button>
+        <p key={index}>“{testimonial.quote}”</p>
       </div>
       <div className="quote-bottom">
-        <span>Legion Health patient · excerpt</span>
+        <span>
+          Legion Health patient{testimonial.excerpt ? " · excerpt" : ""}
+        </span>
+        <div
+          className="quote-dots"
+          role="group"
+          aria-label="Choose a patient testimonial"
+        >
+          {testimonials.map((_, item) => (
+            <button
+              type="button"
+              key={item}
+              aria-label={`Show testimonial ${item + 1} of ${testimonials.length}`}
+              aria-pressed={item === index}
+              onClick={() => {
+                setManuallySelected(true);
+                setIndex(item);
+              }}
+            >
+              <span aria-hidden="true" />
+            </button>
+          ))}
+        </div>
       </div>
     </aside>
   );

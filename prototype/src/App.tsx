@@ -31,6 +31,8 @@ import {
   normalizeConditions,
 } from "./model/fixtures";
 import { createMockApi } from "./model/services";
+import { applyJourneyPatch } from "./model/journey-state";
+import { useMobileViewport } from "./hooks/useMobileViewport";
 import type {
   JourneyState,
   Profile,
@@ -97,6 +99,12 @@ const scenarios: {
     step: "insurance",
   },
   {
+    value: "coverage-unmatched",
+    title: "Insurance details don’t match",
+    detail: "Correct the details without assuming coverage was denied",
+    step: "insurance",
+  },
+  {
     value: "records-unavailable",
     title: "Records can’t be found",
     detail: "Continue with the patient’s own story",
@@ -133,6 +141,10 @@ function restore(): JourneyState {
         ...initialState(),
         ...saved,
         conditions: normalizeConditions(saved.conditions),
+        eligibility:
+          saved.eligibility?.status === "checking"
+            ? { status: "unverified", estimate: null }
+            : saved.eligibility || initialState().eligibility,
         ...(needsConditionReview ? { step: "needs" as Step, history: [] } : {}),
         profile: { ...initialState().profile, ...saved.profile },
       };
@@ -165,7 +177,11 @@ function reviewFixture(step: Step, scenario: Scenario): JourneyState {
     payer: "Aetna",
     memberId: "DEMO12345",
   };
-  if (scenario === "coverage-pending" || step === "insurance")
+  if (
+    scenario === "coverage-pending" ||
+    scenario === "coverage-unmatched" ||
+    step === "insurance"
+  )
     s.coverage = "insurance";
   if (step === "review" || careSteps.includes(step)) {
     s.events = [
@@ -258,14 +274,17 @@ export default function App() {
   const [panel, setPanel] = useState<
     "flow" | "scenarios" | "services" | "simulation"
   >("flow");
-  const [typing, setTyping] = useState(false);
+  const [navigation, setNavigation] = useState<
+    "initial" | "forward" | "backward"
+  >("initial");
   const [storageAvailable, setStorageAvailable] = useState(true);
   const review = useRef<HTMLDialogElement>(null),
     help = useRef<HTMLDialogElement>(null);
   const app = useRef<HTMLDivElement>(null);
+  const typing = useMobileViewport(app);
   const continueTyping = useRef(false);
   const update = useCallback((patch: Partial<JourneyState>) => {
-    const next = { ...stateRef.current, ...patch };
+    const next = applyJourneyPatch(stateRef.current, patch);
     stateRef.current = next;
     setState(next);
   }, []);
@@ -303,6 +322,7 @@ export default function App() {
   const go = useCallback(
     (step: Step) => {
       if (step === stateRef.current.step) return;
+      setNavigation("forward");
       continueTyping.current = !!document.activeElement?.matches(
         "input:not([type=checkbox]),textarea,select",
       );
@@ -317,6 +337,7 @@ export default function App() {
   const back = useCallback(() => {
     const history = stateRef.current.history;
     if (!history.length) return;
+    setNavigation("backward");
     setError("");
     update({
       step: history[history.length - 1],
@@ -331,42 +352,6 @@ export default function App() {
       setStorageAvailable(false);
     }
   }, [state]);
-  useEffect(() => {
-    const sync = () => {
-      const vv = window.visualViewport;
-      document.documentElement.style.setProperty(
-        "--app-height",
-        `${vv?.height || window.innerHeight}px`,
-      );
-      document.documentElement.style.setProperty(
-        "--viewport-top",
-        `${vv?.offsetTop || 0}px`,
-      );
-      const focused = document.activeElement;
-      const editing =
-        focused instanceof HTMLElement &&
-        focused.matches("input:not([type=checkbox]),textarea,select") &&
-        !!app.current?.contains(focused);
-      setTyping(editing);
-      if (editing)
-        requestAnimationFrame(() =>
-          focused.scrollIntoView({ block: "nearest", behavior: "instant" }),
-        );
-    };
-    sync();
-    window.visualViewport?.addEventListener("resize", sync);
-    window.visualViewport?.addEventListener("scroll", sync);
-    window.addEventListener("resize", sync);
-    document.addEventListener("focusin", sync);
-    document.addEventListener("focusout", sync);
-    return () => {
-      window.visualViewport?.removeEventListener("resize", sync);
-      window.visualViewport?.removeEventListener("scroll", sync);
-      window.removeEventListener("resize", sync);
-      document.removeEventListener("focusin", sync);
-      document.removeEventListener("focusout", sync);
-    };
-  }, []);
   useLayoutEffect(() => {
     document.title = `${FLOW.find((item) => item.id === state.step)?.title || "Your care"} · Legion Health`;
     const main = app.current?.querySelector(".screen-main");
@@ -421,6 +406,7 @@ export default function App() {
     review.current?.showModal();
   }
   function jump(step: Step, scenario: Scenario = "standard") {
+    setNavigation("forward");
     const next = reviewFixture(step, scenario);
     stateRef.current = next;
     setState(next);
@@ -515,7 +501,7 @@ export default function App() {
         </aside>
       ) : null}
       <main className="preview-stage">
-        <div className="patient-app" ref={app} aria-busy={busy}>
+        <div className="patient-app" ref={app} data-navigation={navigation}>
           {reviewMode ? (
             <div className="preview-banner">
               <span>

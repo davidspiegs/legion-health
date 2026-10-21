@@ -7,10 +7,28 @@ import {
   CreditCard,
   ArrowUpRight,
   ChevronRight,
+  Brain,
+  CloudRain,
+  Activity,
+  Scale,
+  Shield,
+  CircleHelp,
+  Ellipsis,
+  type LucideIcon,
 } from "lucide-react";
 import { Button, Choice, Notice, Page, Testimonial } from "../components/ui";
 import { CONDITION_OPTIONS, toggleCondition } from "../model/fixtures";
 import type { JourneyState, ScreenProps, Step } from "../model/types";
+
+const conditionIcons: Record<(typeof CONDITION_OPTIONS)[number], LucideIcon> = {
+  ADHD: Brain,
+  Depression: CloudRain,
+  Anxiety: Activity,
+  "Bipolar Disorder": Scale,
+  PTSD: Shield,
+  "I'm not sure": CircleHelp,
+  Other: Ellipsis,
+};
 
 const fitQuestions: {
   id: Step;
@@ -318,27 +336,33 @@ export function IntakeScreens(p: ScreenProps) {
           role="group"
           aria-label="Conditions you would like help with"
         >
-          {CONDITION_OPTIONS.map((condition) => (
-            <label
-              key={condition}
-              className={`condition-option ${state.conditions.includes(condition) ? "selected" : ""}`}
-            >
-              <input
-                type="checkbox"
-                name="conditions"
-                value={condition}
-                checked={state.conditions.includes(condition)}
-                disabled={busy}
-                onChange={() => {
-                  setError("");
-                  update({
-                    conditions: toggleCondition(state.conditions, condition),
-                  });
-                }}
-              />
-              <span>{condition}</span>
-            </label>
-          ))}
+          {CONDITION_OPTIONS.map((condition) => {
+            const Icon = conditionIcons[condition];
+            return (
+              <label
+                key={condition}
+                className={`condition-option ${state.conditions.includes(condition) ? "selected" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  name="conditions"
+                  value={condition}
+                  checked={state.conditions.includes(condition)}
+                  disabled={busy}
+                  onChange={() => {
+                    setError("");
+                    update({
+                      conditions: toggleCondition(state.conditions, condition),
+                    });
+                  }}
+                />
+                <span className="condition-icon" aria-hidden="true">
+                  <Icon size={22} strokeWidth={1.75} />
+                </span>
+                <span className="condition-label">{condition}</span>
+              </label>
+            );
+          })}
         </div>
         <Testimonial />
       </Page>

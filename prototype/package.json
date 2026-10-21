@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 5174",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5175",
-    "test": "node --import tsx --test src/model/*.test.ts"
+    "test": "node --import tsx --test src/model/*.test.ts src/hooks/*.test.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

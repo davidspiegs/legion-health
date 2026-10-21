@@ -345,6 +345,126 @@
   font-size: 13px;
   line-height: 1.55;
 }
+.insurance-checking,
+.insurance-result {
+  padding: 8px 0 0;
+}
+.insurance-checking {
+  text-align: center;
+}
+.insurance-state-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--soft);
+  color: var(--blue);
+  flex: none;
+}
+.insurance-checking h2 {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin: 17px 0 7px;
+}
+.insurance-checking > p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.insurance-loading-track {
+  height: 4px;
+  max-width: 250px;
+  margin: 23px auto;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--soft);
+}
+.insurance-loading-track span {
+  display: block;
+  width: 35%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--blue);
+  animation: insurance-wait 1.1s ease-in-out infinite alternate;
+}
+@keyframes insurance-wait {
+  from {
+    margin-left: 0;
+  }
+  to {
+    margin-left: 65%;
+  }
+}
+.insurance-result-heading {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+}
+.insurance-result-heading > div {
+  display: grid;
+  gap: 5px;
+}
+.insurance-result-heading strong {
+  font-size: 18px;
+  font-weight: 500;
+}
+.insurance-result-heading span:not(.insurance-state-icon) {
+  font-size: 14px;
+  color: var(--muted);
+}
+.insurance-estimate {
+  background: var(--soft);
+  border-radius: 10px;
+  margin: 20px 0 15px;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px 12px;
+  align-items: center;
+}
+.insurance-estimate > span {
+  font-size: 15px;
+}
+.insurance-estimate > strong {
+  font-size: 32px;
+  font-weight: 500;
+  grid-row: span 2;
+}
+.insurance-estimate small,
+.insurance-result-note,
+.insurance-check-time {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.insurance-result-note {
+  margin: 18px 0 0;
+}
+.insurance-check-time {
+  font-size: 12px;
+  margin: 10px 0 4px;
+}
+.insurance-recovery-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px 14px;
+  margin-top: 14px;
+}
+.insurance-recovery-links .booking-text-button {
+  margin: 0;
+  font-size: 15px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .insurance-loading-track span {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
 .booking-info .check-row {
   margin: 0;
   align-items: flex-start;
@@ -576,6 +696,9 @@
   }
 }
 @media (max-height: 700px) {
+  .insurance-result-screen .appointment-context {
+    display: none;
+  }
   .booking-info .appointment-context {
     margin-top: 12px;
     margin-bottom: 17px;

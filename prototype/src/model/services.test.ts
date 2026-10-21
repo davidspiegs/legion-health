@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createMockApi } from "./services";
+import { applyJourneyPatch } from "./journey-state";
 import {
   initialState,
   sampleProfile,
@@ -16,16 +17,25 @@ import {
 import type { JourneyState } from "./types";
 
 function harness(patch: Partial<JourneyState> = {}) {
-  let state = { ...initialState(), ...patch };
+  const insuranceDetails =
+    patch.coverage === "insurance"
+      ? { payer: "Aetna", memberId: "1", profile: { ...sampleProfile } }
+      : {};
+  let state = { ...initialState(), ...insuranceDetails, ...patch };
   const update = (next: Partial<JourneyState>) => {
-    state = { ...state, ...next };
+    state = applyJourneyPatch(state, next);
   };
   return {
     get state() {
       return state;
     },
     update,
-    api: createMockApi({ getState: () => state, update, delayMs: 0 }),
+    api: createMockApi({
+      getState: () => state,
+      update,
+      delayMs: 0,
+      eligibilityDelayMs: 0,
+    }),
   };
 }
 
@@ -148,14 +158,13 @@ test("declining records never calls Metriport and unavailable records can be ret
 
 test("an unresolved insurance response stays pending across retries", async () => {
   const h = harness({ scenario: "coverage-pending", coverage: "insurance" });
-  assert.deepEqual(await h.api.checkEligibility(), {
-    status: "pending",
-    estimate: null,
-  });
-  assert.deepEqual(await h.api.checkEligibility(), {
-    status: "pending",
-    estimate: null,
-  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await h.api.checkEligibility();
+    assert.equal(result.status, "pending");
+    assert.equal(result.estimate, null);
+    assert.equal(result.networkStatus, "unknown");
+    assert.ok(result.checkedAt);
+  }
 });
 
 test("unverified or pending insurance blocks confirmation until verified or explicitly changed to self-pay", async () => {
@@ -178,12 +187,12 @@ test("unverified or pending insurance blocks confirmation until verified or expl
   h.update({ coverage: "selfpay" });
   const appointment = await h.api.confirm();
   assert.equal(appointment.status, "confirmed");
-  assert.equal(h.state.eligibility.status, "pending");
+  assert.equal(h.state.eligibility.status, "unverified");
   assert.equal(h.state.coverage, "selfpay");
 });
 
 test("verified insurance can confirm without changing the selected payment path", async () => {
-  const h = harness({ coverage: "insurance" });
+  const h = harness({ coverage: "insurance", slotId: slots[0].id });
   await h.api.checkEligibility();
   const appointment = await book(h);
   assert.equal(appointment.status, "confirmed");
@@ -371,4 +380,165 @@ test("form helpers reject invalid dates and keep Central Time correct across day
   assert.equal(formatTime(followupSlots[0]), "9:00 AM");
   assert.match(formatDate(slots[0]), /Thursday, October 22/);
   assert.match(formatDate(followupSlots[0]), /Thursday, November 5/);
+});
+
+test("numeric and alphanumeric member IDs use the same asynchronous verification contract", async () => {
+  for (const memberId of ["1", "123456", "ABC123", "test-id"]) {
+    const h = harness({ coverage: "insurance", memberId });
+    const request = h.api.checkEligibility();
+    assert.equal(h.state.eligibility.status, "checking");
+    assert.equal(h.state.eligibility.estimate, null);
+    const result = await request;
+    assert.equal(result.status, "verified");
+    assert.equal(result.activeCoverage, true);
+    assert.equal(result.estimate, 25);
+    assert.equal(result.networkStatus, "in-network");
+    assert.ok(result.checkedAt);
+    assert.equal(
+      h.state.events
+        .map((event) => event.detail)
+        .join(" ")
+        .includes(memberId),
+      false,
+    );
+  }
+});
+
+test("unmatched insurance remains unknown, accepts corrected details, and never invents a denial or price", async () => {
+  const h = harness({
+    coverage: "insurance",
+    scenario: "coverage-unmatched",
+    memberId: "1",
+  });
+  const result = await h.api.checkEligibility();
+  assert.equal(result.status, "unmatched");
+  assert.equal(result.estimate, null);
+  assert.equal(result.activeCoverage, undefined);
+  assert.equal(result.networkStatus, "unknown");
+  assert.equal(h.state.coverage, "insurance");
+  await assert.rejects(book(h), /insurance is not verified/);
+  h.update({
+    scenario: "standard",
+    memberId: "ABC123",
+    eligibility: { status: "unverified", estimate: null },
+  });
+  assert.equal((await h.api.checkEligibility()).status, "verified");
+});
+
+test("an insurance result for changed inputs cannot overwrite the current details", async () => {
+  for (const change of [
+    { memberId: "ABC123" },
+    { payer: "Cigna" },
+    { profile: { ...sampleProfile, day: "15" } },
+    { coverage: "selfpay" as const },
+  ]) {
+    const h = harness({ coverage: "insurance", memberId: "1" });
+    const request = h.api.checkEligibility();
+    h.update({
+      ...change,
+      eligibility: { status: "unverified", estimate: null },
+    });
+    await assert.rejects(request, /details changed/);
+    assert.equal(h.state.eligibility.status, "unverified");
+    assert.equal(h.state.eligibility.estimate, null);
+  }
+});
+
+test("identical verification requests share one operation while a newer input snapshot wins", async () => {
+  const h = harness({ coverage: "insurance", memberId: "1" });
+  const first = h.api.checkEligibility();
+  assert.equal(h.api.checkEligibility(), first);
+  h.update({ memberId: "ABC123" });
+  const current = h.api.checkEligibility();
+  await assert.rejects(first, /details changed/);
+  assert.equal((await current).status, "verified");
+  assert.equal(h.state.memberId, "ABC123");
+  assert.equal(h.state.eligibility.status, "verified");
+  assert.equal(
+    h.state.events.filter(
+      (event) =>
+        event.operation === "eligibility.verification" &&
+        event.outcome === "success",
+    ).length,
+    1,
+  );
+});
+
+test("empty member IDs fail input validation rather than become a coverage response", async () => {
+  const h = harness({ coverage: "insurance", memberId: "   " });
+  await assert.rejects(h.api.checkEligibility(), /member ID/);
+  assert.equal(h.state.eligibility.status, "unverified");
+  assert.equal(
+    h.state.events.some((event) => event.service === "Sohar"),
+    false,
+  );
+});
+
+test("successful benefits are invalidated by changed verification inputs and cannot confirm a booking", async () => {
+  const changes: [string, Partial<JourneyState>][] = [
+    ["first name", { profile: { ...sampleProfile, firstName: "Taylor" } }],
+    ["last name", { profile: { ...sampleProfile, lastName: "Morgan" } }],
+    ["birth month", { profile: { ...sampleProfile, month: "9" } }],
+    ["birth day", { profile: { ...sampleProfile, day: "15" } }],
+    ["birth year", { profile: { ...sampleProfile, year: "1992" } }],
+    ["street address", { profile: { ...sampleProfile, address: "200 Example Lane" } }],
+    ["city", { profile: { ...sampleProfile, city: "Dallas" } }],
+    ["ZIP", { profile: { ...sampleProfile, zip: "75001" } }],
+    ["provider", { providerId: "jordan" }],
+    ["appointment date", { slotId: slots[3].id }],
+    ["payer", { payer: "Cigna" }],
+    ["member ID", { memberId: "ABC123" }],
+    ["scenario", { scenario: "coverage-pending" }],
+  ];
+  for (const [label, patch] of changes) {
+    const h = harness({ coverage: "insurance", agreements: true });
+    await h.api.createAccount();
+    await h.api.reserve("maya", slots[0].id);
+    await h.api.setupPayment();
+    await h.api.checkEligibility();
+    assert.equal(h.state.eligibility.status, "verified", label);
+    h.update(patch);
+    assert.deepEqual(h.state.eligibility, { status: "unverified", estimate: null }, label);
+    await assert.rejects(h.api.confirm(), /insurance is not verified/, label);
+    assert.equal(h.state.appointment, null, label);
+    if (label !== "scenario") {
+      const refreshed = await h.api.checkEligibility();
+      assert.equal(refreshed.status, "verified", `${label} requires a new result`);
+    }
+  }
+});
+
+test("unrelated contact and navigation changes preserve a current benefits result", async () => {
+  const h = harness({ coverage: "insurance", slotId: slots[0].id });
+  await h.api.checkEligibility();
+  const result = h.state.eligibility;
+  for (const patch of [
+    { profile: { ...h.state.profile, email: "another@example.com" } },
+    { profile: { ...h.state.profile, phone: "2025550181" } },
+    { profile: { ...h.state.profile, sms: true } },
+    { step: "email" as const },
+    { step: "phone" as const, history: ["insurance" as const] },
+    { agreements: true },
+  ]) {
+    h.update(patch);
+    assert.equal(h.state.eligibility, result);
+  }
+  await h.api.createAccount();
+  await h.api.reserve("maya", slots[0].id);
+  await h.api.setupPayment();
+  assert.equal((await h.api.confirm()).status, "confirmed");
+});
+
+test("a patch cannot carry an old verified result into a different member or payment path", async () => {
+  const h = harness({ coverage: "insurance" });
+  await h.api.checkEligibility();
+  const before = h.state;
+  const next = applyJourneyPatch(before, { memberId: "NEW123", eligibility: before.eligibility });
+  assert.deepEqual(next.eligibility, { status: "unverified", estimate: null });
+  assert.equal(before.eligibility.status, "verified");
+  assert.equal(before.memberId, "1");
+  h.update({ coverage: "selfpay" });
+  assert.deepEqual(h.state.eligibility, { status: "unverified", estimate: null });
+  h.update({ coverage: "insurance" });
+  assert.deepEqual(h.state.eligibility, { status: "unverified", estimate: null });
 });

@@ -6,9 +6,9 @@ Research, journey documentation, and implementation will be developed on a separ
 
 ## Current phase: working flow prototype
 
-**[Open the protected Vercel preview](https://legion-health-assignment-15bzwyj9z-davidspiegs-projects.vercel.app)**
+**[Open the protected Vercel preview](https://legion-health-assignment-6wgqwyi43-davidspiegs-projects.vercel.app)**
 
-Patient flow opens by default. Use the footer’s **Preview controls** to advance the simulated appointment day and clinician activity, or open [the full journey review](https://legion-health-assignment-15bzwyj9z-davidspiegs-projects.vercel.app/?review=1).
+Patient flow opens by default. Use the footer’s **Preview controls** to advance the simulated appointment day and clinician activity, or open [the full journey review](https://legion-health-assignment-6wgqwyi43-davidspiegs-projects.vercel.app/?review=1).
 
 The mobile-first prototype is in [prototype/](prototype/README.md). It covers intake through a simulated completed first visit, then optional follow-up care.
 

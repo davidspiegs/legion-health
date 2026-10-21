@@ -375,6 +375,24 @@ textarea {
   scrollbar-width: thin;
   scrollbar-color: #d9e1ec transparent;
   scroll-padding: 18px;
+  animation: screen-enter 200ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.patient-app[data-navigation="backward"] {
+  --screen-entry-x: -10px;
+}
+.patient-app[data-navigation="initial"] .screen-main {
+  animation: none;
+}
+/* Keep the frame and action stationary; only the new screen's content enters. */
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateX(var(--screen-entry-x, 10px));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 .screen-heading {
   margin-bottom: 28px;
@@ -668,7 +686,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 24px;
+  min-height: 84px;
 }
 .quote-line p {
   font-size: 14px;
@@ -677,11 +695,6 @@ textarea {
   flex: 1;
   font-weight: 500;
   animation: quote-in 0.2s ease-out;
-}
-.quote-pause {
-  color: #51627f;
-  min-width: 44px;
-  min-height: 44px;
 }
 .quote-bottom {
   display: flex;
@@ -695,25 +708,24 @@ textarea {
 }
 .quote-dots {
   display: flex;
-  gap: 3px;
+  gap: 0;
 }
 .quote-dots button {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   border: 0;
   background: transparent;
-  padding: 6px;
+  padding: 10px;
   position: relative;
 }
-.quote-dots button:after {
-  content: "";
+.quote-dots button > span {
   width: 5px;
   height: 5px;
   background: #c4d0e3;
   border-radius: 50%;
   display: block;
 }
-.quote-dots button.active:after {
+.quote-dots button[aria-pressed="true"] > span {
   background: #5d81e6;
 }
 .welcome-screen .screen-main {
@@ -1240,10 +1252,11 @@ h3 {
 }
 .condition-option {
   min-height: 64px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 19px;
   align-items: center;
-  gap: 10px;
-  padding: 13px;
+  gap: 8px;
+  padding: 12px;
   border: 1px solid #d4dbe6;
   border-radius: 8px;
   font-size: 14px;
@@ -1263,12 +1276,28 @@ h3 {
   box-shadow: inset 0 0 0 0.5px var(--blue);
 }
 .condition-option input {
+  grid-column: 3;
+  grid-row: 1;
   accent-color: var(--blue);
   width: 19px;
   height: 19px;
   flex-shrink: 0;
   margin: 0;
   cursor: pointer;
+}
+.condition-icon {
+  grid-column: 1;
+  grid-row: 1;
+  color: #7186b0;
+  display: flex;
+}
+.condition-label {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+.condition-option.selected .condition-icon {
+  color: var(--blue);
 }
 .condition-option:has(input:focus-visible) {
   outline: 3px solid #a6baf0;
@@ -1498,7 +1527,12 @@ h3 {
   }
   .condition-option {
     padding: 12px 10px;
-    gap: 9px;
+    gap: 7px;
+  }
+}
+@media (max-height: 790px) {
+  .needs-screen .testimonial {
+    display: none;
   }
 }
 @media (max-height: 740px) {
@@ -1571,4 +1605,6 @@ h3 {
   }
 }
 
-.goal-screen .notice { margin-bottom: 0; }
+.goal-screen .notice {
+  margin-bottom: 0;
+}

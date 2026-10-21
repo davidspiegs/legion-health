@@ -34,6 +34,7 @@ export type Scenario =
   | "standard"
   | "slot-taken"
   | "coverage-pending"
+  | "coverage-unmatched"
   | "records-unavailable"
   | "payment-retry"
   | "connection-lost"
@@ -94,8 +95,11 @@ export interface Appointment {
   followup?: boolean;
 }
 export interface Eligibility {
-  status: "unverified" | "pending" | "verified";
+  status: "unverified" | "checking" | "pending" | "unmatched" | "verified";
   estimate: number | null;
+  checkedAt?: string;
+  activeCoverage?: boolean;
+  networkStatus?: "in-network" | "unknown";
 }
 export interface ServiceEvent {
   id: string;
