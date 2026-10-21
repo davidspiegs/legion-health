@@ -14,6 +14,11 @@ import {
   CircleHelp,
   GitBranch,
   HeartHandshake,
+  Home,
+  CalendarDays,
+  MessageCircle,
+  UserRound,
+  Mail,
   Layers3,
   RotateCcw,
   SlidersHorizontal,
@@ -32,8 +37,13 @@ import {
   reviewIntakeAnswers,
 } from "./model/fixtures";
 import { createMockApi } from "./model/services";
-import { applyJourneyPatch } from "./model/journey-state";
+import {
+  applyJourneyPatch,
+  journeyNow,
+  recoverPaymentSetup,
+} from "./model/journey-state";
 import { useMobileViewport } from "./hooks/useMobileViewport";
+import { useCareSimulation } from "./hooks/useCareSimulation";
 import type {
   JourneyState,
   Profile,
@@ -66,7 +76,48 @@ const careSteps: Step[] = [
   "complete",
   "followup",
   "feedback",
+  "portal-visits",
+  "portal-messages",
+  "portal-account",
+  "portal-signin",
+  "health-details",
 ];
+const portalRoutes: Partial<Record<Step, string>> = {
+  "visit-home": "/portal/home",
+  "portal-visits": "/portal/visits",
+  "portal-messages": "/portal/messages",
+  "portal-account": "/portal/account",
+  "portal-signin": "/portal/sign-in",
+  "health-details": "/portal/preparation/health",
+  records: "/portal/preparation/records",
+  brief: "/portal/preparation/brief",
+  reminders: "/portal/reminders",
+  device: "/portal/visit/check-in",
+  waiting: "/portal/visit/waiting",
+  visit: "/portal/visit/room",
+  complete: "/portal/visit/summary",
+  followup: "/portal/visit/follow-up",
+  feedback: "/portal/visit/feedback",
+  confirmed: "/booking/confirmation",
+};
+const portalRoots: Step[] = [
+  "visit-home",
+  "portal-visits",
+  "portal-messages",
+  "portal-account",
+];
+function routeStep(): Step | undefined {
+  const path = window.location.hash.slice(1);
+  return Object.entries(portalRoutes).find(
+    ([, route]) => route === path,
+  )?.[0] as Step | undefined;
+}
+function setRoute(step: Step, replace = false) {
+  const hash = portalRoutes[step] || `/intake/${step}`;
+  const url = `${window.location.pathname}${window.location.search}#${hash}`;
+  if (window.location.hash !== `#${hash}`)
+    window.history[replace ? "replaceState" : "pushState"]({ step }, "", url);
+}
 const phaseEntry: Record<FlowPhase, Step> = {
   fit: "welcome",
   match: "match",
@@ -129,6 +180,36 @@ const scenarios: {
     detail: "Preserve the answer and try again",
     step: "email",
   },
+  {
+    value: "payment-authentication",
+    title: "Your bank needs confirmation",
+    detail: "Approve or cancel a simulated card authentication",
+    step: "review",
+  },
+  {
+    value: "clinician-late",
+    title: "Your clinician is running late",
+    detail: "Stay informed in the waiting room",
+    step: "device",
+  },
+  {
+    value: "care-plan-delayed",
+    title: "Your care plan is being prepared",
+    detail: "Visit completion and plan publication are separate",
+    step: "waiting",
+  },
+  {
+    value: "signin-expired",
+    title: "A sign-in code expires",
+    detail: "Request a fresh code and return to the same visit",
+    step: "portal-signin",
+  },
+  {
+    value: "reminder-failed",
+    title: "A reminder cannot be delivered",
+    detail: "The appointment remains confirmed",
+    step: "confirmed",
+  },
 ];
 function restore(): JourneyState {
   try {
@@ -138,7 +219,8 @@ function restore(): JourneyState {
         !Array.isArray(saved.conditions) &&
         !saved.appointment &&
         ["goal", "coverage", ...bookingSteps].includes(saved.step);
-      return {
+      const base = initialState();
+      const restored: JourneyState = {
         ...initialState(),
         ...saved,
         conditions: normalizeConditions(saved.conditions),
@@ -148,12 +230,94 @@ function restore(): JourneyState {
             : saved.eligibility || initialState().eligibility,
         ...(needsConditionReview ? { step: "needs" as Step, history: [] } : {}),
         profile: { ...initialState().profile, ...saved.profile },
+        paymentReady: saved.paymentSetup
+          ? recoverPaymentSetup(saved.paymentSetup).status === "succeeded"
+          : !!saved.appointment,
+        paymentSetup: saved.paymentSetup
+          ? recoverPaymentSetup(saved.paymentSetup)
+          : saved.appointment
+            ? {
+                id: "seti_restored_preview",
+                status: "succeeded",
+                method: {
+                  id: "pm_restored_preview",
+                  brand: "Visa",
+                  last4: "4242",
+                  expMonth: 12,
+                  expYear: 2030,
+                },
+              }
+            : base.paymentSetup,
+        portalAuth: saved.portalAuth || {
+          status: saved.events?.some(
+            (event: { operation: string }) =>
+              event.operation === "account.created",
+          )
+            ? "signed_in"
+            : "signed_out",
+          codeExpiresAt: null,
+        },
+        encounter:
+          saved.encounter ||
+          (saved.appointment?.status === "completed"
+            ? {
+                ...base.encounter,
+                status: "completed",
+                completedAt: new Date().toISOString(),
+              }
+            : ["joined", "interrupted"].includes(saved.appointment?.status)
+              ? {
+                  ...base.encounter,
+                  status: "in_progress",
+                  connection:
+                    saved.appointment.status === "joined"
+                      ? "connected"
+                      : "interrupted",
+                  joinedAt: new Date().toISOString(),
+                }
+              : base.encounter),
+        carePlan: saved.carePlan || {
+          ...base.carePlan,
+          status:
+            saved.appointment?.status === "completed"
+              ? "pending"
+              : "unavailable",
+        },
+        clock:
+          saved.clock ||
+          (saved.appointment
+            ? {
+                virtualStart:
+                  new Date(saved.appointment.start).getTime() - 45 * 60_000,
+                realStart: Date.now(),
+                rate: 60,
+              }
+            : null),
+        careMessages: (saved.careMessages || []).map((message: object) => ({
+          sender: "patient",
+          status: "delivered",
+          ...message,
+        })),
       };
+      const linkedStep = routeStep();
+      if (
+        linkedStep &&
+        (restored.appointment || linkedStep === "portal-signin")
+      )
+        restored.step = linkedStep;
+      if (
+        careSteps.includes(restored.step) &&
+        restored.portalAuth.status !== "signed_in"
+      )
+        restored.step = "portal-signin";
+      return restored;
     }
   } catch {
     /* A fresh preview is safe when local storage is unavailable. */
   }
-  return initialState();
+  const fresh = initialState();
+  if (routeStep() === "portal-signin") fresh.step = "portal-signin";
+  return fresh;
 }
 function reviewFixture(step: Step, scenario: Scenario): JourneyState {
   const fresh = initialState();
@@ -176,6 +340,7 @@ function reviewFixture(step: Step, scenario: Scenario): JourneyState {
   )
     s.coverage = "insurance";
   if (step === "review" || careSteps.includes(step)) {
+    s.portalAuth = { status: "signed_in", codeExpiresAt: null };
     s.events = [
       {
         id: "review-fixture",
@@ -204,6 +369,23 @@ function reviewFixture(step: Step, scenario: Scenario): JourneyState {
     s.reservation = null;
     s.agreements = true;
     s.paymentReady = true;
+    s.financialConsent = true;
+    s.paymentSetup = {
+      id: "seti_review_fixture",
+      status: "succeeded",
+      method: {
+        id: "pm_review_fixture",
+        brand: "Visa",
+        last4: "4242",
+        expMonth: 12,
+        expYear: 2030,
+      },
+    };
+    s.clock = {
+      virtualStart: new Date(s.appointment.start).getTime() - 5 * 60_000,
+      realStart: Date.now(),
+      rate: 1,
+    };
     s.events.push({
       id: "review-appointment",
       at: new Date().toISOString(),
@@ -240,9 +422,45 @@ function reviewFixture(step: Step, scenario: Scenario): JourneyState {
     s.visitDay = true;
   if (["waiting", "visit", "complete", "followup", "feedback"].includes(step))
     s.deviceReady = true;
-  if (step === "visit") s.appointment = { ...s.appointment!, status: "joined" };
+  if (
+    ["device", "waiting", "visit", "complete", "followup", "feedback"].includes(
+      step,
+    )
+  ) {
+    s.healthReviewed = true;
+    s.currentLocation = "Texas";
+    s.callbackConfirmed = true;
+  }
+  if (step === "waiting")
+    s.encounter = {
+      ...s.encounter,
+      status: "waiting",
+      checkedInAt: new Date().toISOString(),
+      clinicianStatus:
+        scenario === "clinician-late" ? "running_late" : "not_present",
+    };
+  if (step === "visit") {
+    s.appointment = { ...s.appointment!, status: "joined" };
+    s.encounter = {
+      status: "in_progress",
+      connection: "connected",
+      clinicianStatus: "ready",
+      joinedAt: new Date().toISOString(),
+    };
+  }
   if (["complete", "followup", "feedback"].includes(step)) {
     s.appointment = { ...s.appointment!, status: "completed" };
+    s.encounter = {
+      status: "completed",
+      connection: "disconnected",
+      clinicianStatus: "ready",
+      completedAt: new Date().toISOString(),
+    };
+    s.carePlan = {
+      status: "published",
+      publishedAt: new Date().toISOString(),
+      followupWeeks: 2,
+    };
     s.events.push({
       id: "review-encounter",
       at: new Date().toISOString(),
@@ -252,6 +470,8 @@ function reviewFixture(step: Step, scenario: Scenario): JourneyState {
       detail: "Fictional completed encounter loaded for screen review",
     });
   }
+  if (step === "portal-signin")
+    s.portalAuth = { status: "signed_out", codeExpiresAt: null };
   return s;
 }
 
@@ -264,7 +484,7 @@ export default function App() {
     busyRef = useRef(false);
   const [error, setError] = useState("");
   const [panel, setPanel] = useState<
-    "flow" | "scenarios" | "services" | "simulation"
+    "flow" | "scenarios" | "services" | "simulation" | "inbox"
   >("flow");
   const [navigation, setNavigation] = useState<
     "initial" | "forward" | "backward"
@@ -289,6 +509,7 @@ export default function App() {
     () => createMockApi({ getState: () => stateRef.current, update }),
     [update],
   );
+  useCareSimulation(stateRef, api, update);
   const act = useCallback(
     async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
       if (busyRef.current) return undefined;
@@ -313,6 +534,12 @@ export default function App() {
   );
   const go = useCallback(
     (step: Step) => {
+      if (
+        careSteps.includes(step) &&
+        step !== "portal-signin" &&
+        stateRef.current.portalAuth.status !== "signed_in"
+      )
+        step = "portal-signin";
       if (step === stateRef.current.step) return;
       setNavigation("forward");
       continueTyping.current = !!document.activeElement?.matches(
@@ -323,6 +550,7 @@ export default function App() {
         step,
         history: [...stateRef.current.history, stateRef.current.step],
       });
+      setRoute(step);
     },
     [update],
   );
@@ -335,6 +563,7 @@ export default function App() {
       step: history[history.length - 1],
       history: history.slice(0, -1),
     });
+    setRoute(history[history.length - 1]);
   }, [update]);
   useEffect(() => {
     try {
@@ -344,6 +573,37 @@ export default function App() {
       setStorageAvailable(false);
     }
   }, [state]);
+  useEffect(() => {
+    setRoute(stateRef.current.step, true);
+    const navigate = () => {
+      const route =
+        routeStep() || (window.history.state?.step as Step | undefined);
+      if (!route || !FLOW.some((entry) => entry.id === route)) return;
+      const step =
+        careSteps.includes(route) &&
+        route !== "portal-signin" &&
+        stateRef.current.portalAuth.status !== "signed_in"
+          ? "portal-signin"
+          : route;
+      setNavigation("backward");
+      setError("");
+      update({ step });
+    };
+    window.addEventListener("popstate", navigate);
+    window.addEventListener("hashchange", navigate);
+    return () => {
+      window.removeEventListener("popstate", navigate);
+      window.removeEventListener("hashchange", navigate);
+    };
+  }, [update]);
+  useEffect(() => {
+    if (
+      careSteps.includes(state.step) &&
+      state.step !== "portal-signin" &&
+      state.portalAuth.status !== "signed_in"
+    )
+      go("portal-signin");
+  }, [state.step, state.portalAuth.status, go]);
   useLayoutEffect(() => {
     document.title = `${FLOW.find((item) => item.id === state.step)?.title || "Your care"} · Legion Health`;
     const main = app.current?.querySelector(".screen-main");
@@ -358,7 +618,7 @@ export default function App() {
         ?.focus({ preventScroll: true });
     continueTyping.current = false;
   }, [state.step]);
-  const current = FLOW.find((item) => item.id === state.step)!;
+  const current = FLOW.find((item) => item.id === state.step) || FLOW[0];
   const phase = PHASES.findIndex((item) => item.id === current.phase);
   const progressGroups: { label: string; steps: Step[] }[] = [
     {
@@ -392,7 +652,7 @@ export default function App() {
   );
   const progressIndex = progressGroup?.steps.indexOf(state.step) ?? 0;
   function openReview(
-    tab: "flow" | "scenarios" | "services" | "simulation" = "flow",
+    tab: "flow" | "scenarios" | "services" | "simulation" | "inbox" = "flow",
   ) {
     setPanel(tab);
     review.current?.showModal();
@@ -402,6 +662,7 @@ export default function App() {
     const next = reviewFixture(step, scenario);
     stateRef.current = next;
     setState(next);
+    setRoute(step, true);
     setError("");
     review.current?.close();
   }
@@ -409,6 +670,7 @@ export default function App() {
     const fresh = initialState();
     stateRef.current = fresh;
     setState(fresh);
+    setRoute("welcome", true);
     setError("");
     review.current?.close();
   }
@@ -425,6 +687,27 @@ export default function App() {
     act,
     openHelp: () => help.current?.showModal(),
   };
+  const portal = careSteps.includes(state.step) && state.step !== "confirmed";
+  const showPortalNav =
+    portal &&
+    !["portal-signin", "device", "waiting", "visit"].includes(state.step) &&
+    state.portalAuth.status === "signed_in";
+  const portalTab: Step =
+    state.step === "portal-messages"
+      ? "portal-messages"
+      : ["portal-account", "reminders"].includes(state.step)
+        ? "portal-account"
+        : ["portal-visits", "complete", "followup", "feedback"].includes(
+              state.step,
+            )
+          ? "portal-visits"
+          : "visit-home";
+  const portalNavigation: { step: Step; label: string; icon: typeof Home }[] = [
+    { step: "visit-home", label: "Home", icon: Home },
+    { step: "portal-visits", label: "Visits", icon: CalendarDays },
+    { step: "portal-messages", label: "Messages", icon: MessageCircle },
+    { step: "portal-account", label: "Account", icon: UserRound },
+  ];
   const screen = bookingSteps.includes(state.step) ? (
     <BookingScreens key={state.step} {...props} />
   ) : careSteps.includes(state.step) ? (
@@ -493,7 +776,11 @@ export default function App() {
         </aside>
       ) : null}
       <main className="preview-stage">
-        <div className="patient-app" ref={app} data-navigation={navigation}>
+        <div
+          className={`patient-app ${portal ? "portal-app" : ""}`}
+          ref={app}
+          data-navigation={navigation}
+        >
           {reviewMode ? (
             <div className="preview-banner">
               <span>
@@ -507,22 +794,67 @@ export default function App() {
           ) : null}
           <header className="app-header">
             <div className="header-left">
-              <img
-                className="brand-logo"
-                src="/brand/legion-logo.svg"
-                alt="Legion Health"
-                width="132"
-                height="35"
-              />
+              {portal && state.portalAuth.status === "signed_in" ? (
+                <button
+                  className="portal-brand"
+                  aria-label="Legion Health portal home"
+                  onClick={() => go("visit-home")}
+                >
+                  <img
+                    className="brand-logo"
+                    src="/brand/legion-logo.svg"
+                    alt="Legion Health"
+                    width="132"
+                    height="35"
+                  />
+                </button>
+              ) : (
+                <img
+                  className="brand-logo"
+                  src="/brand/legion-logo.svg"
+                  alt="Legion Health"
+                  width="132"
+                  height="35"
+                />
+              )}
             </div>
-            <button
-              className="help-button"
-              onClick={() => help.current?.showModal()}
-            >
-              <CircleHelp size={16} /> Help
-            </button>
+            <div className="header-actions">
+              {state.step === "welcome" &&
+              state.events.some(
+                (event) => event.operation === "account.created",
+              ) ? (
+                <button
+                  className="help-button"
+                  onClick={() =>
+                    go(
+                      state.portalAuth.status === "signed_in"
+                        ? "visit-home"
+                        : "portal-signin",
+                    )
+                  }
+                >
+                  Your portal
+                </button>
+              ) : null}
+              <button
+                className="help-button"
+                onClick={() => help.current?.showModal()}
+              >
+                <CircleHelp size={16} /> Help
+              </button>
+            </div>
           </header>
-          {state.step !== "welcome" ? (
+          {portal &&
+          !portalRoots.includes(state.step) &&
+          state.step !== "portal-signin" &&
+          state.step !== "visit" ? (
+            <div className="portal-back">
+              <button onClick={() => go("visit-home")} disabled={busy}>
+                <ArrowLeft size={17} /> Back to home
+              </button>
+            </div>
+          ) : null}
+          {state.step !== "welcome" && !portal && state.step !== "confirmed" ? (
             <div className="journey-progress">
               <div className="progress-label">
                 <span>
@@ -578,12 +910,39 @@ export default function App() {
             </div>
           ) : null}
           {screen}
+          {showPortalNav ? (
+            <nav className="portal-navigation" aria-label="Patient portal">
+              {portalNavigation.map(({ step, label, icon: Icon }) => (
+                <button
+                  key={step}
+                  disabled={busy}
+                  aria-current={portalTab === step ? "page" : undefined}
+                  onClick={() => go(step)}
+                >
+                  <span>
+                    <Icon size={21} strokeWidth={1.7} />
+                  </span>
+                  <small>{label}</small>
+                </button>
+              ))}
+            </nav>
+          ) : null}
         </div>
         <div className="stage-note">
+          {state.appointment ||
+          state.portalAuth.status === "code_sent" ||
+          state.portalAuth.status === "expired" ? (
+            <>
+              <button onClick={() => openReview("inbox")}>
+                <Mail size={11} /> Preview inbox
+              </button>
+              <span> · </span>
+            </>
+          ) : null}
           <button onClick={() => openReview("simulation")}>
             Preview controls
           </button>
-          <span> · no real appointments or charges</span>
+          <span> · simulated care</span>
         </div>
       </main>
       {reviewMode ? (
@@ -631,9 +990,11 @@ export default function App() {
         <div className="dialog-heading">
           <div>
             <h2>
-              {panel === "simulation"
-                ? "Preview controls"
-                : "Explore the journey"}
+              {panel === "inbox"
+                ? "Preview inbox"
+                : panel === "simulation"
+                  ? "Preview controls"
+                  : "Explore the journey"}
             </h2>
           </div>
           <button
@@ -650,8 +1011,14 @@ export default function App() {
           aria-label="Review controls"
         >
           {(reviewMode
-            ? (["simulation", "flow", "scenarios", "services"] as const)
-            : (["simulation"] as const)
+            ? ([
+                "simulation",
+                "inbox",
+                "flow",
+                "scenarios",
+                "services",
+              ] as const)
+            : (["simulation", "inbox"] as const)
           ).map((tab) => (
             <button
               key={tab}
@@ -659,24 +1026,107 @@ export default function App() {
               aria-selected={panel === tab}
               onClick={() => setPanel(tab)}
             >
-              {tab === "simulation"
-                ? "Simulation"
-                : tab === "flow"
-                  ? "The flow"
-                  : tab === "scenarios"
-                    ? "Recovery"
-                    : "Mock activity"}
+              {tab === "inbox"
+                ? "Inbox"
+                : tab === "simulation"
+                  ? "Simulation"
+                  : tab === "flow"
+                    ? "The flow"
+                    : tab === "scenarios"
+                      ? "Recovery"
+                      : "Mock activity"}
             </button>
           ))}
         </div>
         <div className="dialog-content">
+          {panel === "inbox" ? (
+            <section className="preview-inbox">
+              <p className="dialog-note">
+                These messages are generated by the simulated email and text
+                services. Nothing is sent to a real address or phone.
+              </p>
+              {["code_sent", "expired"].includes(state.portalAuth.status) ? (
+                <article className="preview-message">
+                  <span>Legion Health · Sign in</span>
+                  <h3>Your sign-in code</h3>
+                  <p>Use this code to return to your patient portal.</p>
+                  <strong className="preview-code">246810</strong>
+                  <small>
+                    {state.portalAuth.status === "expired"
+                      ? "This code has expired. Request a new one."
+                      : "Valid for 10 minutes in this preview."}
+                  </small>
+                </article>
+              ) : null}
+              {[...state.notifications]
+                .reverse()
+                .filter((item) => item.status !== "cancelled")
+                .map((item) => (
+                  <article className="preview-message" key={item.id}>
+                    <span>
+                      {item.channel === "sms" ? "Text message" : "Email"} ·{" "}
+                      {item.status}
+                    </span>
+                    <h3>
+                      {item.kind === "confirmation"
+                        ? "Your appointment is confirmed"
+                        : item.kind === "rescheduled"
+                          ? "Your appointment time has changed"
+                          : item.kind === "cancelled"
+                            ? "Your appointment is cancelled"
+                            : item.kind === "care-plan"
+                              ? "Your visit summary is ready"
+                              : "Your visit is coming up"}
+                    </h3>
+                    <p>
+                      {item.status === "failed"
+                        ? "Delivery was unsuccessful. Your appointment details are still available in the portal."
+                        : "Open your portal for appointment details, preparation, and the link to join."}
+                    </p>
+                    <button
+                      className="button secondary"
+                      onClick={() => {
+                        go(
+                          state.portalAuth.status === "signed_in"
+                            ? "visit-home"
+                            : "portal-signin",
+                        );
+                        review.current?.close();
+                      }}
+                    >
+                      Open your portal
+                    </button>
+                  </article>
+                ))}
+              {!state.notifications.length &&
+              !["code_sent", "expired"].includes(state.portalAuth.status) ? (
+                <p className="dialog-note">
+                  Sign-in messages and appointment notifications will appear
+                  here.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
           {panel === "simulation" ? (
             <section className="simulation-panel">
               <p className="dialog-note">
                 This environment uses fictional appointments and local services.
-                These controls let you advance time and simulate clinician
-                actions while keeping the patient experience intact.
+                Time moves faster before your visit. Your clinician joins,
+                completes the conversation, and publishes a care plan
+                automatically. No real appointments, card charges, messages, or
+                video calls occur.
               </p>
+              {state.clock ? (
+                <p className="dialog-note">
+                  Simulated appointment clock:{" "}
+                  {new Intl.DateTimeFormat("en-US", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                    timeZone: "America/Chicago",
+                  }).format(journeyNow(state))}{" "}
+                  Central Time.
+                </p>
+              ) : null}
               {!state.appointment ? (
                 <p>Complete the booking flow to preview appointment day.</p>
               ) : null}
@@ -687,7 +1137,16 @@ export default function App() {
                 <Button
                   disabled={busy}
                   onClick={() => {
-                    update({ visitDay: true });
+                    update({
+                      visitDay: true,
+                      clock: {
+                        virtualStart:
+                          new Date(state.appointment!.start).getTime() -
+                          5 * 60_000,
+                        realStart: Date.now(),
+                        rate: 1,
+                      },
+                    });
                     go("visit-home");
                     review.current?.close();
                   }}
@@ -901,9 +1360,26 @@ export default function App() {
           </p>
           <h3>Need a hand with care or coverage?</h3>
           <p>
-            In the full experience, a care coordinator would help here. This
-            preview doesn’t connect to a real support team.
+            Your care team can help with appointment times, billing questions,
+            and getting ready for your visit.
           </p>
+          {state.portalAuth.status === "signed_in" && state.appointment ? (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                help.current?.close();
+                go("portal-messages");
+              }}
+            >
+              Message your care team
+            </Button>
+          ) : (
+            <p>
+              You can review pricing before confirming. After booking, your
+              portal keeps your appointment, join link, and care-team messages
+              together.
+            </p>
+          )}
           <h3>Need immediate support?</h3>
           <p>
             For immediate danger, call 911. Call or text 988 for the Suicide &

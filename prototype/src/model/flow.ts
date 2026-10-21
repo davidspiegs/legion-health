@@ -50,6 +50,46 @@ export const PHASES: { id: FlowPhase; title: string; description: string }[] = [
 export const FLOW_GROUPS = PHASES;
 export const FLOW: FlowEntry[] = [
   {
+    id: "portal-visits",
+    title: "Your visits",
+    phase: "prepare",
+    description:
+      "Upcoming and completed appointments, with rescheduling, cancellation, and a clear route into care.",
+    integration: "Scheduling and encounter status",
+  },
+  {
+    id: "portal-messages",
+    title: "Messages",
+    phase: "prepare",
+    description:
+      "A persistent conversation with the care team, with simulated delivery and replies.",
+    integration: "Mock messaging service; no real messages sent",
+  },
+  {
+    id: "portal-account",
+    title: "Your account",
+    phase: "prepare",
+    description:
+      "Contact details, insurance, payment method, and reminder preferences in one place.",
+    integration: "Profile, payment metadata, and authentication",
+  },
+  {
+    id: "portal-signin",
+    title: "Welcome back",
+    phase: "prepare",
+    description:
+      "Return to the same appointment with a short-lived sign-in code.",
+    integration: "Mock Auth and simulated email inbox",
+  },
+  {
+    id: "health-details",
+    title: "Your health details",
+    phase: "prepare",
+    description:
+      "Review important health context once, with saved and editable completion.",
+    integration: "Patient-reviewed clinical context, outside general analytics",
+  },
+  {
     id: "welcome",
     title: "A little support changes a lot",
     phase: "fit",

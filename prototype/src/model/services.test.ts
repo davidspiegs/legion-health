@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createMockApi } from "./services";
-import { applyJourneyPatch } from "./journey-state";
+import {
+  applyJourneyPatch,
+  journeyNow,
+  joinAvailability,
+  recoverPaymentSetup,
+} from "./journey-state";
 import {
   initialState,
   sampleProfile,
@@ -39,11 +44,24 @@ function harness(patch: Partial<JourneyState> = {}) {
   };
 }
 
+const paymentInput = {
+  token: "pm_mock_visa",
+  brand: "Visa",
+  last4: "4242",
+  expMonth: 12,
+  expYear: 2030,
+  billingZip: "78701",
+};
+
 async function book(h: ReturnType<typeof harness>) {
-  h.update({ profile: { ...sampleProfile }, agreements: true });
+  h.update({
+    profile: { ...sampleProfile },
+    agreements: true,
+    financialConsent: true,
+  });
   await h.api.createAccount();
   await h.api.reserve("maya", slots[0].id);
-  await h.api.setupPayment();
+  await h.api.setupPayment(paymentInput);
   return h.api.confirm();
 }
 
@@ -83,7 +101,11 @@ test("condition restoration accepts only explicit selections and does not diagno
 });
 
 test("reservation is not confirmation, repeat requests reuse the hold, concurrent confirmation creates one appointment", async () => {
-  const h = harness({ profile: { ...sampleProfile }, agreements: true });
+  const h = harness({
+    profile: { ...sampleProfile },
+    agreements: true,
+    financialConsent: true,
+  });
   await h.api.createAccount();
   await h.api.createAccount();
   const first = await h.api.reserve("maya", slots[0].id);
@@ -91,7 +113,7 @@ test("reservation is not confirmation, repeat requests reuse the hold, concurren
   assert.deepEqual(first, second);
   assert.equal(h.state.appointment, null);
   await assert.rejects(h.api.confirm(), /payment method/);
-  await h.api.setupPayment();
+  await h.api.setupPayment(paymentInput);
   const [a, b] = await Promise.all([h.api.confirm(), h.api.confirm()]);
   assert.deepEqual(a, b);
   assert.equal(a.status, "confirmed");
@@ -112,9 +134,13 @@ test("reservation is not confirmation, repeat requests reuse the hold, concurren
 });
 
 test("expired holds cannot be confirmed and details survive recovery", async () => {
-  const h = harness({ profile: { ...sampleProfile }, agreements: true });
+  const h = harness({
+    profile: { ...sampleProfile },
+    agreements: true,
+    financialConsent: true,
+  });
   await h.api.createAccount();
-  await h.api.setupPayment();
+  await h.api.setupPayment(paymentInput);
   const hold = await h.api.reserve("maya", slots[0].id);
   h.update({ reservation: { ...hold, expiresAt: Date.now() - 1 } });
   await assert.rejects(h.api.confirm(), /hold expired/);
@@ -135,10 +161,10 @@ test("a lost slot stays unavailable across retries while another slot and paymen
     "slot-taken",
     `unavailable-slot:${slots[0].id}`,
   ]);
-  h.update({ scenario: "payment-retry" });
-  await assert.rejects(h.api.setupPayment(), /try again/);
+  h.update({ scenario: "payment-retry", financialConsent: true });
+  await assert.rejects(h.api.setupPayment(paymentInput), /try again/);
   assert.equal(h.state.paymentReady, false);
-  await h.api.setupPayment();
+  await h.api.setupPayment(paymentInput);
   assert.equal(h.state.paymentReady, true);
 });
 
@@ -173,10 +199,11 @@ test("unverified or pending insurance blocks confirmation until verified or expl
     coverage: "insurance",
     profile: { ...sampleProfile },
     agreements: true,
+    financialConsent: true,
   });
   await h.api.createAccount();
   await h.api.reserve("maya", slots[0].id);
-  await h.api.setupPayment();
+  await h.api.setupPayment(paymentInput);
   await assert.rejects(h.api.confirm(), /insurance is not verified/);
   assert.equal(h.state.appointment, null);
   await h.api.checkEligibility();
@@ -185,6 +212,9 @@ test("unverified or pending insurance blocks confirmation until verified or expl
   assert.equal(h.state.appointment, null);
   assert.equal(h.state.reservation?.slotId, slots[0].id);
   h.update({ coverage: "selfpay" });
+  assert.equal(h.state.financialConsent, false);
+  await assert.rejects(h.api.confirm(), /payment authorization/);
+  h.update({ financialConsent: true });
   const appointment = await h.api.confirm();
   assert.equal(appointment.status, "confirmed");
   assert.equal(h.state.eligibility.status, "unverified");
@@ -240,9 +270,19 @@ test("joining and reconnecting do not complete care; only clinician completion u
     h.api.bookFollowup(followupSlots[0].id),
     /after your first visit/,
   );
+  h.update({ healthReviewed: true });
   await assert.rejects(h.api.joinVisit(), /device check/);
-  h.update({ deviceReady: true });
-  await h.api.joinVisit();
+  h.update({
+    healthReviewed: true,
+    deviceReady: true,
+    currentLocation: "Austin, Texas",
+    callbackConfirmed: true,
+    visitDay: true,
+    clock: null,
+  });
+  await h.api.checkIn();
+  await h.api.setClinicianReady("clinician");
+  await h.api.admitToVisit();
   assert.equal(h.state.appointment?.status, "interrupted");
   await assert.rejects(h.api.completeVisit("clinician"), /Join and finish/);
   await h.api.reconnect();
@@ -252,7 +292,9 @@ test("joining and reconnecting do not complete care; only clinician completion u
     h.api.completeVisit("patient" as "clinician"),
     /Only the simulated clinician/,
   );
+  h.update({ visitPhase: 2 });
   await h.api.completeVisit("clinician");
+  h.update({ visitPhase: 2 });
   await h.api.completeVisit("clinician");
   assert.equal(h.state.appointment?.status, "completed");
   assert.equal(
@@ -263,7 +305,7 @@ test("joining and reconnecting do not complete care; only clinician completion u
   );
   await h.api.bookFollowup(followupSlots[0].id);
   await h.api.bookFollowup(followupSlots[0].id);
-  assert.equal(h.state.followupAppointment?.id, "visit-followup");
+  assert.match(h.state.followupAppointment!.id, /^visit-followup-/);
   assert.equal(h.state.followupAppointment?.status, "confirmed");
   assert.equal(h.state.appointment?.status, "completed");
 });
@@ -274,8 +316,18 @@ test("reminder scheduling targets the upcoming follow-up and never the completed
   await h.api.scheduleReminders();
   assert.equal(h.state.reminderScheduled, true);
   assert.equal(h.state.followupReminderScheduled, false);
-  h.update({ deviceReady: true });
-  await h.api.joinVisit();
+  h.update({
+    healthReviewed: true,
+    deviceReady: true,
+    currentLocation: "Austin, Texas",
+    callbackConfirmed: true,
+    visitDay: true,
+    clock: null,
+  });
+  await h.api.checkIn();
+  await h.api.setClinicianReady("clinician");
+  await h.api.admitToVisit();
+  h.update({ visitPhase: 2 });
   await h.api.completeVisit("clinician");
   await assert.rejects(
     h.api.scheduleReminders(),
@@ -283,7 +335,7 @@ test("reminder scheduling targets the upcoming follow-up and never the completed
   );
   const followup = await h.api.bookFollowup(followupSlots[0].id);
   assert.equal(followup.id, h.state.followupAppointment?.id);
-  assert.equal(h.state.followupReminderScheduled, false);
+  assert.equal(h.state.followupReminderScheduled, true);
   await h.api.scheduleReminders(followup.id);
   assert.equal(h.state.followupReminderScheduled, true);
   assert.equal(h.state.appointment?.id, first.id);
@@ -301,7 +353,7 @@ test("reminder scheduling targets the upcoming follow-up and never the completed
     /Choose an upcoming appointment/,
   );
   await h.api.bookFollowup(followupSlots[1].id);
-  assert.equal(h.state.followupReminderScheduled, false);
+  assert.equal(h.state.followupReminderScheduled, true);
   assert.equal(h.state.reminderScheduled, true);
 });
 
@@ -481,7 +533,10 @@ test("successful benefits are invalidated by changed verification inputs and can
     ["birth month", { profile: { ...sampleProfile, month: "9" } }],
     ["birth day", { profile: { ...sampleProfile, day: "15" } }],
     ["birth year", { profile: { ...sampleProfile, year: "1992" } }],
-    ["street address", { profile: { ...sampleProfile, address: "200 Example Lane" } }],
+    [
+      "street address",
+      { profile: { ...sampleProfile, address: "200 Example Lane" } },
+    ],
     ["city", { profile: { ...sampleProfile, city: "Dallas" } }],
     ["ZIP", { profile: { ...sampleProfile, zip: "75001" } }],
     ["provider", { providerId: "jordan" }],
@@ -491,19 +546,31 @@ test("successful benefits are invalidated by changed verification inputs and can
     ["scenario", { scenario: "coverage-pending" }],
   ];
   for (const [label, patch] of changes) {
-    const h = harness({ coverage: "insurance", agreements: true });
+    const h = harness({
+      coverage: "insurance",
+      agreements: true,
+      financialConsent: true,
+    });
     await h.api.createAccount();
     await h.api.reserve("maya", slots[0].id);
-    await h.api.setupPayment();
+    await h.api.setupPayment(paymentInput);
     await h.api.checkEligibility();
     assert.equal(h.state.eligibility.status, "verified", label);
     h.update(patch);
-    assert.deepEqual(h.state.eligibility, { status: "unverified", estimate: null }, label);
+    assert.deepEqual(
+      h.state.eligibility,
+      { status: "unverified", estimate: null },
+      label,
+    );
     await assert.rejects(h.api.confirm(), /insurance is not verified/, label);
     assert.equal(h.state.appointment, null, label);
     if (label !== "scenario") {
       const refreshed = await h.api.checkEligibility();
-      assert.equal(refreshed.status, "verified", `${label} requires a new result`);
+      assert.equal(
+        refreshed.status,
+        "verified",
+        `${label} requires a new result`,
+      );
     }
   }
 });
@@ -518,14 +585,14 @@ test("unrelated contact and navigation changes preserve a current benefits resul
     { profile: { ...h.state.profile, sms: true } },
     { step: "email" as const },
     { step: "phone" as const, history: ["insurance" as const] },
-    { agreements: true },
+    { agreements: true, financialConsent: true },
   ]) {
     h.update(patch);
     assert.equal(h.state.eligibility, result);
   }
   await h.api.createAccount();
   await h.api.reserve("maya", slots[0].id);
-  await h.api.setupPayment();
+  await h.api.setupPayment(paymentInput);
   assert.equal((await h.api.confirm()).status, "confirmed");
 });
 
@@ -533,12 +600,434 @@ test("a patch cannot carry an old verified result into a different member or pay
   const h = harness({ coverage: "insurance" });
   await h.api.checkEligibility();
   const before = h.state;
-  const next = applyJourneyPatch(before, { memberId: "NEW123", eligibility: before.eligibility });
+  const next = applyJourneyPatch(before, {
+    memberId: "NEW123",
+    eligibility: before.eligibility,
+  });
   assert.deepEqual(next.eligibility, { status: "unverified", estimate: null });
   assert.equal(before.eligibility.status, "verified");
   assert.equal(before.memberId, "1");
   h.update({ coverage: "selfpay" });
-  assert.deepEqual(h.state.eligibility, { status: "unverified", estimate: null });
+  assert.deepEqual(h.state.eligibility, {
+    status: "unverified",
+    estimate: null,
+  });
   h.update({ coverage: "insurance" });
-  assert.deepEqual(h.state.eligibility, { status: "unverified", estimate: null });
+  assert.deepEqual(h.state.eligibility, {
+    status: "unverified",
+    estimate: null,
+  });
+});
+
+test("Stripe setup saves only masked metadata and requires separate authorization and authentication", async () => {
+  const h = harness({
+    profile: { ...sampleProfile },
+    scenario: "payment-authentication",
+    agreements: true,
+  });
+  await h.api.createAccount();
+  await h.api.reserve("maya", slots[0].id);
+  await assert.rejects(h.api.setupPayment(paymentInput), /Authorize/);
+  h.update({ financialConsent: true });
+  const setup = await h.api.setupPayment(paymentInput);
+  assert.equal(setup.status, "requires_action");
+  assert.equal(h.state.paymentReady, false);
+  await assert.rejects(h.api.confirm(), /payment method/);
+  const cancelled = await h.api.completePaymentAuthentication(false);
+  assert.equal(cancelled.status, "failed");
+  assert.equal(h.state.appointment, null);
+  await h.api.setupPayment(paymentInput);
+  assert.equal(h.state.paymentSetup.status, "requires_action");
+  await h.api.completePaymentAuthentication(true);
+  assert.equal(h.state.paymentSetup.status, "succeeded");
+  assert.deepEqual(Object.keys(h.state.paymentSetup.method!).sort(), [
+    "brand",
+    "expMonth",
+    "expYear",
+    "id",
+    "last4",
+  ]);
+  assert.equal(JSON.stringify(h.state).includes("4242424242424242"), false);
+  assert.equal((await h.api.confirm()).status, "confirmed");
+});
+
+test("a successful bank authentication is idempotent and a saved card is retained when a hold expires", async () => {
+  const h = harness({
+    profile: { ...sampleProfile },
+    agreements: true,
+    financialConsent: true,
+    scenario: "payment-authentication",
+  });
+  await h.api.createAccount();
+  const hold = await h.api.reserve("maya", slots[0].id);
+  await h.api.setupPayment(paymentInput);
+  const first = await h.api.completePaymentAuthentication(true);
+  assert.deepEqual(await h.api.completePaymentAuthentication(true), first);
+  h.update({ reservation: { ...hold, expiresAt: 1 } });
+  await assert.rejects(h.api.confirm(), /hold expired/);
+  assert.equal(h.state.paymentSetup.status, "succeeded");
+  assert.equal(h.state.paymentSetup.method?.last4, "4242");
+  assert.equal(h.state.appointment, null);
+});
+
+test("booking automatically schedules notifications without entering preparation and cancellation retires pending jobs", async () => {
+  const h = harness();
+  await book(h);
+  assert.equal(h.state.reminderScheduled, true);
+  assert.equal(h.state.healthReviewed, false);
+  assert.equal(
+    h.state.notifications.filter((item) => item.kind === "confirmation").length,
+    2,
+  );
+  assert.equal(
+    h.state.notifications.filter((item) => item.status === "queued").length,
+    2,
+  );
+  const ids = h.state.notifications.map((item) => item.id);
+  await h.api.confirm();
+  assert.deepEqual(
+    h.state.notifications.map((item) => item.id),
+    ids,
+  );
+  await h.api.cancelAppointment();
+  assert.equal(h.state.appointment?.status, "cancelled");
+  assert.equal(
+    h.state.notifications.filter((item) => item.status === "queued").length,
+    0,
+  );
+  assert.equal(
+    h.state.notifications.filter((item) => item.status === "cancelled").length,
+    2,
+  );
+  await assert.rejects(h.api.checkIn(), /Book your first visit/);
+});
+
+test("rescheduling retires old reminder jobs and targets the new slot without duplicating the appointment", async () => {
+  const h = harness();
+  const first = await book(h);
+  await h.api.reschedule(slots[2].id);
+  assert.equal(h.state.appointment?.id, first.id);
+  const queued = h.state.notifications.filter(
+    (item) => item.status === "queued",
+  );
+  assert.equal(queued.length, 2);
+  assert.ok(queued.every((item) => item.id.includes(slots[2].id)));
+  assert.ok(
+    h.state.notifications
+      .filter(
+        (item) => item.id.includes(slots[0].id) && item.kind === "reminder",
+      )
+      .every((item) => item.status === "cancelled"),
+  );
+});
+
+test("the appointment clock exposes a realistic joining window and freezes acceleration at check-in", async () => {
+  const h = harness();
+  await book(h);
+  const clock = h.state.clock!;
+  assert.equal(joinAvailability(h.state, clock.realStart), "before");
+  assert.equal(joinAvailability(h.state, clock.realStart + 30_000), "open");
+  assert.equal(
+    joinAvailability(h.state, clock.realStart + 60 * 60_000),
+    "open",
+  );
+  assert.equal(
+    journeyNow(h.state, clock.realStart + 60 * 60_000),
+    new Date(slots[0].start).getTime() + 10 * 60_000,
+  );
+  h.update({
+    healthReviewed: true,
+    deviceReady: true,
+    currentLocation: "Austin, Texas",
+    callbackConfirmed: true,
+  });
+  await assert.rejects(h.api.checkIn(), /opens 15 minutes/);
+  h.update({ clock: { ...clock, realStart: Date.now() - 31_000 } });
+  await h.api.checkIn();
+  assert.equal(h.state.encounter.status, "waiting");
+  assert.equal(h.state.clock?.rate, 1);
+  assert.ok(h.state.encounter.checkedInAt);
+});
+
+test("required health details and check-in are finite, while declined records and unapproved AI do not block attendance", async () => {
+  const h = harness();
+  await book(h);
+  h.update({
+    clock: null,
+    visitDay: true,
+    deviceReady: true,
+    currentLocation: "Austin, Texas",
+    callbackConfirmed: true,
+  });
+  await assert.rejects(h.api.checkIn(), /health information/);
+  await h.api.saveHealthDetails();
+  await h.api.requestRecords(false);
+  await h.api.checkIn();
+  assert.equal(h.state.healthReviewed, true);
+  assert.equal(h.state.briefApproved, false);
+  assert.equal(h.state.recordsStatus, "declined");
+  await assert.rejects(h.api.admitToVisit(), /clinician will let/);
+  await h.api.setClinicianReady("clinician");
+  await h.api.admitToVisit();
+  assert.equal(h.state.encounter.status, "in_progress");
+  assert.ok(h.state.encounter.joinedAt);
+});
+
+test("patient departure preserves an unfinished encounter and care plan publication is separate from completion", async () => {
+  const h = harness();
+  await book(h);
+  h.update({
+    healthReviewed: true,
+    deviceReady: true,
+    currentLocation: "Austin, Texas",
+    callbackConfirmed: true,
+    visitDay: true,
+    clock: null,
+  });
+  await h.api.checkIn();
+  await h.api.setClinicianReady("clinician");
+  await h.api.admitToVisit();
+  const joinedAt = h.state.encounter.joinedAt;
+  await h.api.leaveVisit();
+  assert.equal(h.state.appointment?.status, "interrupted");
+  assert.equal(h.state.carePlan.status, "unavailable");
+  await assert.rejects(h.api.completeVisit("clinician"), /Join and finish/);
+  h.update({
+    encounter: {
+      ...h.state.encounter,
+      pausedAt: new Date(Date.now() - 10_000).toISOString(),
+    },
+  });
+  await h.api.reconnect();
+  assert.equal(h.state.encounter.joinedAt, joinedAt);
+  assert.ok(h.state.encounter.pausedDurationMs! >= 10_000);
+  assert.equal(h.state.encounter.pausedAt, undefined);
+  await assert.rejects(
+    h.api.publishCarePlan("clinician"),
+    /after the encounter/,
+  );
+  await assert.rejects(h.api.completeVisit("clinician"), /Join and finish/);
+  h.update({ visitPhase: 2 });
+  await h.api.completeVisit("clinician");
+  assert.equal(h.state.carePlan.status, "pending");
+  await assert.rejects(
+    h.api.publishCarePlan("patient" as "clinician"),
+    /Only the simulated clinician/,
+  );
+  await h.api.publishCarePlan("clinician");
+  await h.api.publishCarePlan("clinician");
+  assert.equal(h.state.carePlan.status, "published");
+  assert.equal(
+    h.state.events.filter(
+      (item) =>
+        item.operation === "care_plan.published" && item.outcome === "success",
+    ).length,
+    1,
+  );
+});
+
+test("sign-in restores the same appointment and completed preparation, with recoverable code expiry", async () => {
+  const h = harness({ scenario: "signin-expired" });
+  const appointment = await book(h);
+  await h.api.saveHealthDetails();
+  h.api.signOut();
+  assert.equal(h.state.portalAuth.status, "signed_out");
+  await assert.rejects(h.api.saveHealthDetails(), /Sign in/);
+  await h.api.requestSignIn(sampleProfile.email);
+  await assert.rejects(h.api.verifySignIn("246810"), /expired/);
+  assert.equal(h.state.portalAuth.status, "expired");
+  await h.api.requestSignIn(sampleProfile.email);
+  await assert.rejects(h.api.verifySignIn("000000"), /doesn’t match/);
+  await h.api.verifySignIn("246810");
+  assert.equal(h.state.portalAuth.status, "signed_in");
+  assert.deepEqual(h.state.appointment, appointment);
+  assert.equal(h.state.healthReviewed, true);
+});
+
+test("care-team replies are durable and deduplicated without adding message content to telemetry", async () => {
+  const h = harness();
+  await book(h);
+  h.update({ careMessage: "How do I change the time?" });
+  await h.api.sendCareMessage();
+  await Promise.all([h.api.replyToCareMessage(), h.api.replyToCareMessage()]);
+  await h.api.replyToCareMessage();
+  assert.equal(h.state.careMessages?.length, 2);
+  assert.equal(h.state.careMessages?.[0].sender, "patient");
+  assert.equal(h.state.careMessages?.[1].sender, "care-team");
+  assert.equal(h.state.careMessages?.[1].replyTo, h.state.careMessages?.[0].id);
+  assert.equal(
+    JSON.stringify(h.state.events).includes("How do I change"),
+    false,
+  );
+});
+
+test("reminder preferences apply to queued delivery and failed delivery never changes booking status", async () => {
+  const h = harness({ scenario: "reminder-failed", emailReminder: false });
+  await book(h);
+  assert.equal(
+    h.state.notifications.filter((item) => item.kind === "reminder").length,
+    1,
+  );
+  assert.equal(
+    h.state.notifications.find((item) => item.kind === "reminder")?.channel,
+    "sms",
+  );
+  h.update({ clock: null, visitDay: true });
+  await h.api.deliverNotifications();
+  assert.equal(
+    h.state.notifications.find((item) => item.kind === "reminder")?.status,
+    "failed",
+  );
+  assert.equal(h.state.appointment?.status, "confirmed");
+  assert.equal(h.state.reminderScheduled, true);
+  h.update({
+    emailReminder: true,
+    profile: { ...h.state.profile, sms: false },
+    visitDay: false,
+    clock: {
+      virtualStart: new Date(slots[0].start).getTime() - 45 * 60_000,
+      realStart: Date.now(),
+      rate: 1,
+    },
+  });
+  await h.api.scheduleReminders();
+  const queued = h.state.notifications.filter(
+    (item) => item.status === "queued",
+  );
+  assert.equal(queued.length, 1);
+  assert.equal(queued[0].channel, "email");
+  h.update({ clock: null, visitDay: true });
+  await h.api.deliverNotifications();
+  assert.equal(
+    h.state.notifications.find((item) => item.id === queued[0].id)?.status,
+    "delivered",
+  );
+});
+
+test("failed, cancelled, and interrupted card replacement preserve the active saved method", async () => {
+  const h = harness();
+  await book(h);
+  const previous = h.state.paymentSetup.method;
+  const replacement = {
+    ...paymentInput,
+    token: "pm_mock_replacement",
+    expYear: 2031,
+  };
+  h.update({ scenario: "payment-retry" });
+  const request = h.api.setupPayment(replacement);
+  assert.equal(h.state.paymentSetup.status, "processing");
+  const recovered = recoverPaymentSetup(
+    JSON.parse(JSON.stringify(h.state.paymentSetup)),
+  );
+  assert.equal(recovered.status, "succeeded");
+  assert.deepEqual(recovered.method, previous);
+  assert.match(recovered.error!, /previous payment method/);
+  await assert.rejects(request, /try again/);
+  assert.equal(h.state.paymentSetup.status, "succeeded");
+  assert.equal(h.state.paymentReady, true);
+  assert.deepEqual(h.state.paymentSetup.method, previous);
+  h.update({ scenario: "payment-authentication" });
+  await h.api.setupPayment(replacement);
+  assert.equal(h.state.paymentSetup.status, "requires_action");
+  const cancelled = await h.api.completePaymentAuthentication(false);
+  assert.equal(cancelled.status, "succeeded");
+  assert.ok(cancelled.error);
+  assert.deepEqual(cancelled.method, previous);
+  await h.api.setupPayment(replacement);
+  await h.api.completePaymentAuthentication(true);
+  assert.equal(h.state.paymentSetup.method?.id, replacement.token);
+  assert.equal(h.state.paymentSetup.previousMethod, undefined);
+  assert.equal(h.state.paymentSetup.error, undefined);
+});
+
+test("financial authorization must be renewed when pre-booking payment terms change", async () => {
+  const h = harness({ coverage: "insurance", financialConsent: true });
+  await h.api.checkEligibility();
+  assert.equal(h.state.financialConsent, false);
+  h.update({ financialConsent: true });
+  h.update({ coverage: "selfpay" });
+  assert.equal(h.state.financialConsent, false);
+  h.update({ financialConsent: true });
+  h.update({ payer: "Another plan" });
+  assert.equal(h.state.financialConsent, false);
+});
+
+test("reminders schedule only future 24-hour, one-hour and joining notices without repeating confirmation", async () => {
+  const h = harness();
+  await book(h);
+  assert.equal(
+    h.state.notifications.filter((item) => item.kind === "reminder").length,
+    2,
+  );
+  const confirmations = h.state.notifications.filter(
+    (item) => item.kind === "confirmation",
+  );
+  h.update({
+    clock: {
+      virtualStart: new Date(slots[0].start).getTime() - 48 * 60 * 60_000,
+      realStart: Date.now(),
+      rate: 1,
+    },
+  });
+  await h.api.scheduleReminders();
+  assert.equal(
+    h.state.notifications.filter((item) => item.status === "queued").length,
+    6,
+  );
+  assert.deepEqual(
+    h.state.notifications.filter((item) => item.kind === "confirmation"),
+    confirmations,
+  );
+  await h.api.scheduleReminders();
+  assert.equal(
+    h.state.notifications.filter((item) => item.status === "queued").length,
+    6,
+  );
+  assert.deepEqual(
+    h.state.notifications.filter((item) => item.kind === "confirmation"),
+    confirmations,
+  );
+});
+
+
+test("cancelling then rebooking the same slot creates a new appointment and fresh notification identities", async () => {
+  const h = harness();
+  const original = await book(h);
+  const originalNotifications = h.state.notifications.filter(item => item.appointmentId === original.id);
+  await h.api.cancelAppointment(original.id);
+  await h.api.reserve("maya", slots[0].id);
+  const [replacement, duplicate] = await Promise.all([h.api.confirm(), h.api.confirm()]);
+  assert.notEqual(replacement.id, original.id);
+  assert.deepEqual(replacement, duplicate);
+  assert.equal(replacement.slotId, original.slotId);
+  const oldJobs = h.state.notifications.filter(item => item.appointmentId === original.id);
+  assert.equal(oldJobs.length, originalNotifications.length);
+  assert.ok(oldJobs.filter(item => item.kind === "reminder").every(item => item.status === "cancelled"));
+  const newJobs = h.state.notifications.filter(item => item.appointmentId === replacement.id);
+  assert.equal(newJobs.filter(item => item.kind === "confirmation" && item.status === "delivered").length, 2);
+  assert.equal(newJobs.filter(item => item.kind === "reminder" && item.status === "queued").length, 2);
+  assert.equal(new Set(h.state.notifications.map(item => item.id)).size, h.state.notifications.length);
+  assert.deepEqual(await h.api.confirm(), replacement);
+  await assert.rejects(h.api.cancelAppointment(original.id), /could not be found/);
+  assert.equal(h.state.appointment?.status, "confirmed");
+});
+
+test("cancelled follow-ups get a new identity on rebooking while moving an upcoming follow-up preserves identity", async () => {
+  const h = harness();
+  await book(h);
+  h.update({ healthReviewed: true, deviceReady: true, currentLocation: "Austin, Texas", callbackConfirmed: true, visitDay: true, clock: null });
+  await h.api.checkIn();
+  await h.api.setClinicianReady("clinician");
+  await h.api.admitToVisit();
+  h.update({ visitPhase: 2 });
+  await h.api.completeVisit("clinician");
+  const original = await h.api.bookFollowup(followupSlots[0].id);
+  const moved = await h.api.bookFollowup(followupSlots[1].id);
+  assert.equal(moved.id, original.id);
+  await h.api.cancelAppointment(moved.id);
+  const replacement = await h.api.bookFollowup(followupSlots[1].id);
+  assert.notEqual(replacement.id, original.id);
+  assert.ok(h.state.notifications.filter(item => item.appointmentId === original.id && item.kind === "reminder").every(item => item.status === "cancelled"));
+  assert.ok(h.state.notifications.some(item => item.appointmentId === replacement.id && item.status === "queued"));
+  assert.equal(h.state.appointment?.status, "completed");
 });

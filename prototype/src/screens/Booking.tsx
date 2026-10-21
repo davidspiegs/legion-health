@@ -38,6 +38,7 @@ import {
 } from "../model/fixtures";
 import type { ScreenProps, Step } from "../model/types";
 import "./booking.css";
+import { Checkout } from "./Checkout";
 
 type FieldErrors = Record<string, string>;
 const payerOptions = [
@@ -85,8 +86,6 @@ export function BookingScreens(props: ScreenProps) {
   const { state, update, updateProfile, go, api, busy, act } = props;
   const [errors, setErrors] = useState<FieldErrors>({});
   const [day, setDay] = useState("");
-  const [showAgreements, setShowAgreements] = useState(false);
-  const [holdExpired, setHoldExpired] = useState(false);
   const directoryRequested = useRef(false);
   const profile = state.profile;
   const provider = getProvider(state.providerId);
@@ -144,17 +143,6 @@ export function BookingScreens(props: ScreenProps) {
     )
       update({ slotId: "", reservation: null });
   }, [state.step, state.slotId, state.faultsUsed, update]);
-  useEffect(() => {
-    if (state.step !== "review" || !state.reservation) {
-      setHoldExpired(false);
-      return;
-    }
-    const remaining = state.reservation.expiresAt - Date.now();
-    setHoldExpired(remaining <= 0);
-    if (remaining <= 0) return;
-    const timer = window.setTimeout(() => setHoldExpired(true), remaining + 20);
-    return () => window.clearTimeout(timer);
-  }, [state.step, state.reservation?.expiresAt]);
 
   function changePhone(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
@@ -1026,7 +1014,7 @@ export function BookingScreens(props: ScreenProps) {
             onChange={(event) => updateProfile({ email: event.target.value })}
           />
           <p className="field-hint">
-            A secure sign-in link, with no password to remember.
+            A sign-in code, with no password to remember.
           </p>
         </div>
       </Page>
@@ -1094,195 +1082,7 @@ export function BookingScreens(props: ScreenProps) {
       </Page>
     );
 
-  if (state.step === "review")
-    return (
-      <Page
-        className="booking-review"
-        title="Your first step, all set"
-        subtitle="One last look before you book."
-        onSubmit={submit(async () => {
-          if (
-            state.coverage === "insurance" &&
-            state.eligibility.status !== "verified"
-          ) {
-            go("insurance");
-            return;
-          }
-          if (!state.paymentReady) {
-            props.setError("Add a payment method before confirming.");
-            return;
-          }
-          if (!state.agreements) {
-            invalid(
-              "booking-agreements",
-              "Review the care and booking details before confirming.",
-            );
-            return;
-          }
-          const appointment = await act(() => api.confirm());
-          if (appointment) go("confirmed");
-        })}
-        footer={
-          <>
-            {!state.reservation || holdExpired ? (
-              <>
-                <Button
-                  loading={busy}
-                  onClick={() =>
-                    void act(() => api.reserve(state.providerId, state.slotId))
-                  }
-                >
-                  Recheck this time
-                </Button>
-                <button
-                  className="booking-text-button"
-                  type="button"
-                  onClick={() => go("slots")}
-                >
-                  Choose another time
-                </button>
-              </>
-            ) : (
-              <Button type="submit" loading={busy}>
-                Confirm my first visit
-              </Button>
-            )}
-            <p className="footer-note">Test mode · no charge</p>
-          </>
-        }
-      >
-        <div className="review-appointment">
-          <ProviderAvatar provider={provider} size="small" />
-          <div>
-            <strong>{provider.name}</strong>
-            <span>{formatDate(state.slotId, true)}</span>
-            <span>{formatTime(state.slotId)} CT · 60-minute video visit</span>
-          </div>
-          <button
-            className="booking-edit"
-            type="button"
-            onClick={() => go("slots")}
-          >
-            Edit
-          </button>
-        </div>
-        {!state.reservation || holdExpired ? (
-          <Notice>
-            Your temporary hold has ended. Your details are saved—recheck this
-            time before confirming.
-          </Notice>
-        ) : null}
-        <div className="review-cost">
-          <div>
-            <span>
-              {state.coverage === "selfpay"
-                ? "Your first visit"
-                : state.eligibility.status === "verified"
-                  ? "Estimated visit cost"
-                  : "Your visit cost"}
-            </span>
-            <strong>
-              {state.coverage === "selfpay"
-                ? "$250"
-                : state.eligibility.status === "verified"
-                  ? `$${state.eligibility.estimate}`
-                  : "Pending"}
-            </strong>
-          </div>
-          <p>
-            {state.coverage === "selfpay"
-              ? "Self-pay · $150 for future follow-up visits"
-              : state.eligibility.status === "verified"
-                ? `${state.payer} · an estimate, subject to your plan`
-                : `${state.payer} · coverage verification is still pending. Your care team will confirm the cost before your visit.`}
-          </p>
-        </div>
-        <button
-          type="button"
-          className={`demo-payment ${state.paymentReady ? "ready" : ""}`}
-          disabled={busy || state.paymentReady}
-          onClick={() =>
-            void act(async () => {
-              await api.setupPayment();
-              return true;
-            })
-          }
-        >
-          <CreditCard size={22} />
-          <span>
-            <strong>
-              {state.paymentReady
-                ? "Visa ending in 4242"
-                : "Add payment method"}
-            </strong>
-            <small>
-              {state.paymentReady
-                ? "Payment method ready"
-                : "Use test Visa ending in 4242"}
-            </small>
-          </span>
-          {state.paymentReady ? (
-            <Check size={20} />
-          ) : (
-            <ChevronRight size={20} />
-          )}
-        </button>
-        <div className="review-policy">
-          <Clock3 size={16} />
-          <p>
-            Please give 48 hours’ notice to cancel or reschedule. A $250 fee
-            applies to late cancellations or a missed first visit.
-          </p>
-        </div>
-        <label
-          className={`check-row review-agreements ${errors["booking-agreements"] ? "has-error" : ""}`}
-        >
-          <input
-            id="booking-agreements"
-            type="checkbox"
-            checked={state.agreements}
-            aria-invalid={!!errors["booking-agreements"]}
-            onChange={(event) => {
-              update({ agreements: event.target.checked });
-              setErrors({});
-            }}
-          />
-          <span>
-            <strong>I’ve reviewed the care and booking details</strong>
-            <small>Visit format, costs, and cancellation policy</small>
-          </span>
-        </label>
-        <button
-          type="button"
-          className="booking-text-button agreement-toggle"
-          aria-expanded={showAgreements}
-          onClick={() => setShowAgreements((value) => !value)}
-        >
-          {showAgreements
-            ? "Hide care and booking details"
-            : "Read care and booking details"}
-        </button>
-        {showAgreements ? (
-          <div className="example-agreements">
-            <h2>Your care and booking details</h2>
-            <p>
-              Your first visit is a 60-minute video conversation. You and your
-              clinician decide on next steps together. Medication is only
-              prescribed when your clinician considers it appropriate.
-            </p>
-            <p>
-              Review the visit cost above and give at least 48 hours’ notice if
-              you need to cancel or reschedule.
-            </p>
-          </div>
-        ) : null}
-        {errors["booking-agreements"] ? (
-          <p className="field-error" role="alert">
-            {errors["booking-agreements"]}
-          </p>
-        ) : null}
-      </Page>
-    );
+  if (state.step === "review") return <Checkout {...props} />;
 
   return null;
 }

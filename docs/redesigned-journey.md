@@ -1,77 +1,80 @@
-# A first visit that feels connected
+# From finding care to a completed first visit
 
-Proposed October 20, 2026. This is the scope for a working flow prototype for David's review, before the larger rebuild. All care, providers, transactions, communications, and service responses are fictional simulations. The existing research canvas remains separate.
+Updated October 20, 2026. This describes the implemented patient journey in `prototype/`. The assignment defines the endpoint as the **first completed visit**, not an account, reservation, payment page, or confirmed appointment. Checkout and the patient portal now form one continuing experience. Providers, appointments, payments, records, messages, and visits remain fictional local simulations; the research canvas documents the separately observed live experience.
 
 ## The journey
 
-| Phase | Screens and patient decisions | Service boundary |
+| Phase | Patient experience | Mock connections |
 | --- | --- | --- |
-| Find care | Welcome → six compact fit questions → select one or more conditions → preferred support → insurance or self-pay → two useful provider choices → time selection | Eligibility routing; local draft; directory and availability |
-| Your details | Name → birth date → address → coverage details and result if insured → email → phone and optional SMS preference → refresh availability and acquire a hold | Profile; Sohar checking/verified/pending/unmatched result; authentication; scheduling |
-| Confirm | Review provider, time, time zone, price and example agreements → simulated payment method → confirmation; recover if the hold expires | Scheduling; payment setup; appointment authority |
-| Prepare | Confirmation and calendar → records permission → records/goal review → editable, source-linked care brief → appointment home and reminder previews | Metriport; simulated AI summarization; reminder scheduling |
-| Meet | Appointment-day preview → location/callback and device readiness → waiting room → simulated visit, interruption/reconnect → clinician completion event | Telehealth; encounter authority |
-| Continue care | Clinician-reviewed example plan → experience feedback and questions → optional recommended follow-up selection and confirmation | Care team; follow-up scheduling |
+| Find care | Welcome → six fit questions → multiple conditions → preferred support → insurance or self-pay → provider comparison → appointment time | Service-area routing, draft persistence, directory, availability |
+| Your details | Name → birth date → address → insurance details/result if insured → email → phone and optional text preference | Profile, Sohar-shaped verification, account, scheduling hold |
+| Checkout | Appointment/cost summary → synthetic card fields → financial authorization and video-care consent → save card → any bank verification → confirm | Stripe SetupIntent-shaped adapter and appointment authority |
+| Confirmation | Appointment confirmation, calendar download, confirmation/reminders created automatically, **Go to your portal** | Scheduling, notification queue |
+| Portal | Home, Visits, Messages, Account; return to the same appointment after reload or simulated sign-in | Local profile/session, scheduling, messages, notifications |
+| Prepare | Review health details once; optionally share records and review an editable care brief; return Home | Profile, Metriport, deterministic AI brief |
+| Join | Time-based joining → location/callback and simulated device checks → waiting → clinician ready → join | Appointment clock, check-in, clinician presence, video |
+| Meet | Simulated conversation; interruption/leave/reconnect; clinician completion | Encounter state separate from connection state |
+| Continue care | Completed acknowledgment → care plan pending → publication → summary, feedback, messages, optional follow-up | Care-plan publication, follow-up, care-team thread |
 
-A time selected before personal information is a preference. After the final contact step succeeds, availability is checked and a hold acquired on entry to review, so there is no expiring hold while entering identity/contact information. Review can recheck an expired hold or return to alternative times without losing those details. Unverified insurance remains unverified; self-pay is an explicit choice. Booking, payment-method setup, attending, and completing a visit are separate states.
+A time selected before personal details is a preference. The local 15-minute hold is acquired after final contact validation, draft save, and account creation. The patient is not racing a hold while entering their identity. An expired hold can be rechecked or replaced without discarding entered details or a successfully saved payment method. Selection, reservation, payment setup, confirmation, joining, completion, and care-plan publication remain separate states.
 
-**The insurance/member-ID step before email is an introduced redesign, not an established part of Legion's live sequence.** The audit followed self-pay and observed a [payer directory and saved payer choice](runtime-service-evidence.md), which do not establish eligibility verification. After account creation, the [payment screen said insurance verification came next](technical-audit.md). This prototype moves an insured patient's coverage check after the needed demographics and before contact collection and financial confirmation, so an unresolved result or estimated cost can inform the patient's decision earlier.
+## Checkout and payment policy
 
-## What must work in this version
+Checkout presents the clinician, date/time in Central Time, duration, expected cost, **$0 due today**, card fields, and two specific acknowledgments. Confirm appointment is enabled when fields, consent, current hold, and applicable insurance result are ready. Submission saves the method, completes bank authentication when required, then confirms the appointment. Payment failure is recoverable; saved-card success alone is not booking success.
 
-- A complete path through the first completed visit and optional follow-up.
-- Helpful fit exits; urgent support guidance instead of a conversion CTA when appropriate. No autonomous diagnosis or prescribing.
-- Fit answers and the preferred-support choice advance directly, without a second Continue tap or an artificial save delay. Urgent resources appear immediately even if the draft save fails.
-- Seven explicit condition choices support multiple selections: ADHD, Depression, Anxiety, Bipolar Disorder, PTSD, “I'm not sure,” and Other. These are patient selections, not inferred or confirmed diagnoses.
-- Provider comparison, explicit Central Time display, nearby alternatives if a time is taken, and rescheduling without erasing intake.
-- Logical personal information steps, contact last, email before phone, visible labels, autocomplete, correct input modes, US phone formatting, and field validation.
-- Keyboard-aware layout uses actual layout/visual-viewport geometry plus editing state, rather than treating focus alone as proof of an open keyboard. Enter/Next/Done submits or advances; the shell releases stale keyboard offsets and distinguishes pinch zoom. Optional proof yields to an inferred open keyboard. Never clip required content to enforce a screenshot height.
-- Clear self-pay prices, insured estimates with provenance/status, simulated payment setup, and a distinct confirmation.
-- Save/resume on the same browser, recovery after save/payment failures, and idempotent reservation/confirmation.
-- Records permission, missing-record fallback, patient corrections, sourced preparation summary, and clinician review.
-- Reminder previews with editable channel preferences, a real downloadable calendar file, visit-day simulation, device readiness, waiting, reconnect, and an authoritative simulated completion event.
-- A care plan, feedback, care-team question simulation, and optional follow-up booking.
-- Review controls for chapter navigation, synthetic data, recovery scenarios, and a sanitized integration trace. No real advertising, notifications, camera/microphone capture, cards, or clinical APIs.
+**Working policy assumption, not verified Legion policy:** save a card at booking, charge no visit fee today, bill the $250 self-pay first visit after the visit, and bill an insured patient's final balance after insurance processing and presentation of the balance. The $150 self-pay follow-up amount is also a scenario price. These amounts are never charged. Charge timing, financial authorization, claim reconciliation, cancellation fees, and legal language require validated policy before live release. The earlier unsupported 48-hour/$250 cancellation rule is not used.
 
-## Visual and interaction direction
+The payment fields accept the synthetic `4242 4242 4242 4242` preview number, future expiration, any three-digit code, and a five-digit ZIP. Number/expiration format during entry, numeric keyboard hints and Enter/Next connect the fields, and errors are field-specific. Raw entry stays in mounted component state; it never enters journey storage, service arguments, or the ledger. These are **custom mock inputs, not Stripe-hosted fields or a production card-handling implementation**. The adapter receives a synthetic opaque token and masked metadata. A live implementation must use hosted payment components and a server-owned lifecycle.
 
-**Visual thesis:** use Legion's existing identity with a clear mobile hierarchy, calm spacing, and a recognizable clinician.
+Payment moves through empty, processing, requires action, succeeded, or failed. Bank verification can be approved or cancelled. Stable-button processing, content transitions, and confirmation acknowledgment communicate real state changes without invented percentage progress. Reduced-motion preferences suppress nonessential animation.
 
-The current internal visual reference is [brand-correction-reference.png](design/brand-correction-reference.png), superseding the earlier concepts in `docs/design/`. It is a generated working reference, not a user-approved final design.
+## A portal, not a continuing wizard
 
-**Content plan:** one immediate question or decision per ordinary screen; provider and appointment context where it helps; the next action anchored at the bottom; longer comparison/review content allowed to scroll. The default `/` route is the patient experience without review rails. `/?review=1` adds chapter navigation, scenarios, and integration inspection.
+Home is the persistent place to find the appointment and join. Visits contains upcoming/past appointments, first-visit rescheduling, and cancellation. Messages retains a thread with local delivery states and simulated acknowledgments. Account supports contact editing, masked payment details, coverage, reminder preferences, and sign-out. Its Change card action opens a self-service replacement form with fresh financial authorization and the same mock authentication/failure states. The prior method remains available until replacement succeeds; updating a card neither charges it nor reconfirms the appointment. Coverage changes route to the care team rather than pretending to reverify benefits.
 
-**Interaction thesis:** direct answer selection and stable controls keep the task moving. The chosen fit/goal answer is acknowledged for 200ms, then incoming content transitions over 320ms while the frame and action remain stationary. Only explicit answers receive selection styling; incoming answer controls are briefly gated against repeated taps. Reduced-motion settings skip the presentation delays. Shared buttons retain stable dimensions while busy, without arrows, spinners, or button motion. The compact testimonial rotates every 9 seconds, suspends rotation on hover, focus, or a hidden document, and does not rotate with reduced motion enabled. Three manual dots select quotes and stop automatic rotation for that screen; there is no separate pause button. The strip yields to short viewports and the keyboard.
+Portal hash routes include `#/portal/home`, `#/portal/visits`, and `#/portal/visit/summary`. Reload restores progress on the same browser/origin. A signed-out patient requests a code using their saved email and enters the code from the **Preview inbox**, outside the patient app. The synthetic code is `246810`; expiry, wrong-code, and resend states exist. No email is sent and this is not secure authentication or cross-device access.
 
-### Design system and implementation inventory
+| Preparation task | Required? | Completion behavior |
+| --- | --- | --- |
+| Health details | Before check-in | Review conditions, medications, and allergies. Saving marks reviewed; editing clears review. Return Home or continue to check-in when joining is open. |
+| Outside records | Optional | Grant permission, decline, or continue when unavailable; review/correct a returned source. Return Home with reviewed/skipped/unavailable status. |
+| Care brief | Optional | Edit the draft from intake and available sample records; save and return Home. Never blocks joining. |
+| Device setup | At check-in; can be tried earlier | Save simulated camera/sound readiness. Confirm current location and callback number at check-in. |
 
-- White background; Legion blue `#3A68E9`, ink `#000614`, muted text `#657082`, and pale blue `#EEF2FC`.
-- Bundled Inter from Legion's live app. Screen headings are 32px by default and 30px on mobile, weight 500, with smaller short-viewport/keyboard treatments; form inputs stay 16px. Mobile gutters are 24px, or 20px on narrow devices. Physical-device and large-text legibility still need review.
-- Shared primary buttons have a stable 52px minimum height and 8px corners, with a compact 48px keyboard treatment. Cards are reserved for selectable choices, provider comparison, and appointment context.
-- Lucide outline icons at consistent 20–24px, 1.8–2px stroke; icons indicate meaning, not decoration.
-- Legion's public SVG logo is bundled at `/brand/legion-logo.svg`, alongside the local Inter font. One generated fictional clinician portrait is used consistently across matching, booking and the simulated visit.
-- Components: app shell/progress, Page with a scrolling main region and separate action area, buttons, choice rows, fields, notices, appointment context, testimonial strip, accessible review/help dialogs.
-- Full-screen mobile shell uses dynamic/visual viewport height. At keyboard-open sizes, progress and optional proof collapse before essential fields or actions. Large text and unusually short viewports can scroll rather than clip.
-- Three distinct authentic testimonials from the captured current flow are attributed as Legion Health patient experiences; shortened quotes are labelled as excerpts. No invented names or ratings.
-- Condition choices use native checkboxes and persist as a `conditions` array. Older single-topic drafts are not converted into diagnoses; eligible unfinished drafts return to the condition screen for an explicit selection.
-- “Preview controls” lives outside the patient surface. Its dialog advances appointment day, the simulated conversation, and clinician completion in either mode, so the default patient flow can be reviewed end to end without embedding simulation controls in the care screens.
+Home says **You're ready for your visit** after health review. Completed tasks become view/edit links, not a compulsory loop. Records permission, corrections, and brief approval remain saved. Missing records and an unreviewed brief do not become attendance barriers.
 
-Brand references are Legion's [public logo](https://app.legionhealth.com/legion-logo-dark-text.svg) and its live [base stylesheet](https://app.legionhealth.com/_next/static/css/cf04015137e5e14a.css) and [application stylesheet](https://app.legionhealth.com/_next/static/css/c50624e23d0abf09.css). These identify the source of the identity assets and styling; the redesigned layout remains this prototype's work.
+## Joining and completing the visit
 
-Implementation references: the [W3C carousel tutorial](https://www.w3.org/WAI/tutorials/carousels/) is a reference for reviewing rotation and user control, not a claim of conformance; [MDN `enterkeyhint`](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/enterkeyhint) documents keyboard action hints; and the [Visual Viewport API](https://developer.mozilla.org/en-US/docs/Web/API/Visual_Viewport_API) supports adapting the shell when a mobile keyboard changes the visible area. These mechanisms do not replace device testing. The urgent-support exit links to [988's explanation of what to expect](https://988lifeline.org/get-help/what-to-expect/); it does not simulate a crisis service or claim a care coordinator has been contacted.
+The join window opens 15 minutes before the appointment and ends one hour after its start unless the patient is already waiting or in the encounter. Home explains when to return and offers a setup check before the window. Join visit leads through outstanding health review and check-in. A closed window directs to the care team.
 
-## Integration choices
+**Preview time is deliberately accelerated:** confirmation starts 45 minutes before the selected visit at 60× speed, opening joining after roughly 30 real seconds. Acceleration caps at ten minutes after start so review does not cause a missed visit, and returns to normal speed at check-in. External Preview controls disclose this behavior. It is not a production scheduling rule or predicted visit timing.
 
-Mock profile/authentication, directory/scheduling, payment setup, Sohar, Metriport, AI preparation, reminders, video, encounter completion and care-team messaging. Follow-up reminders target the follow-up's own appointment ID; the completed first visit remains unchanged. Care-team messages persist locally outside the event ledger and are never delivered. Healthie is an architectural lead from the audit, not a claim to reproduce its private API. Keep adapters replaceable. The [architecture document](prototype-architecture.md) records the implemented methods, invariants, and production gaps.
+The global mock clinician becomes ready automatically after six seconds of waiting, or 25 seconds in the late scenario. The patient joins; three illustrative conversation phases progress and the clinician completes the visit after 28 seconds of connected time. Leaving or interruption pauses connected-time progress and preserves the encounter for reconnecting. Reviewer controls are not required to finish.
 
-The Sohar simulation accepts any nonempty member ID—including `1`—and moves through a visible checking state for 1,250ms. Its scenario then returns active/in-network coverage with a $25 first-visit estimate, pending, or unmatched. These are fixed demonstration responses and timing, not real payer performance or a payment guarantee. Pending and unmatched results offer retry, editing, care-help, or an explicit $250 self-pay choice; unmatched does not mean uninsured or denied. The care-help route explains the support concept but does not contact a team.
+Completion creates a **pending** care plan. A separate clinician simulation publishes it after five seconds, or 25 seconds in the delayed-plan scenario. The generic summary fabricates no diagnosis or prescription. Follow-up timing comes from the mock care-plan field; the current fixture is two weeks, not a personalized recommendation. Optional follow-up has its own appointment identity/reminders. The full simulated encounter covers the first visit, not a second follow-up encounter.
 
-A real implementation would create an asynchronous verification request and retrieve its result by polling or webhook, using patient name/birth date, payer/member information, and the applicable specialty/place-of-service inputs. [Sohar quickstart](https://docs.soharhealth.com/documentation/getting-started/quickstart), [verification guide](https://docs.soharhealth.com/documentation/guides/verification). Active coverage, provider network status, and estimated patient cost must stay distinct; Sohar documents separate [network-status](https://docs.soharhealth.com/api-reference/network-status/get-network-status) and [cost-estimate](https://docs.soharhealth.com/api-reference/cost-estimate/create-cost-estimate) operations. Inactive coverage, out-of-network care, deductible/coinsurance calculations, and prior-authorization requirements remain future variants, not implemented claims in this flow.
+Confirmation/reminders are created at booking, independently of preparation. Reminder times are 24 hours, one hour, and 15 minutes before the appointment, with only future jobs created. The default accelerated clock begins 45 minutes before the visit, so that path schedules only the 15-minute reminder. Rescheduling replaces pending jobs and cancellation stops them. Care-plan publication also creates a simulated notification. The external Preview inbox shows notification records; its portal links respect simulated session state. Notification failure does not unconfirm the visit. Messages persist locally and receive a generic simulated acknowledgment without clinical advice.
 
-Verified's phone-first prerequisite conflicts with the requested contact-last sequence, so omit it from the main flow. Persona needs a specific assurance gap before adding a universal identity gate. DoseSpot is a potential clinician medication handoff; this first flow review does not need a simulated prescription to establish successful care.
+## Insurance evidence and integration choices
 
-## Evidence and outcome
+The member-ID/Sohar step after demographics and before email is **our redesign**, not an established part of the observed live flow. The self-pay audit found a [payer directory and saved payer choice](runtime-service-evidence.md); after account creation, the [payment page said insurance verification came next](technical-audit.md). That does not establish a live member-ID step or the Sohar trigger.
 
-The primary outcome is a simulated clinician-confirmed first visit. Supporting measures include eligible continuation, provider/time visibility and choice, reservation recovery, confirmed appointment, preparation reviewed, joined/interrupted/reconnected, and completed encounter. General event traces exclude names, contact information, answers, conditions, medication details and free text. Historical funnel losses remain investigation signals, not promised lift.
+Any nonempty member ID, including `1`, works. After a visible 1,250ms check, the chosen scenario returns synthetic verified active/in-network coverage with a $25 estimate, pending, or unmatched. Pending/unmatched retain insurance and offer edit, retry, help, or explicit self-pay; they imply neither denial nor a price. Demographic, payer/member, provider, slot, coverage, or scenario changes invalidate results; contact/navigation do not. The fixture combines eligibility/network/cost, rather than making a real benefits determination or payment guarantee.
 
-Review at 390 × 844 and 375 × 667, plus short keyboard-sized viewports. Exercise the complete happy path and recovery scenarios; verify keyboard submission and footer reach, focus order, visible errors, reduced-motion carousel behavior, consent boundaries, idempotency, and completion authority. Desktop and responsive browser checks do not substitute for physical iOS/Android testing.
+Implemented adapters cover profile/session, directory/scheduling, Stripe-shaped setup, Sohar, Metriport, AI preparation, notifications, video, completion, publication, and messaging. Healthie remains an architectural lead from the audit, not reproduction of its private API. Verified/Persona are unused. DoseSpot is not invoked because this scenario has no prescribing action. No advertising or retargeting receives data. Exact contracts and limitations are in [prototype-architecture.md](prototype-architecture.md).
+
+## Mobile and visual direction
+
+Legion's public identity supplies white, blue `#3A68E9`, ink `#000614`, muted `#657082`, pale blue `#EEF2FC`, the bundled public SVG logo, and Inter. One generated fictional clinician portrait stays consistent. The redesigned layout is original work; asset sources are recorded in `prototype/public/brand/SOURCES.md`.
+
+Ordinary intake screens ask one question with a stable bottom action. Checkout, booking, portal, and longer health content can scroll. The visual-viewport-aware shell keeps active inputs/actions usable as keyboard geometry changes. Fields have labels, relevant autocomplete/input modes, phone formatting, and Enter/Next behavior. Short/large-text layouts may scroll rather than clip required content.
+
+Fit/goal choices advance after a 200ms acknowledgment; incoming content transitions for 320ms with stationary frame/actions and brief repeated-tap protection. Only actual answers look selected. Reduced motion removes presentation delays. Condition icons accompany native multiple-choice checkboxes: ADHD, Depression, Anxiety, Bipolar Disorder, PTSD, “I'm not sure,” and Other.
+
+Three authentic testimonials from captured live screens rotate every nine seconds. Manual dots stop rotation for that screen; hover/focus/hidden-document/reduced-motion suspend it. No pause button is present. Testimonials yield to short viewports and keyboards. No names, ratings, or reviews are fabricated.
+
+## Outcome and validation boundary
+
+Success is a simulated clinician-confirmed first visit: the patient can book, prepare once, leave, return, join, reconnect, and find next steps. The activity ledger excludes personal/clinical details and free text. Historical production funnel gaps remain investigation evidence, not causal abandonment or predicted lift.
+
+Model/viewport tests cover state and recovery. Executed results, mobile rendered walkthroughs, and screenshots are recorded separately in [prototype-qa.md](prototype-qa.md). Responsive browser tests do not establish physical iOS/Android keyboard behavior, real media, secure authentication, real payments/delivery, or production readiness.

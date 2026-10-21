@@ -13,8 +13,14 @@ import type {
   MockApi,
   ServiceEvent,
   ServiceName,
+  PaymentSetup,
+  Notification,
 } from "./types";
-import { eligibilityInputKey } from "./journey-state";
+import {
+  eligibilityInputKey,
+  journeyNow,
+  joinAvailability,
+} from "./journey-state";
 
 interface MockApiOptions {
   getState: () => JourneyState;
@@ -125,6 +131,107 @@ export function createMockApi({
     if (!appointment || appointment.status === "cancelled")
       throw new Error("Book your first visit before continuing.");
     return appointment;
+  };
+
+  const queueNotifications = (
+    appointment: Appointment,
+    kind: "confirmation" | "rescheduled" | null = "confirmation",
+  ) => {
+    const state = getState();
+    const now = journeyNow(state);
+    const channels: ("email" | "sms")[] = [
+      "email",
+      ...(state.profile.sms ? ["sms" as const] : []),
+    ];
+    const upcoming: Notification[] = [];
+    for (const channel of channels) {
+      if (kind) {
+        const id = `${appointment.id}:${appointment.slotId}:${channel}:${kind}`;
+        const existing = state.notifications.find((item) => item.id === id);
+        upcoming.push(
+          existing ?? {
+            id,
+            appointmentId: appointment.id,
+            channel,
+            kind,
+            scheduledAt: new Date(now).toISOString(),
+            status: "delivered",
+          },
+        );
+      }
+      if (channel === "email" && !state.emailReminder) continue;
+      for (const minutes of [24 * 60, 60, 15]) {
+        const scheduled =
+          new Date(appointment.start).getTime() - minutes * 60_000;
+        const id = `${appointment.id}:${appointment.slotId}:${channel}:reminder-${minutes}`;
+        const existing = state.notifications.find((item) => item.id === id);
+        // A same-day booking should never trigger a burst of already-missed reminders.
+        if (scheduled <= now && !existing) continue;
+        if (existing?.status === "delivered" || existing?.status === "failed") {
+          upcoming.push(existing);
+          continue;
+        }
+        upcoming.push({
+          id,
+          appointmentId: appointment.id,
+          channel,
+          kind: "reminder",
+          scheduledAt: new Date(scheduled).toISOString(),
+          status: "queued",
+        });
+      }
+    }
+    const previous = state.notifications.map((item) =>
+      item.appointmentId === appointment.id && item.status === "queued"
+        ? { ...item, status: "cancelled" as const }
+        : item,
+    );
+    const ids = new Set(upcoming.map((item) => item.id));
+    update({
+      notifications: [
+        ...previous.filter((item) => !ids.has(item.id)),
+        ...upcoming,
+      ],
+      ...(appointment.followup
+        ? { followupReminderScheduled: true }
+        : { reminderScheduled: true }),
+    });
+    emit(
+      "Reminders",
+      "reminders.scheduled",
+      "success",
+      "Future appointment notification jobs updated without repeating past reminders; delivery is simulated",
+    );
+  };
+  const assertSignedIn = () => {
+    if (getState().portalAuth.status !== "signed_in")
+      throw new Error("Sign in to your patient portal to continue.");
+  };
+  const checkInRequirements = () => {
+    const state = getState();
+    assertSignedIn();
+    currentAppointment();
+    if (!state.healthReviewed)
+      throw new Error("Review your health information before checking in.");
+    if (!state.deviceReady)
+      throw new Error("Complete the device check before joining.");
+    if (!state.currentLocation.trim() || !state.callbackConfirmed)
+      throw new Error(
+        "Confirm your current location and callback number before joining.",
+      );
+    const availability = joinAvailability(state);
+    if (availability === "before")
+      throw new Error(
+        "Your visit room opens 15 minutes before the appointment.",
+      );
+    if (availability === "closed")
+      throw new Error(
+        "The joining window has ended. Contact your care team for help.",
+      );
+    if (availability === "completed")
+      throw new Error(
+        "This visit is complete. You can find your summary in your portal.",
+      );
   };
 
   return {
@@ -278,6 +385,7 @@ export function createMockApi({
             throw new Error("Enter a valid email address.");
           if (profile.phone.replace(/\D/g, "").length !== 10)
             throw new Error("Enter a 10-digit phone number.");
+          update({ portalAuth: { status: "signed_in", codeExpiresAt: null } });
         },
       );
     },
@@ -316,19 +424,117 @@ export function createMockApi({
         },
       );
     },
-    setupPayment() {
-      if (getState().paymentReady) return Promise.resolve();
+    setupPayment(input) {
+      const state = getState();
+      if (
+        state.paymentSetup.status === "succeeded" &&
+        state.paymentSetup.method?.id === input.token
+      )
+        return Promise.resolve(state.paymentSetup);
+      if (
+        !input.token.startsWith("pm_mock_") ||
+        !/^\d{4}$/.test(input.last4) ||
+        !/^\d{5}$/.test(input.billingZip) ||
+        input.expMonth < 1 ||
+        input.expMonth > 12 ||
+        input.expYear < new Date().getFullYear() ||
+        (input.expYear === new Date().getFullYear() &&
+          input.expMonth < new Date().getMonth() + 1)
+      ) {
+        return Promise.reject(
+          new Error("Check your payment details before continuing."),
+        );
+      }
+      if (!state.financialConsent)
+        return Promise.reject(
+          new Error("Authorize saving your payment method before continuing."),
+        );
+      const previousMethod =
+        state.paymentSetup.status === "succeeded"
+          ? state.paymentSetup.method
+          : state.paymentSetup.previousMethod;
+      update({
+        paymentSetup: {
+          id: state.paymentSetup.id ?? `seti_mock_${Date.now()}`,
+          status: "processing",
+          method: null,
+          previousMethod,
+        },
+        paymentReady: !!previousMethod,
+      });
       return run(
         "setupPayment",
         "Payment",
-        "payment_method.prepared",
-        "Demo payment method ready; no card or charge collected",
+        "setup_intent.confirmed",
+        "Synthetic Stripe setup processed; no card or charge collected",
         () => {
-          if (consumeFault("payment-retry"))
-            throw new Error(
-              "We couldn’t prepare the demo payment method. Your details are safe—try again.",
-            );
-          update({ paymentReady: true });
+          if (consumeFault("payment-retry")) {
+            const error =
+              "We couldn’t save that payment method. Check your details and try again.";
+            update({
+              paymentSetup: {
+                id: getState().paymentSetup.id,
+                status: previousMethod ? "succeeded" : "failed",
+                method: previousMethod ?? null,
+                error,
+              },
+              paymentReady: !!previousMethod,
+            });
+            throw new Error(error);
+          }
+          const needsAuthentication =
+            getState().scenario === "payment-authentication";
+          const paymentSetup: PaymentSetup = {
+            id: getState().paymentSetup.id,
+            status: needsAuthentication ? "requires_action" : "succeeded",
+            method: {
+              id: input.token,
+              brand: input.brand,
+              last4: input.last4,
+              expMonth: input.expMonth,
+              expYear: input.expYear,
+            },
+            previousMethod: needsAuthentication ? previousMethod : undefined,
+          };
+          update({
+            paymentSetup,
+            paymentReady: paymentSetup.status === "succeeded",
+          });
+          return paymentSetup;
+        },
+      );
+    },
+    completePaymentAuthentication(approved) {
+      return run(
+        "paymentAuthentication",
+        "Payment",
+        "setup_intent.authentication",
+        "Synthetic bank authentication resolved; no charge collected",
+        () => {
+          const existing = getState().paymentSetup;
+          if (existing.status === "succeeded") return existing;
+          if (existing.status !== "requires_action")
+            throw new Error("There is no bank authentication to complete.");
+          const paymentSetup: PaymentSetup = approved
+            ? {
+                ...existing,
+                status: "succeeded",
+                previousMethod: undefined,
+                error: undefined,
+              }
+            : {
+                id: existing.id,
+                status: existing.previousMethod ? "succeeded" : "failed",
+                method: existing.previousMethod ?? null,
+                error: existing.previousMethod
+                  ? "Bank verification was cancelled. Your previous payment method is still saved."
+                  : "Bank verification was cancelled. Try again to save your card.",
+              };
+          update({
+            paymentSetup,
+            paymentReady: paymentSetup.status === "succeeded",
+          });
+          return paymentSetup;
         },
       );
     },
@@ -357,8 +563,12 @@ export function createMockApi({
               "Your insurance is not verified yet. Wait for a coverage update, or choose self-pay before booking.",
             );
           }
-          if (!state.paymentReady)
-            throw new Error("Prepare your demo payment method to continue.");
+          if (!state.paymentReady || state.paymentSetup.status !== "succeeded")
+            throw new Error("Save a payment method to continue.");
+          if (!state.financialConsent)
+            throw new Error(
+              "Review the payment authorization before confirming.",
+            );
           if (!state.reservation || state.reservation.expiresAt <= Date.now()) {
             update({ reservation: null });
             throw new Error(
@@ -367,13 +577,30 @@ export function createMockApi({
           }
           const slot = getSlot(state.reservation.slotId);
           const appointment: Appointment = {
-            id: "visit-first",
+            id: `visit-first-${crypto.randomUUID()}`,
             providerId: slot.providerId,
             slotId: slot.id,
             start: slot.start,
             status: "confirmed",
           };
-          update({ appointment, reservation: null, bookingMode: "first" });
+          update({
+            appointment,
+            reservation: null,
+            bookingMode: "first",
+            clock: {
+              virtualStart: new Date(appointment.start).getTime() - 45 * 60_000,
+              realStart: Date.now(),
+              rate: 60,
+            },
+            portalAuth: { status: "signed_in", codeExpiresAt: null },
+            encounter: {
+              status: "not_started",
+              connection: "disconnected",
+              clinicianStatus: "not_present",
+            },
+            carePlan: { status: "unavailable", followupWeeks: 2 },
+          });
+          queueNotifications(appointment);
           return appointment;
         },
       );
@@ -467,31 +694,106 @@ export function createMockApi({
             throw new Error(
               "Reminders can only be scheduled for an upcoming confirmed appointment.",
             );
-          update(
-            appointment.followup
-              ? { followupReminderScheduled: true }
-              : { reminderScheduled: true },
-          );
+          queueNotifications(appointment, null);
         },
       );
     },
-    joinVisit() {
+    saveHealthDetails() {
       return run(
-        "joinVisit",
+        "healthDetails",
+        "Profile",
+        "health_details.reviewed",
+        "Patient health information reviewed; no clinical content in events",
+        () => {
+          assertSignedIn();
+          update({ healthReviewed: true });
+        },
+      );
+    },
+    checkIn() {
+      if (
+        getState().encounter.status === "waiting" ||
+        getState().encounter.status === "in_progress"
+      )
+        return Promise.resolve();
+      return run(
+        "checkIn",
+        "Video",
+        "visit.checked_in",
+        "Patient checked into appointment waiting room",
+        () => {
+          checkInRequirements();
+          const state = getState();
+          update({
+            encounter: {
+              status: "waiting",
+              connection: "disconnected",
+              clinicianStatus:
+                state.scenario === "clinician-late"
+                  ? "running_late"
+                  : "not_present",
+              checkedInAt: new Date().toISOString(),
+            },
+            clock: {
+              virtualStart: journeyNow(state),
+              realStart: Date.now(),
+              rate: 1,
+            },
+          });
+        },
+      );
+    },
+    setClinicianReady(actor) {
+      if (actor !== "clinician")
+        return Promise.reject(
+          new Error("Only the simulated clinician service can update arrival."),
+        );
+      return run(
+        "clinicianReady",
+        "Encounter",
+        "clinician.ready",
+        "Simulated clinician is ready to admit the patient",
+        () => {
+          const state = getState();
+          currentAppointment();
+          if (state.encounter.status !== "waiting")
+            throw new Error("The patient has not checked in yet.");
+          update({
+            encounter: { ...state.encounter, clinicianStatus: "ready" },
+          });
+        },
+      );
+    },
+    admitToVisit() {
+      return run(
+        "admitToVisit",
         "Video",
         "room.joined",
-        "Demo room entered; visit remains incomplete",
+        "Patient connected to the clinician; visit remains incomplete",
         () => {
-          const appointment = currentAppointment();
-          if (appointment.status === "completed")
-            throw new Error("This visit is complete. Your care plan is ready.");
-          if (!getState().deviceReady)
-            throw new Error("Complete the device check before joining.");
+          checkInRequirements();
+          const state = getState();
+          if (state.encounter.status === "in_progress") return;
+          if (
+            state.encounter.status !== "waiting" ||
+            state.encounter.clinicianStatus !== "ready"
+          )
+            throw new Error(
+              "Your clinician will let you in when they are ready.",
+            );
           const interrupted = consumeFault("connection-lost");
           update({
             appointment: {
-              ...appointment,
+              ...currentAppointment(),
               status: interrupted ? "interrupted" : "joined",
+            },
+            encounter: {
+              ...state.encounter,
+              status: "in_progress",
+              joinedAt: state.encounter.joinedAt ?? new Date().toISOString(),
+              pausedAt: interrupted ? new Date().toISOString() : undefined,
+              pausedDurationMs: state.encounter.pausedDurationMs ?? 0,
+              connection: interrupted ? "interrupted" : "connected",
             },
           });
           if (interrupted)
@@ -504,17 +806,83 @@ export function createMockApi({
         },
       );
     },
+    joinVisit() {
+      return run(
+        "joinVisit",
+        "Video",
+        "room.joined",
+        "Patient connected to the clinician; visit remains incomplete",
+        () => {
+          checkInRequirements();
+          const state = getState();
+          if (state.encounter.clinicianStatus !== "ready")
+            throw new Error(
+              "Your clinician will let you in when they are ready.",
+            );
+          const interrupted = consumeFault("connection-lost");
+          update({
+            appointment: {
+              ...currentAppointment(),
+              status: interrupted ? "interrupted" : "joined",
+            },
+            encounter: {
+              ...state.encounter,
+              status: "in_progress",
+              joinedAt: state.encounter.joinedAt ?? new Date().toISOString(),
+              pausedAt: interrupted ? new Date().toISOString() : undefined,
+              pausedDurationMs: state.encounter.pausedDurationMs ?? 0,
+              connection: interrupted ? "interrupted" : "connected",
+            },
+          });
+        },
+      );
+    },
+    leaveVisit() {
+      return run(
+        "leaveVisit",
+        "Video",
+        "room.left",
+        "Patient left the room; encounter is not marked completed",
+        () => {
+          const appointment = currentAppointment();
+          if (appointment.status === "completed") return;
+          update({
+            appointment: { ...appointment, status: "interrupted" },
+            encounter: {
+              ...getState().encounter,
+              connection: "interrupted",
+              pausedAt:
+                getState().encounter.pausedAt ?? new Date().toISOString(),
+            },
+          });
+        },
+      );
+    },
     reconnect() {
       return run(
         "reconnect",
         "Video",
         "room.reconnected",
-        "Demo connection restored to the same visit",
+        "Connection restored to the same encounter",
         () => {
+          assertSignedIn();
           const appointment = currentAppointment();
           if (appointment.status !== "interrupted")
             throw new Error("There is no interrupted visit to reconnect.");
-          update({ appointment: { ...appointment, status: "joined" } });
+          const encounter = getState().encounter;
+          const pause = encounter.pausedAt
+            ? Math.max(0, Date.now() - new Date(encounter.pausedAt).getTime())
+            : 0;
+          update({
+            appointment: { ...appointment, status: "joined" },
+            encounter: {
+              ...encounter,
+              status: "in_progress",
+              connection: "connected",
+              pausedAt: undefined,
+              pausedDurationMs: (encounter.pausedDurationMs ?? 0) + pause,
+            },
+          });
         },
       );
     },
@@ -529,12 +897,72 @@ export function createMockApi({
         "completeVisit",
         "Encounter",
         "visit.completed",
-        "Simulated clinician completed the encounter",
+        "Simulated clinician completed the encounter; summary awaits publication",
         () => {
           const appointment = currentAppointment();
-          if (appointment.status !== "joined")
+          const state = getState();
+          if (
+            appointment.status !== "joined" ||
+            state.encounter.status !== "in_progress" ||
+            state.visitPhase < 2
+          )
             throw new Error("Join and finish the visit before completing it.");
-          update({ appointment: { ...appointment, status: "completed" } });
+          update({
+            appointment: { ...appointment, status: "completed" },
+            encounter: {
+              ...state.encounter,
+              status: "completed",
+              connection: "disconnected",
+              completedAt: new Date().toISOString(),
+            },
+            carePlan: { status: "pending", followupWeeks: 2 },
+          });
+        },
+      );
+    },
+    publishCarePlan(actor) {
+      if (actor !== "clinician")
+        return Promise.reject(
+          new Error("Only the simulated clinician can publish the care plan."),
+        );
+      if (getState().carePlan.status === "published") return Promise.resolve();
+      return run(
+        "publishCarePlan",
+        "Encounter",
+        "care_plan.published",
+        "Clinician reviewed and published the simulated care plan",
+        () => {
+          if (getState().appointment?.status !== "completed")
+            throw new Error(
+              "The care plan can be published after the encounter is complete.",
+            );
+          const state = getState();
+          const id = `${state.appointment!.id}:care-plan:email`;
+          const notification: Notification = {
+            id,
+            appointmentId: state.appointment!.id,
+            channel: "email",
+            kind: "care-plan",
+            scheduledAt: new Date(journeyNow(state)).toISOString(),
+            status: "delivered",
+          };
+          update({
+            carePlan: {
+              ...state.carePlan,
+              status: "published",
+              publishedAt: new Date().toISOString(),
+            },
+            notifications: [
+              ...state.notifications.filter((item) => item.id !== id),
+              notification,
+            ],
+          });
+          emit(
+            "Reminders",
+            "care_plan.notification",
+            "success",
+            "Care-plan publication notification simulated; no email sent",
+          );
         },
       );
     },
@@ -560,7 +988,7 @@ export function createMockApi({
           if (existing?.slotId === slot.id && existing.status !== "cancelled")
             return existing;
           const followupAppointment: Appointment = {
-            id: "visit-followup",
+            id: existing && existing.status !== "cancelled" ? existing.id : `visit-followup-${crypto.randomUUID()}`,
             providerId: slot.providerId,
             slotId: slot.id,
             start: slot.start,
@@ -572,6 +1000,7 @@ export function createMockApi({
             followupReminderScheduled: false,
             bookingMode: "first",
           });
+          queueNotifications(followupAppointment);
           return followupAppointment;
         },
       );
@@ -604,8 +1033,143 @@ export function createMockApi({
             reservation: null,
             bookingMode: "first",
             reminderScheduled: false,
+            deviceReady: false,
+            callbackConfirmed: false,
+            clock: {
+              virtualStart: new Date(slot.start).getTime() - 45 * 60_000,
+              realStart: Date.now(),
+              rate: 60,
+            },
+          });
+          queueNotifications(getState().appointment!, "rescheduled");
+        },
+      );
+    },
+    cancelAppointment(appointmentId) {
+      const targetId = appointmentId ?? getState().appointment?.id;
+      return run(
+        `cancel:${targetId}`,
+        "Scheduling",
+        "appointment.cancelled",
+        "Appointment cancelled and pending reminders removed",
+        () => {
+          assertSignedIn();
+          const state = getState();
+          const appointment = [
+            state.appointment,
+            state.followupAppointment,
+          ].find((item) => item?.id === targetId);
+          if (!appointment)
+            throw new Error("This appointment could not be found.");
+          if (appointment.status === "cancelled") return;
+          if (appointment.status !== "confirmed")
+            throw new Error("Only an upcoming appointment can be cancelled.");
+          const cancelled = { ...appointment, status: "cancelled" as const };
+          update({
+            ...(appointment.followup
+              ? {
+                  followupAppointment: cancelled,
+                  followupReminderScheduled: false,
+                }
+              : {
+                  appointment: cancelled,
+                  reminderScheduled: false,
+                  encounter: {
+                    status: "not_started" as const,
+                    connection: "disconnected" as const,
+                    clinicianStatus: "not_present" as const,
+                  },
+                }),
+            notifications: state.notifications.map((item) =>
+              item.appointmentId === targetId && item.status === "queued"
+                ? { ...item, status: "cancelled" as const }
+                : item,
+            ),
           });
         },
+      );
+    },
+    deliverNotifications() {
+      return run(
+        "deliverNotifications",
+        "Reminders",
+        "notification.delivered",
+        "Due notification delivery simulated; no email or SMS sent",
+        () => {
+          const state = getState();
+          let failed = false;
+          update({
+            notifications: state.notifications.map((item) => {
+              if (
+                item.status !== "queued" ||
+                new Date(item.scheduledAt).getTime() > journeyNow(state)
+              )
+                return item;
+              const shouldFail = !failed && consumeFault("reminder-failed");
+              if (shouldFail) failed = true;
+              return {
+                ...item,
+                status: shouldFail
+                  ? ("failed" as const)
+                  : ("delivered" as const),
+              };
+            }),
+          });
+        },
+      );
+    },
+    requestSignIn(email) {
+      return run(
+        "requestSignIn",
+        "Auth",
+        "signin.code_requested",
+        "Synthetic secure sign-in code prepared; no email sent",
+        () => {
+          if (
+            !hasAccount() ||
+            email.trim().toLowerCase() !==
+              getState().profile.email.trim().toLowerCase()
+          )
+            throw new Error("Use the email address you entered when booking.");
+          const expired = consumeFault("signin-expired");
+          update({
+            portalAuth: {
+              status: "code_sent",
+              codeExpiresAt: Date.now() + (expired ? -1 : 10 * 60_000),
+            },
+          });
+        },
+      );
+    },
+    verifySignIn(code) {
+      return run(
+        "verifySignIn",
+        "Auth",
+        "signin.verified",
+        "Simulated authenticated session restored with existing appointment",
+        () => {
+          const auth = getState().portalAuth;
+          if (!auth.codeExpiresAt || auth.codeExpiresAt < Date.now()) {
+            update({ portalAuth: { status: "expired", codeExpiresAt: null } });
+            throw new Error(
+              "That sign-in code has expired. Request a new code.",
+            );
+          }
+          if (code.trim() !== "246810")
+            throw new Error(
+              "That code doesn’t match. Check the six digits and try again.",
+            );
+          update({ portalAuth: { status: "signed_in", codeExpiresAt: null } });
+        },
+      );
+    },
+    signOut() {
+      update({ portalAuth: { status: "signed_out", codeExpiresAt: null } });
+      emit(
+        "Auth",
+        "session.signed_out",
+        "success",
+        "Patient session ended; appointment and progress retained",
       );
     },
     sendCareMessage() {
@@ -613,21 +1177,62 @@ export function createMockApi({
       return run(
         "sendCareMessage",
         "Care team",
-        "message.simulated",
-        "Demo message recorded locally; not delivered to a care team",
+        "message.delivered",
+        "Message delivery simulated in the local care-team thread",
         () => {
-          currentAppointment();
+          assertSignedIn();
+          if (!hasAccount())
+            throw new Error("Sign in to send a message to your care team.");
           if (!body) throw new Error("Write a message before sending.");
           const state = getState();
           const message = {
             id: `message-${Date.now()}-${++sequence}`,
             body,
             at: new Date().toISOString(),
+            sender: "patient" as const,
+            status: "delivered" as const,
           };
           update({
             careMessages: [...(state.careMessages ?? []), message],
             careMessage:
               state.careMessage.trim() === body ? "" : state.careMessage,
+          });
+        },
+      );
+    },
+    replyToCareMessage() {
+      const state = getState();
+      const replied = new Set(
+        (state.careMessages ?? []).map((item) => item.replyTo).filter(Boolean),
+      );
+      const target = (state.careMessages ?? []).find(
+        (item) =>
+          item.sender === "patient" &&
+          item.status === "delivered" &&
+          !replied.has(item.id),
+      );
+      if (!target) return Promise.resolve();
+      return run(
+        `reply:${target.id}`,
+        "Care team",
+        "message.reply_received",
+        "Simulated care-team acknowledgment received; no clinical advice generated",
+        () => {
+          const current = getState();
+          if (current.careMessages?.some((item) => item.replyTo === target.id))
+            return;
+          update({
+            careMessages: [
+              ...(current.careMessages ?? []),
+              {
+                id: `reply-${target.id}`,
+                replyTo: target.id,
+                body: "Thanks for reaching out. We’ve received your message. Your care team can help with scheduling and visit questions here; medical questions will be reviewed by your clinician.",
+                at: new Date().toISOString(),
+                sender: "care-team",
+                status: "delivered",
+              },
+            ],
           });
         },
       );

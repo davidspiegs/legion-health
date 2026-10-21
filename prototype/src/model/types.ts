@@ -29,7 +29,12 @@ export type Step =
   | "visit"
   | "complete"
   | "followup"
-  | "feedback";
+  | "feedback"
+  | "portal-visits"
+  | "portal-messages"
+  | "portal-account"
+  | "portal-signin"
+  | "health-details";
 export type Scenario =
   | "standard"
   | "slot-taken"
@@ -38,7 +43,12 @@ export type Scenario =
   | "records-unavailable"
   | "payment-retry"
   | "connection-lost"
-  | "save-retry";
+  | "save-retry"
+  | "payment-authentication"
+  | "clinician-late"
+  | "care-plan-delayed"
+  | "signin-expired"
+  | "reminder-failed";
 export type Coverage = "selfpay" | "insurance";
 export type ServiceName =
   | "Profile"
@@ -109,6 +119,45 @@ export interface ServiceEvent {
   outcome: "pending" | "success" | "error";
   detail: string;
 }
+export interface PaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+}
+/** Only tokenized synthetic metadata enters the adapter, never a PAN or CVC. */
+export interface PaymentMethodInput {
+  token: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  billingZip: string;
+}
+export interface PaymentSetup {
+  id: string | null;
+  status: "empty" | "processing" | "requires_action" | "succeeded" | "failed";
+  method: PaymentMethod | null;
+  previousMethod?: PaymentMethod | null;
+  error?: string;
+}
+export interface Notification {
+  id: string;
+  appointmentId: string;
+  channel: "email" | "sms";
+  kind: "confirmation" | "reminder" | "rescheduled" | "cancelled" | "care-plan";
+  scheduledAt: string;
+  status: "queued" | "delivered" | "failed" | "cancelled";
+}
+export interface CareMessage {
+  id: string;
+  body: string;
+  at: string;
+  sender: "patient" | "care-team";
+  status: "sending" | "delivered" | "failed";
+  replyTo?: string;
+}
 export interface JourneyState {
   version: 1;
   step: Step;
@@ -129,6 +178,34 @@ export interface JourneyState {
   eligibility: Eligibility;
   reservation: Reservation | null;
   paymentReady: boolean;
+  paymentSetup: PaymentSetup;
+  financialConsent: boolean;
+  portalAuth: {
+    status: "signed_in" | "signed_out" | "code_sent" | "expired";
+    codeExpiresAt: number | null;
+  };
+  notifications: Notification[];
+  clock: { virtualStart: number; realStart: number; rate: number } | null;
+  healthReviewed: boolean;
+  medications: string;
+  allergies: string;
+  currentLocation: string;
+  callbackConfirmed: boolean;
+  encounter: {
+    status: "not_started" | "waiting" | "in_progress" | "completed";
+    connection: "disconnected" | "connected" | "interrupted";
+    clinicianStatus: "not_present" | "running_late" | "ready";
+    checkedInAt?: string;
+    joinedAt?: string;
+    pausedAt?: string;
+    pausedDurationMs?: number;
+    completedAt?: string;
+  };
+  carePlan: {
+    status: "unavailable" | "pending" | "published";
+    publishedAt?: string;
+    followupWeeks: number;
+  };
   appointment: Appointment | null;
   followupAppointment: Appointment | null;
   bookingMode: "first" | "reschedule" | "followup";
@@ -152,7 +229,7 @@ export interface JourneyState {
   feedback: string;
   feedbackSaved: boolean;
   careMessage: string;
-  careMessages?: { id: string; body: string; at: string }[];
+  careMessages?: CareMessage[];
   events: ServiceEvent[];
   faultsUsed: string[];
 }
@@ -162,19 +239,32 @@ export interface MockApi {
   checkEligibility(): Promise<Eligibility>;
   createAccount(): Promise<void>;
   reserve(providerId: string, slotId: string): Promise<Reservation>;
-  setupPayment(): Promise<void>;
+  setupPayment(input: PaymentMethodInput): Promise<PaymentSetup>;
+  completePaymentAuthentication(approved: boolean): Promise<PaymentSetup>;
   confirm(): Promise<Appointment>;
   requestRecords(
     allowed: boolean,
   ): Promise<"ready" | "unavailable" | "declined">;
   generateBrief(): Promise<void>;
   scheduleReminders(appointmentId?: string): Promise<void>;
+  saveHealthDetails(): Promise<void>;
+  checkIn(): Promise<void>;
+  admitToVisit(): Promise<void>;
+  setClinicianReady(actor: "clinician"): Promise<void>;
   joinVisit(): Promise<void>;
+  leaveVisit(): Promise<void>;
+  publishCarePlan(actor: "clinician"): Promise<void>;
+  cancelAppointment(appointmentId?: string): Promise<void>;
+  deliverNotifications(): Promise<void>;
+  requestSignIn(email: string): Promise<void>;
+  verifySignIn(code: string): Promise<void>;
+  signOut(): void;
   reconnect(): Promise<void>;
   completeVisit(actor: "clinician"): Promise<void>;
   bookFollowup(slotId: string): Promise<Appointment>;
   reschedule(slotId: string): Promise<void>;
   sendCareMessage(): Promise<void>;
+  replyToCareMessage(): Promise<void>;
 }
 export interface ScreenProps {
   state: JourneyState;

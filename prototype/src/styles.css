@@ -1609,3 +1609,154 @@ h3 {
 .goal-screen .notice {
   margin-bottom: 0;
 }
+
+/* The portal has stable navigation; it is no longer a chapter of the intake. */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.portal-app .app-header {
+  height: 80px;
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+.portal-brand {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.portal-back {
+  padding: 0 28px 8px;
+  flex-shrink: 0;
+}
+.portal-back button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 0;
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: #64718a;
+  font-size: 12px;
+}
+.portal-navigation {
+  display: flex;
+  flex-shrink: 0;
+  padding: 8px 18px max(8px, env(safe-area-inset-bottom));
+  background: white;
+  box-shadow: 0 -6px 22px #18336805;
+  z-index: 3;
+}
+.portal-navigation button {
+  background: transparent;
+  border: 0;
+  flex: 1;
+  color: #758093;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 5px;
+}
+.portal-navigation button > span {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 30px;
+  border-radius: 9px;
+}
+.portal-navigation button small {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 16px;
+}
+.portal-navigation button[aria-current="page"] {
+  color: var(--blue);
+}
+.portal-navigation button[aria-current="page"] > span {
+  background: #eef2fc;
+}
+.portal-app .screen-footer {
+  padding-top: 10px;
+  padding-bottom: 12px;
+}
+.portal-app .screen-heading {
+  margin-bottom: 22px;
+}
+.stage-note button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.preview-message {
+  padding: 20px;
+  border-radius: 12px;
+  background: #f5f7fc;
+  margin-bottom: 12px;
+}
+.preview-message > span {
+  font-size: 11px;
+  color: #657082;
+}
+.preview-message h3 {
+  margin: 12px 0 10px;
+  font-size: 17px;
+  letter-spacing: -0.4px;
+  font-weight: 600;
+}
+.preview-message p {
+  color: #657082;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.preview-message .button {
+  min-height: 42px;
+  font-size: 13px;
+  padding: 9px 14px;
+}
+.preview-message small {
+  color: #657082;
+  font-size: 11px;
+  display: block;
+  margin-top: 12px;
+}
+.preview-code {
+  display: block;
+  font-size: 30px;
+  letter-spacing: 8px;
+  font-weight: 500;
+  padding: 8px 0;
+}
+@media (max-width: 760px) {
+  .portal-app .app-header {
+    height: 72px;
+    padding: 14px 22px;
+  }
+  .portal-back {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+  .portal-app .brand-logo {
+    width: 118px;
+  }
+  .workspace.is-typing .portal-navigation {
+    display: none;
+  }
+  .workspace.is-typing .portal-app .app-header {
+    height: 46px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+  .workspace.is-typing .portal-app .brand-logo {
+    width: 96px;
+  }
+  .workspace.is-typing .portal-back {
+    display: none;
+  }
+}

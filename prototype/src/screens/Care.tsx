@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  Clock3,
   FileText,
   Headphones,
   Heart,
@@ -14,13 +15,13 @@ import {
   Mic,
   MicOff,
   PhoneOff,
+  ShieldCheck,
   Sparkles,
   Video,
   VideoOff,
   WifiOff,
 } from "lucide-react";
 import {
-  AppointmentContext,
   Button,
   CheckRow,
   Field,
@@ -36,7 +37,9 @@ import {
   formatTime,
   getProvider,
 } from "../model/fixtures";
+import { joinAvailability } from "../model/journey-state";
 import type { Appointment, JourneyState, ScreenProps } from "../model/types";
+import { PortalScreens } from "./Portal";
 import "./care.css";
 
 const careSteps = new Set([
@@ -51,9 +54,13 @@ const careSteps = new Set([
   "complete",
   "followup",
   "feedback",
+  "portal-visits",
+  "portal-messages",
+  "portal-account",
+  "portal-signin",
+  "health-details",
 ]);
 
-/** Generates a real local calendar file; no calendar account or external request. */
 function downloadCalendar(appointment: Appointment) {
   const stamp = (date: Date) =>
     date
@@ -100,7 +107,7 @@ function costDescription(state: JourneyState, followup = false) {
   if (followup) return "Insurance · benefits rechecked before your follow-up";
   return state.eligibility.status === "verified"
     ? `$${state.eligibility.estimate} estimated copay`
-    : "Insurance · your cost is still being confirmed";
+    : "Insurance · cost being confirmed";
 }
 
 function AppointmentPanel({
@@ -108,25 +115,17 @@ function AppointmentPanel({
   appointment,
   onCalendar,
   onReschedule,
-  compact = false,
+  children,
 }: {
   state: JourneyState;
   appointment: Appointment;
   onCalendar?: () => void;
   onReschedule?: () => void;
-  compact?: boolean;
+  children?: ReactNode;
 }) {
   const provider = getProvider(appointment.providerId);
   return (
-    <div className={`care-appointment ${compact ? "compact" : ""}`}>
-      <p className="care-appointment-date">{formatDate(appointment.start)}</p>
-      <div className="care-appointment-time">
-        {formatTime(appointment.start)}
-      </div>
-      <p className="care-appointment-zone">
-        Central Time · {appointment.followup ? "30" : "60"} minutes · video
-        visit
-      </p>
+    <div className="care-appointment">
       <div className="care-appointment-provider">
         <ProviderAvatar provider={provider} size="small" />
         <span>
@@ -134,24 +133,31 @@ function AppointmentPanel({
           <small>{provider.title}</small>
         </span>
       </div>
-      <p className="care-appointment-cost">
-        {costDescription(state, appointment.followup)}
+      <div className="care-appointment-schedule">
+        <p className="care-appointment-date">{formatDate(appointment.start)}</p>
+        <div className="care-appointment-time">
+          {formatTime(appointment.start)} <span>CT</span>
+        </div>
+      </div>
+      <p className="care-appointment-zone">
+        <Video size={15} /> {appointment.followup ? "30" : "60"} minutes · video
+        visit <span>·</span> {costDescription(state, appointment.followup)}
       </p>
-      {onCalendar || onReschedule ? (
+      {children}
+      {(onCalendar || onReschedule) && (
         <div className="care-appointment-actions">
-          {onCalendar ? (
+          {onCalendar && (
             <button type="button" onClick={onCalendar}>
-              <CalendarDays size={16} />
-              Add to calendar
+              <CalendarDays size={15} /> Add to calendar
             </button>
-          ) : null}
-          {onReschedule ? (
+          )}
+          {onReschedule && (
             <button type="button" onClick={onReschedule}>
               Reschedule
             </button>
-          ) : null}
+          )}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
@@ -162,23 +168,28 @@ function CareLink({
   detail,
   onClick,
   done = false,
+  optional = false,
 }: {
   icon: ReactNode;
   title: string;
   detail: string;
   onClick: () => void;
   done?: boolean;
+  optional?: boolean;
 }) {
   return (
     <button type="button" className="care-link" onClick={onClick}>
       <span className={`care-link-icon ${done ? "done" : ""}`}>
-        {done ? <Check size={20} /> : icon}
+        {done ? <Check size={19} /> : icon}
       </span>
       <span>
-        <strong>{title}</strong>
+        <strong>
+          {title}
+          {optional && <em>Optional</em>}
+        </strong>
         <small>{detail}</small>
       </span>
-      <ChevronRight size={18} />
+      <ChevronRight size={17} />
     </button>
   );
 }
@@ -186,36 +197,45 @@ function CareLink({
 export function CareScreens(props: ScreenProps) {
   const { state, update, updateProfile, go, api, act, busy, setError } = props;
   const [downloaded, setDownloaded] = useState(false);
-  const [audioChecked, setAudioChecked] = useState(false);
-  const [videoChecked, setVideoChecked] = useState(false);
-  const [inTexas, setInTexas] = useState(false);
+  const [audioCheck, setAudioCheck] = useState<"idle" | "checking" | "ready">(
+    "idle",
+  );
+  const [videoCheck, setVideoCheck] = useState<"idle" | "checking" | "ready">(
+    "idle",
+  );
   const [callback, setCallback] = useState(state.profile.phone);
+  const [location, setLocation] = useState(state.currentLocation || "");
+  const [inTexas, setInTexas] = useState(false);
   const [followupId, setFollowupId] = useState("");
-  const [messageSent, setMessageSent] = useState(false);
-  const [messageOpen, setMessageOpen] = useState(Boolean(state.careMessage));
   const [showPlan, setShowPlan] = useState(false);
-
   useEffect(() => {
     setDownloaded(false);
-    setMessageSent(false);
     if (state.step === "device") {
       setCallback(state.profile.phone);
+      setLocation(state.currentLocation || "");
       setInTexas(false);
-      setAudioChecked(state.deviceReady);
-      setVideoChecked(state.deviceReady);
+      setAudioCheck(state.deviceReady ? "ready" : "idle");
+      setVideoCheck(state.deviceReady ? "ready" : "idle");
     }
   }, [state.step]);
-
   useEffect(() => {
-    if (state.step !== "complete" || !messageOpen) return;
-    const focus = window.setTimeout(
-      () => document.getElementById("care-message")?.focus(),
-      0,
-    );
-    return () => window.clearTimeout(focus);
-  }, [state.step, messageOpen]);
+    if (audioCheck !== "checking") return;
+    const timer = window.setTimeout(() => setAudioCheck("ready"), 1200);
+    return () => window.clearTimeout(timer);
+  }, [audioCheck]);
+  useEffect(() => {
+    if (videoCheck !== "checking") return;
+    const timer = window.setTimeout(() => setVideoCheck("ready"), 1000);
+    return () => window.clearTimeout(timer);
+  }, [videoCheck]);
+  useEffect(() => {
+    if (state.step === "visit" && state.appointment?.status === "completed")
+      go("complete");
+  }, [state.step, state.appointment?.status]);
 
   if (!careSteps.has(state.step)) return null;
+  if (state.step.startsWith("portal-") || state.step === "health-details")
+    return <PortalScreens {...props} />;
   const appointment = state.appointment;
   const provider = getProvider(appointment?.providerId || state.providerId);
   const calendar = (item: Appointment) => {
@@ -232,84 +252,311 @@ export function CareScreens(props: ScreenProps) {
     </p>
   ) : null;
   const returnHome = (
-    <Button onClick={() => go("visit-home")}>Back to your visit</Button>
+    <Button onClick={() => go("visit-home")}>Back to Home</Button>
   );
-
   if (!appointment)
     return (
       <Page
-        title="Your visit starts here"
-        subtitle="Choose your provider and a time before preparing for your visit."
+        title="Your care starts here"
+        subtitle="Choose a provider and a time that works for you."
         footer={<Button onClick={() => go("match")}>Find your provider</Button>}
       >
         <Notice>You haven’t booked a visit yet.</Notice>
       </Page>
     );
+  const joinState = joinAvailability(state);
+  const failedNotification = state.notifications.some(
+    (item) => item.appointmentId === appointment.id && item.status === "failed",
+  );
 
-  if (state.step === "confirmed") {
-    const prepare = async () => {
-      const success = await act(async () => {
-        await api.scheduleReminders();
-        return true;
-      });
-      if (success) go(state.briefApproved ? "visit-home" : "records");
-    };
+  if (state.step === "confirmed")
     return (
       <Page
         className="care-confirmed"
         title={`You’re booked${state.profile.firstName ? `, ${state.profile.firstName}` : ""}`}
-        subtitle="Let’s make your first visit feel familiar."
+        subtitle="Your first step is in place. We’ll take it from here, together."
         footer={
-          <Button loading={busy} onClick={prepare}>
-            Prepare for your visit
-          </Button>
+          <Button onClick={() => go("visit-home")}>Go to your portal</Button>
         }
       >
+        <span className="care-confirmed-mark">
+          <Check size={24} />
+        </span>
         <AppointmentPanel
           state={state}
           appointment={appointment}
           onCalendar={() => calendar(appointment)}
-          onReschedule={reschedule}
         />
         {statusNote}
         <div className="care-next">
           <span className="care-next-icon">
-            <FileText size={22} />
+            <ShieldCheck size={23} />
           </span>
           <div>
-            <h2>A little preparation, less repeating</h2>
+            <h2>One place for everything ahead</h2>
             <p>
-              Share what matters to you, and review it before your clinician
-              does.
+              Prepare for your visit, join your appointment, and stay in touch
+              with your care team.
             </p>
           </div>
         </div>
-        <button
-          className="care-inline-link"
-          type="button"
-          onClick={() => go("reminders")}
-        >
-          <Mail size={16} />
-          Reminders 24 hours and 1 hour before
-          <ChevronRight size={15} />
-        </button>
+        <p className="care-confirmation-delivery">
+          <Mail size={16} /> Confirmation and reminders are set up for you.
+        </p>
+      </Page>
+    );
+
+  if (state.step === "visit-home") {
+    const completed = appointment.status === "completed";
+    const cancelled = appointment.status === "cancelled";
+    const interrupted = appointment.status === "interrupted";
+    const connected = appointment.status === "joined";
+    const waiting = state.encounter.status === "waiting";
+    const planReady = state.carePlan.status === "published";
+    const joinOpens = new Date(
+      new Date(appointment.start).getTime() - 15 * 60 * 1000,
+    ).toISOString();
+    const action =
+      interrupted || connected
+        ? () => go("visit")
+        : waiting
+          ? () => go("waiting")
+          : () => go(state.healthReviewed ? "device" : "health-details");
+    return (
+      <Page
+        className="portal-home"
+        title={
+          state.profile.firstName
+            ? `Hi, ${state.profile.firstName}`
+            : "Welcome back"
+        }
+        subtitle={
+          completed
+            ? "A good beginning. Your care continues here."
+            : "Your care, in one place."
+        }
+      >
+        {cancelled ? (
+          <div className="care-home-empty">
+            <CalendarDays size={30} />
+            <h2>Your visit was cancelled</h2>
+            <p>When you’re ready, choose another time with your provider.</p>
+            <Button
+              onClick={() => {
+                update({ bookingMode: "first", reservation: null });
+                go("slots");
+              }}
+            >
+              Find another time
+            </Button>
+          </div>
+        ) : completed ? (
+          <>
+            <div className="care-home-completed">
+              <span className="care-complete-mark">
+                <Check size={27} />
+              </span>
+              <div>
+                <h2>Your first visit is complete</h2>
+                <p>
+                  {formatDate(appointment.start)} with {provider.firstName}
+                </p>
+              </div>
+            </div>
+            <div className="care-home-plan">
+              <FileText size={23} />
+              <h2>
+                {planReady
+                  ? "Your care plan is ready"
+                  : `${provider.firstName} is preparing your care plan`}
+              </h2>
+              <p>
+                {planReady
+                  ? "Your visit summary and next steps, all together."
+                  : "We’ll let you know when it’s available. You can still message your care team."}
+              </p>
+              <Button
+                onClick={() => go("complete")}
+                variant={planReady ? "primary" : "secondary"}
+              >
+                {planReady ? "View care plan" : "View visit details"}
+              </Button>
+            </div>
+            {state.followupAppointment &&
+              state.followupAppointment.status !== "cancelled" && (
+                <AppointmentPanel
+                  state={state}
+                  appointment={state.followupAppointment}
+                  onCalendar={() => calendar(state.followupAppointment!)}
+                />
+              )}
+            <CareLink
+              icon={<MessageCircle size={21} />}
+              title="Your care team"
+              detail="Questions and support between visits"
+              onClick={() => go("portal-messages")}
+            />
+            <CareLink
+              icon={<Heart size={21} />}
+              title={
+                state.feedbackSaved
+                  ? "Thank you for your feedback"
+                  : "How did your visit feel?"
+              }
+              detail={
+                state.feedbackSaved
+                  ? "Your experience helps us improve"
+                  : "Share a little about your experience"
+              }
+              done={state.feedbackSaved}
+              onClick={() => go("feedback")}
+            />
+          </>
+        ) : (
+          <>
+            <AppointmentPanel state={state} appointment={appointment}>
+              <div className="care-join-status">
+                {interrupted ? <WifiOff size={16} /> : <Clock3 size={16} />}
+                <span>
+                  {interrupted
+                    ? "Your visit is still open"
+                    : connected
+                      ? "Your provider is in the room"
+                      : waiting
+                        ? `${provider.firstName} knows you’re here`
+                        : joinState === "open"
+                          ? "Your waiting room is open"
+                          : joinState === "closed"
+                            ? "Your appointment time has passed"
+                            : `Join opens at ${formatTime(joinOpens)} CT`}
+                </span>
+              </div>
+              {interrupted || connected || waiting || joinState === "open" ? (
+                <Button className="care-card-button" onClick={action}>
+                  {interrupted
+                    ? "Reconnect to visit"
+                    : connected
+                      ? "Return to visit"
+                      : waiting
+                        ? "Return to waiting room"
+                        : "Join visit"}
+                </Button>
+              ) : joinState === "closed" ? (
+                <Button
+                  className="care-card-button"
+                  onClick={() => go("portal-messages")}
+                >
+                  Contact your care team
+                </Button>
+              ) : (
+                <p className="care-join-hint">
+                  Come back here when it’s time. We’ll send a reminder, too.
+                </p>
+              )}
+            </AppointmentPanel>
+            {failedNotification && (
+              <div className="care-reminder-problem">
+                <Mail size={18} />
+                <span>
+                  A reminder couldn’t be delivered. Your visit is still
+                  confirmed.
+                </span>
+                <button type="button" onClick={() => go("portal-account")}>
+                  Check details
+                </button>
+              </div>
+            )}
+            <div className="care-preparation-heading">
+              <h2>
+                {state.healthReviewed
+                  ? "You’re ready for your visit"
+                  : "Before we meet"}
+              </h2>
+              {state.healthReviewed ? (
+                <span>
+                  <Check size={14} /> Required details complete
+                </span>
+              ) : (
+                <span>One quick check, then you’re ready</span>
+              )}
+            </div>
+            <div className="care-preparation-list">
+              <CareLink
+                icon={<ClipboardList size={20} />}
+                title="Your health details"
+                detail={
+                  state.healthReviewed
+                    ? "Reviewed · view or edit"
+                    : "Confirm medications and allergies"
+                }
+                done={state.healthReviewed}
+                onClick={() => go("health-details")}
+              />
+              <CareLink
+                icon={<FileText size={20} />}
+                title="Outside records"
+                detail={
+                  state.recordsReviewed
+                    ? state.recordsStatus === "declined"
+                      ? "Skipped · change your choice"
+                      : state.recordsStatus === "unavailable"
+                        ? "Unavailable · you can still join"
+                        : "Reviewed · view or edit"
+                    : "Share useful history from past care"
+                }
+                done={state.recordsReviewed}
+                optional
+                onClick={() => go("records")}
+              />
+              <CareLink
+                icon={<Sparkles size={20} />}
+                title="Your care brief"
+                detail={
+                  state.briefApproved
+                    ? "Reviewed · view or edit"
+                    : "A short introduction, in your words"
+                }
+                done={state.briefApproved}
+                optional
+                onClick={() => {
+                  if (state.briefGoal) go("brief");
+                  else
+                    void act(async () => {
+                      await api.generateBrief();
+                      go("brief");
+                    });
+                }}
+              />
+            </div>
+            <div className="care-home-tools">
+              <button type="button" onClick={() => go("device")}>
+                <Video size={16} /> Check your setup
+              </button>
+              <button type="button" onClick={() => go("portal-visits")}>
+                <CalendarDays size={16} /> Manage visit
+              </button>
+            </div>
+          </>
+        )}
+        {statusNote}
       </Page>
     );
   }
 
   if (state.step === "records") {
     const resolved = state.recordsStatus !== "idle";
-    const continueWithRecords = async () => {
+    const finish = async () => {
       const success = await act(async () => {
-        if (!resolved) {
-          await api.requestRecords(state.recordsPermission);
-          return "requested";
+        if (!resolved && state.recordsPermission) {
+          await api.requestRecords(true);
+          return "review";
         }
+        if (!resolved) await api.requestRecords(false);
         update({ recordsReviewed: true });
-        await api.generateBrief();
-        return "brief";
+        await api.saveDraft("records-reviewed");
+        return "done";
       });
-      if (success === "brief") go("brief");
+      if (success === "done") go("visit-home");
     };
     return (
       <Page
@@ -318,13 +565,13 @@ export function CareScreens(props: ScreenProps) {
         }
         subtitle={
           resolved
-            ? "You decide what your clinician should know."
+            ? "Review what came back. Your clinician will confirm what’s relevant."
             : "Optional records sharing can give your clinician useful context."
         }
         footer={
-          <Button loading={busy} onClick={continueWithRecords}>
+          <Button loading={busy} onClick={finish}>
             {resolved
-              ? "Review my care brief"
+              ? "Done reviewing"
               : state.recordsPermission
                 ? "Find my records"
                 : "Continue without records"}
@@ -346,7 +593,7 @@ export function CareScreens(props: ScreenProps) {
             <CheckRow
               checked={state.recordsPermission}
               onChange={(value) => update({ recordsPermission: value })}
-              detail="Optional. You can still have your visit without sharing records."
+              detail="You can still have your visit without sharing records."
             >
               Allow a records request
             </CheckRow>
@@ -373,7 +620,7 @@ export function CareScreens(props: ScreenProps) {
                   onChange={(value) =>
                     update({ outdatedRecord: value, briefApproved: false })
                   }
-                  detail="We’ll flag this for your clinician instead of treating it as current."
+                  detail="This will be flagged for your clinician, not treated as current."
                 >
                   This may be out of date
                 </CheckRow>
@@ -385,29 +632,42 @@ export function CareScreens(props: ScreenProps) {
                 }
               >
                 {state.recordsStatus === "unavailable"
-                  ? "We couldn’t retrieve records this time. You can share your own context and keep your appointment."
-                  : "No records requested. What you tell us is enough to get started."}
+                  ? "We couldn’t retrieve records this time. Your visit can go ahead, and you can share your own context."
+                  : "No records requested. You can share your history with your clinician."}
               </Notice>
             )}
             <Field
-              label="Anything you want your clinician to know?"
+              label="Anything you want to clarify?"
               hint="Optional. A short note is plenty."
               value={state.briefNote}
               onChange={(e) =>
                 update({ briefNote: e.target.value, briefApproved: false })
               }
-              placeholder="For example, what has changed lately"
               enterKeyHint="done"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  void continueWithRecords();
+                  void finish();
                 }
               }}
             />
-            <p className="care-quiet">
-              This is context for a conversation, not a diagnosis.
-            </p>
+            {state.recordsStatus !== "ready" && (
+              <button
+                className="care-inline-link"
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void act(async () => {
+                    await api.requestRecords(true);
+                    update({ recordsPermission: true, recordsReviewed: false });
+                  })
+                }
+              >
+                Request records{" "}
+                {state.recordsStatus === "unavailable" ? "again" : "now"}
+                <ChevronRight size={16} />
+              </button>
+            )}
           </>
         )}
       </Page>
@@ -418,34 +678,30 @@ export function CareScreens(props: ScreenProps) {
     const approve = async (event?: FormEvent<HTMLFormElement>) => {
       event?.preventDefault();
       if (!state.briefGoal.trim()) {
-        setError("Add one thing you’d like help with.");
+        setError("Add one thing you’d like help with, or come back later.");
         return;
       }
       const success = await act(async () => {
         await api.saveDraft("care-brief");
-        await api.scheduleReminders();
+        update({ briefApproved: true });
         return true;
       });
-      if (success) {
-        update({ briefApproved: true, recordsReviewed: true });
-        go("visit-home");
-      }
+      if (success) go("visit-home");
     };
     return (
       <Page
         title="Your story, ready to share"
-        subtitle={`A short care brief for ${provider.firstName}. Change anything that doesn’t feel right.`}
+        subtitle={`A short introduction for ${provider.firstName}. Change anything that doesn’t feel right.`}
         onSubmit={approve}
         footer={
           <Button type="submit" loading={busy}>
-            This reflects me
+            Save my care brief
           </Button>
         }
       >
-        <div className="care-ai-label">
-          <Sparkles size={16} />
-          AI-assisted draft · for your review
-        </div>
+        <p className="care-ai-label">
+          <Sparkles size={16} /> AI-assisted draft · reviewed by you
+        </p>
         <Field
           label="What I’d like help with"
           value={state.briefGoal}
@@ -468,13 +724,13 @@ export function CareScreens(props: ScreenProps) {
             <div>
               <strong>Sleep routine discussed</strong>
               <small>Sample primary care record · May 2025</small>
-              {state.outdatedRecord ? (
-                <span className="care-correction">
-                  You flagged this as possibly out of date
-                </span>
-              ) : (
-                <span>For your clinician to confirm</span>
-              )}
+              <span
+                className={state.outdatedRecord ? "care-correction" : undefined}
+              >
+                {state.outdatedRecord
+                  ? "You flagged this as possibly out of date"
+                  : "For your clinician to confirm"}
+              </span>
             </div>
           </div>
         ) : (
@@ -493,224 +749,112 @@ export function CareScreens(props: ScreenProps) {
           enterKeyHint="done"
         />
         <p className="care-quiet">
-          No diagnosis or treatment decisions are made by this summary.
+          This is a starting point for your conversation. It doesn’t make a
+          diagnosis or treatment decision.
         </p>
-      </Page>
-    );
-  }
-
-  if (state.step === "visit-home") {
-    if (appointment.status === "completed")
-      return (
-        <Page
-          title="Your care continues here"
-          subtitle={`Your first visit with ${provider.firstName} is complete.`}
-          footer={
-            <Button onClick={() => go("complete")}>View your care plan</Button>
-          }
-        >
-          <div className="care-complete-mark">
-            <Check size={35} />
-          </div>
-          <Notice tone="success">
-            Your clinician marked the visit complete.
-          </Notice>
-          {state.followupAppointment ? (
-            <AppointmentPanel
-              state={state}
-              appointment={state.followupAppointment}
-              compact
-              onCalendar={() => calendar(state.followupAppointment!)}
-            />
-          ) : (
-            <p className="care-body-copy">
-              Your plan, follow-up options, and care team are ready when you
-              are.
-            </p>
-          )}
-          {statusNote}
-        </Page>
-      );
-    const interrupted = appointment.status === "interrupted";
-    const primaryLabel = interrupted
-      ? "Reconnect to your visit"
-      : state.visitDay
-        ? "Get ready to join"
-        : state.briefApproved
-          ? "Review your care brief"
-          : "Prepare for your visit";
-    const primaryAction = () =>
-      go(
-        interrupted
-          ? "visit"
-          : state.visitDay
-            ? "device"
-            : state.briefApproved
-              ? "brief"
-              : "records",
-      );
-    return (
-      <Page
-        title={
-          state.visitDay
-            ? "Today is your first visit"
-            : "A good start, together"
-        }
-        subtitle={
-          state.visitDay
-            ? `A little space in your day for you and ${provider.firstName}.`
-            : "Everything you need, in one place."
-        }
-        footer={<Button onClick={primaryAction}>{primaryLabel}</Button>}
-      >
-        <AppointmentPanel
-          state={state}
-          appointment={appointment}
-          compact
-          onCalendar={() => calendar(appointment)}
-          onReschedule={
-            appointment.status === "confirmed" ? reschedule : undefined
-          }
-        />
-        {statusNote}
-        {interrupted ? (
-          <Notice tone="warning">
-            Your visit was interrupted. Your room and care brief are still here.
-          </Notice>
-        ) : null}
-        <div className="care-link-group">
-          <CareLink
-            icon={<ClipboardList size={21} />}
-            title={
-              state.briefApproved
-                ? "Your care brief is ready"
-                : "Prepare your care brief"
-            }
-            detail={
-              state.briefApproved
-                ? "Reviewed by you · editable anytime"
-                : "Your goals and the context that matters"
-            }
-            done={state.briefApproved}
-            onClick={() =>
-              go(state.recordsStatus === "idle" ? "records" : "brief")
-            }
-          />
-          <CareLink
-            icon={<Mail size={21} />}
-            title="Your reminders"
-            detail={`${state.emailReminder ? "Email" : "Email off"}${state.profile.sms ? " + text" : ""} · 24 hours and 1 hour before`}
-            onClick={() => go("reminders")}
-          />
-        </div>
       </Page>
     );
   }
 
   if (state.step === "reminders") {
-    const reminderAppointment =
+    const upcoming =
       appointment.status === "completed"
         ? state.followupAppointment
-        : appointment;
-    if (!reminderAppointment)
-      return (
-        <Page
-          title="No upcoming reminders"
-          subtitle="Your first visit is complete. When you book a follow-up, its reminders will appear here."
-          footer={
-            <Button onClick={() => go("complete")}>
-              Back to your care plan
-            </Button>
-          }
-        >
-          <div className="care-feature-icon">
-            <CalendarDays size={30} />
-          </div>
-        </Page>
-      );
-    const invalidateSchedule = () =>
-      update(
-        reminderAppointment.followup
-          ? { followupReminderScheduled: false }
-          : { reminderScheduled: false },
-      );
+        : appointment.status === "cancelled"
+          ? null
+          : appointment;
     const save = async () => {
       const success = await act(async () => {
-        await api.scheduleReminders(reminderAppointment.id);
+        if (upcoming) await api.scheduleReminders(upcoming.id);
         return true;
       });
-      if (success) go(reminderAppointment.followup ? "followup" : "visit-home");
+      if (success) go("portal-account");
     };
     return (
       <Page
-        title="A little nudge, right on time"
-        subtitle="Choose how we remind you. Your visit details stay easy to find."
+        title="Your reminders"
+        subtitle="A little nudge, right on time. Choose how we reach you."
         footer={
           <Button loading={busy} onClick={save}>
-            Save reminders
+            Save preferences
           </Button>
         }
       >
-        <p className="care-reminder-context">
-          {reminderAppointment.followup ? "Follow-up" : "First visit"} ·{" "}
-          {formatSlot(reminderAppointment.slotId, { short: true })}
-        </p>
         <CheckRow
           checked={state.emailReminder}
-          onChange={(value) => {
-            update({ emailReminder: value });
-            invalidateSchedule();
-          }}
+          onChange={(value) => update({ emailReminder: value })}
+          detail={state.profile.email}
         >
           Email reminders
         </CheckRow>
         <CheckRow
           checked={state.profile.sms}
-          onChange={(value) => {
-            updateProfile({ sms: value });
-            invalidateSchedule();
-          }}
-          detail="Optional. You can turn texts off anytime."
+          onChange={(value) => updateProfile({ sms: value })}
+          detail={`Optional · ${formatPhone(state.profile.phone)}`}
         >
           Text message reminders
         </CheckRow>
-        <div className="care-reminder-timeline">
-          <h2>A preview of your reminders</h2>
-          <div className="care-reminder">
-            <span>24 hours before</span>
-            <p>
-              Your Legion Health visit is tomorrow at{" "}
-              {formatTime(reminderAppointment.start)} Central Time. Review your
-              visit details and get ready.
-            </p>
+        {upcoming ? (
+          <div className="care-reminder-timeline">
+            <h2>For your visit on {formatDate(upcoming.start, true)}</h2>
+            <div className="care-reminder">
+              <span>24 hours before</span>
+              <p>
+                A reminder with your appointment details and a secure link to
+                your portal.
+              </p>
+            </div>
+            <div className="care-reminder">
+              <span>1 hour before</span>
+              <p>
+                A link to check your setup. Your waiting room opens 15 minutes
+                before your visit.
+              </p>
+            </div>
           </div>
-          <div className="care-reminder">
-            <span>1 hour before</span>
-            <p>
-              Your Legion Health visit starts in 1 hour. Open your visit page to
-              check your setup and join.
-            </p>
-          </div>
-        </div>
-        {!state.emailReminder && !state.profile.sms ? (
+        ) : (
           <Notice>
-            You’ve turned reminders off. Your visit details remain available
-            here.
+            No upcoming visits. We’ll use these preferences when you book again.
           </Notice>
-        ) : null}
+        )}
+        {!state.emailReminder && !state.profile.sms && (
+          <Notice>
+            Your reminders are off. You can still find and join your visit from
+            Home.
+          </Notice>
+        )}
+        {failedNotification && (
+          <Notice tone="warning">
+            A reminder couldn’t be delivered. Check your contact information in
+            Account. You can always join from Home.
+          </Notice>
+        )}
+        <p className="care-quiet">
+          Changes to your appointment update its reminders automatically.
+        </p>
       </Page>
     );
   }
 
   if (state.step === "device") {
-    const ready = (event: FormEvent<HTMLFormElement>) => {
+    const checkOnly = joinState !== "open";
+    const ready = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!videoChecked || !audioChecked) {
+      if (videoCheck !== "ready" || audioCheck !== "ready") {
         setError("Check your camera and sound before continuing.");
         return;
       }
-      if (!inTexas) {
-        setError("Confirm you’re in Texas for this visit.");
+      if (checkOnly) {
+        update({ deviceReady: true });
+        go("visit-home");
+        return;
+      }
+      if (!state.healthReviewed) {
+        go("health-details");
+        return;
+      }
+      if (!inTexas || !location.trim()) {
+        setError("Confirm you’re in Texas and add your current location.");
         return;
       }
       if (callback.replace(/\D/g, "").length !== 10) {
@@ -718,65 +862,162 @@ export function CareScreens(props: ScreenProps) {
         return;
       }
       updateProfile({ phone: callback.replace(/\D/g, "") });
-      update({ deviceReady: true });
-      go("waiting");
+      update({
+        deviceReady: true,
+        currentLocation: location.trim(),
+        callbackConfirmed: true,
+      });
+      const success = await act(async () => {
+        await api.checkIn();
+        return true;
+      });
+      if (success) go("waiting");
     };
     return (
       <Page
-        title="Let’s get you settled"
-        subtitle="A quiet spot, a charged device, and a way to reach you."
+        className="care-device"
+        title={checkOnly ? "Check your setup" : "Let’s get you settled"}
+        subtitle={
+          checkOnly
+            ? "Make sure everything is ready before your appointment."
+            : "A quiet spot and a way to reach you if we get disconnected."
+        }
         onSubmit={ready}
-        footer={<Button type="submit">Enter waiting room</Button>}
+        footer={
+          <Button
+            type="submit"
+            loading={busy}
+            disabled={videoCheck !== "ready" || audioCheck !== "ready"}
+          >
+            {checkOnly ? "Save setup check" : "Enter waiting room"}
+          </Button>
+        }
       >
         <div className="care-device-checks">
           <button
             type="button"
-            className={videoChecked ? "checked" : ""}
-            onClick={() => setVideoChecked(true)}
+            className={videoCheck === "ready" ? "checked" : ""}
+            disabled={videoCheck === "checking"}
+            onClick={() => setVideoCheck("checking")}
           >
-            {videoChecked ? <Check size={22} /> : <Video size={22} />}
-            <strong>{videoChecked ? "Camera ready" : "Check camera"}</strong>
+            {videoCheck === "ready" ? (
+              <Check size={23} />
+            ) : (
+              <Video
+                size={23}
+                className={
+                  videoCheck === "checking" ? "care-checking-icon" : undefined
+                }
+              />
+            )}
+            <strong>
+              {videoCheck === "ready"
+                ? "Camera ready"
+                : videoCheck === "checking"
+                  ? "Checking camera…"
+                  : "Check camera"}
+            </strong>
+            <small>
+              {videoCheck === "ready"
+                ? "Connection checked"
+                : "Video connection"}
+            </small>
           </button>
           <button
             type="button"
-            className={audioChecked ? "checked" : ""}
-            onClick={() => setAudioChecked(true)}
+            className={audioCheck === "ready" ? "checked" : ""}
+            disabled={audioCheck === "checking"}
+            onClick={() => setAudioCheck("checking")}
           >
-            {audioChecked ? <Check size={22} /> : <Headphones size={22} />}
-            <strong>{audioChecked ? "Sound ready" : "Check sound"}</strong>
+            {audioCheck === "ready" ? (
+              <Check size={23} />
+            ) : (
+              <Headphones
+                size={23}
+                className={
+                  audioCheck === "checking" ? "care-checking-icon" : undefined
+                }
+              />
+            )}
+            <strong>
+              {audioCheck === "ready"
+                ? "Sound ready"
+                : audioCheck === "checking"
+                  ? "Checking sound…"
+                  : "Check sound"}
+            </strong>
+            <small>
+              {audioCheck === "ready"
+                ? "Connection checked"
+                : "Microphone and audio"}
+            </small>
           </button>
         </div>
-        <CheckRow
-          checked={inTexas}
-          onChange={setInTexas}
-          detail="Your clinician must be licensed where you are during the visit."
-        >
-          I’m in Texas right now
-        </CheckRow>
-        <Field
-          label="If we get disconnected"
-          hint="We’ll use this number to call you back."
-          value={formatPhone(callback)}
-          onChange={(e) =>
-            setCallback(e.target.value.replace(/\D/g, "").slice(0, 10))
-          }
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel-national"
-          enterKeyHint="done"
-          placeholder="(202) 555-0147"
-        />
-        <p className="care-quiet">
-          Your camera and microphone aren’t activated in this preview
+        <p className="care-simulation-note">
+          Device checks are simulated. Your camera and microphone stay off.
         </p>
+        {!checkOnly && !state.healthReviewed && (
+          <CareLink
+            icon={<ClipboardList size={20} />}
+            title="Review your health details first"
+            detail="A quick check before joining your visit"
+            onClick={() => go("health-details")}
+          />
+        )}
+        {!checkOnly ? (
+          <>
+            <CheckRow
+              checked={inTexas}
+              onChange={setInTexas}
+              detail="Your clinician must be licensed where you are during the visit."
+            >
+              I’m in Texas right now
+            </CheckRow>
+            <Field
+              label="Where are you joining from?"
+              hint="Your current address, in case you need urgent help."
+              placeholder="Street address, city, ZIP"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              autoComplete="street-address"
+              enterKeyHint="next"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  document.getElementById("visit-callback")?.focus();
+                }
+              }}
+            />
+            <Field
+              id="visit-callback"
+              label="Callback number"
+              hint="We’ll use this number if we lose the connection."
+              value={formatPhone(callback)}
+              onChange={(e) =>
+                setCallback(e.target.value.replace(/\D/g, "").slice(0, 10))
+              }
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel-national"
+              enterKeyHint="done"
+            />
+          </>
+        ) : (
+          <Notice>
+            Your waiting room opens 15 minutes before your appointment. Your
+            completed setup check will be saved.
+          </Notice>
+        )}
       </Page>
     );
   }
 
   if (state.step === "waiting") {
+    const ready = state.encounter.clinicianStatus === "ready";
+    const late = state.encounter.clinicianStatus === "running_late";
     const join = async () => {
       const success = await act(async () => {
-        await api.joinVisit();
+        await api.admitToVisit();
         return true;
       });
       if (success) go("visit");
@@ -784,48 +1025,74 @@ export function CareScreens(props: ScreenProps) {
     return (
       <Page
         className="care-waiting"
-        title="You’re in the right place"
-        subtitle={`${provider.firstName} has your visit details. Take a moment to get comfortable.`}
+        title={
+          ready ? `${provider.firstName} is ready for you` : "You’re checked in"
+        }
+        subtitle={
+          ready
+            ? "Your clinician is in the room. Join whenever you’re ready."
+            : "Your clinician knows you’re here. You can take a moment to settle in."
+        }
         footer={
-          <Button loading={busy} onClick={join}>
-            Join your visit
+          <Button loading={busy} disabled={!ready} onClick={join}>
+            {ready ? "Join your visit" : "Waiting for your clinician"}
           </Button>
         }
       >
         <div className="care-waiting-portrait">
           <ProviderAvatar provider={provider} size="large" />
-          <span className="care-ready-dot" />
+          <span className={`care-ready-dot ${ready ? "" : "waiting"}`} />
         </div>
         <h2 className="care-waiting-name">{provider.name}</h2>
         <p className="care-waiting-time">
           {formatSlot(appointment.slotId, { short: true })}
         </p>
-        <div className="care-ready-status">
-          <CheckCheck size={19} />
-          <span>Camera and sound checked</span>
+        <div
+          className={`care-ready-status ${ready ? "" : "waiting"}`}
+          role="status"
+        >
+          {ready ? <CheckCheck size={19} /> : <Clock3 size={19} />}
+          <span>
+            {ready
+              ? "Your clinician has joined"
+              : late
+                ? "Your clinician is running a little late"
+                : "Waiting for your clinician"}
+          </span>
         </div>
-        <Notice>
-          {state.briefApproved
-            ? "Your care brief is ready. You can start with what matters most to you."
-            : "You can share your story with your clinician. A care brief is optional."}
-        </Notice>
+        {late ? (
+          <Notice>
+            We’re sorry for the wait. You’ll see an update here when your
+            clinician is ready. Your place is saved.
+          </Notice>
+        ) : (
+          <Notice>
+            {state.briefApproved
+              ? "Your care brief is ready for your clinician. Start with what matters most to you."
+              : "You can share your story directly with your clinician. A care brief is optional."}
+          </Notice>
+        )}
+        <button
+          type="button"
+          className="care-footer-link"
+          onClick={() => go("portal-messages")}
+        >
+          <MessageCircle size={16} /> Need help? Message your care team
+        </button>
       </Page>
     );
   }
 
   if (state.step === "visit") {
     const interrupted = appointment.status === "interrupted";
-    const leave = () => {
-      if (appointment.status === "joined")
-        update({ appointment: { ...appointment, status: "interrupted" } });
-      go("visit-home");
-    };
-    const reconnect = async () => {
-      await act(async () => {
-        await api.reconnect();
+    const leave = async () => {
+      const success = await act(async () => {
+        await api.leaveVisit();
         return true;
       });
+      if (success) go("visit-home");
     };
+    const reconnect = () => void act(() => api.reconnect());
     const phrases = [
       {
         title: "Start with what matters to you",
@@ -843,28 +1110,28 @@ export function CareScreens(props: ScreenProps) {
       },
     ];
     const conversation = phrases[Math.min(state.visitPhase, 2)];
-    if (appointment.status === "completed")
+    if (appointment.status !== "joined" && !interrupted)
       return (
         <Page
-          title="Your visit is complete"
-          subtitle="Your care plan is ready."
+          title="Your visit room"
+          subtitle={
+            appointment.status === "completed"
+              ? "Your clinician has completed your visit."
+              : "Check your setup before joining."
+          }
           footer={
-            <Button onClick={() => go("complete")}>View your care plan</Button>
+            <Button
+              onClick={() =>
+                go(appointment.status === "completed" ? "complete" : "device")
+              }
+            >
+              {appointment.status === "completed"
+                ? "View visit details"
+                : "Check my setup"}
+            </Button>
           }
         >
-          <div className="care-complete-mark">
-            <Check size={35} />
-          </div>
-        </Page>
-      );
-    if (appointment.status === "confirmed")
-      return (
-        <Page
-          title="Your room is ready"
-          subtitle="Check your setup before joining the visit."
-          footer={<Button onClick={() => go("device")}>Check my setup</Button>}
-        >
-          <AppointmentContext state={state} />
+          <AppointmentPanel state={state} appointment={appointment} />
         </Page>
       );
     return (
@@ -876,7 +1143,9 @@ export function CareScreens(props: ScreenProps) {
         subtitle={
           <span className="care-connection">
             <span className={interrupted ? "offline" : ""} />
-            {interrupted ? "Connection interrupted" : "Connected"}
+            {interrupted
+              ? "Connection interrupted"
+              : "Connected · simulated visit"}
           </span>
         }
         footer={
@@ -893,6 +1162,7 @@ export function CareScreens(props: ScreenProps) {
           ) : (
             <div className="care-video-monogram">{provider.initials}</div>
           )}
+          <div className="care-video-name">{provider.name}</div>
           <div className="care-self-preview">
             {state.cameraOn ? (
               <span>{state.profile.firstName?.[0] || "Y"}</span>
@@ -901,13 +1171,13 @@ export function CareScreens(props: ScreenProps) {
             )}
             <small>You</small>
           </div>
-          {interrupted ? (
+          {interrupted && (
             <div className="care-video-overlay">
               <WifiOff size={30} />
               <strong>Your room is still here</strong>
               <p>No need to start over</p>
             </div>
-          ) : null}
+          )}
         </div>
         <div className="care-conversation" aria-live="polite">
           <h2>
@@ -915,7 +1185,7 @@ export function CareScreens(props: ScreenProps) {
           </h2>
           <p>
             {interrupted
-              ? "Try reconnecting. If it doesn’t work, your clinician can use your callback number."
+              ? "Try reconnecting. Your clinician can use your callback number if the connection doesn’t return."
               : conversation.text}
           </p>
         </div>
@@ -938,7 +1208,12 @@ export function CareScreens(props: ScreenProps) {
             {state.cameraOn ? <Video size={23} /> : <VideoOff size={23} />}
             <small>Camera</small>
           </button>
-          <button type="button" className="care-end-call" onClick={leave}>
+          <button
+            type="button"
+            className="care-end-call"
+            onClick={leave}
+            disabled={busy}
+          >
             <PhoneOff size={23} />
             <small>Leave</small>
           </button>
@@ -955,168 +1230,151 @@ export function CareScreens(props: ScreenProps) {
           subtitle="Your care plan arrives after your clinician completes the visit."
           footer={returnHome}
         >
-          <Notice>
-            Joining or leaving the room doesn’t mark a visit complete.
-          </Notice>
+          <Notice>Leaving the room doesn’t mark a visit complete.</Notice>
         </Page>
       );
-    const sendMessage = async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const success = await act(async () => {
-        await api.sendCareMessage();
-        return true;
-      });
-      if (success) setMessageSent(true);
-    };
-    const latestMessage = state.careMessages?.at(-1);
+    const published = state.carePlan.status === "published";
     return (
       <Page
         className="care-complete"
         title="Your first visit, complete"
-        subtitle="A plan you can come back to."
+        subtitle={`Time for you, with ${provider.firstName}. A good beginning.`}
         footer={
-          <Button onClick={() => go("followup")}>
-            {state.followupAppointment
-              ? "View your next visit"
-              : "Find a follow-up time"}
-          </Button>
+          published ? (
+            <Button onClick={() => go("followup")}>
+              {state.followupAppointment &&
+              state.followupAppointment.status !== "cancelled"
+                ? "View your next visit"
+                : "Choose a follow-up time"}
+            </Button>
+          ) : (
+            returnHome
+          )
         }
       >
         <div className="care-complete-mark">
-          <Check size={32} />
+          <Check size={31} />
         </div>
-        <p className="care-completion-proof">Visit completed</p>
-        <div className="care-plan">
-          <h2>Your care plan</h2>
-          <p>Your next steps</p>
-          <button
-            type="button"
-            className="care-plan-summary"
-            onClick={() => setShowPlan((value) => !value)}
-            aria-expanded={showPlan}
-          >
-            <FileText size={22} />
-            <span>
-              <strong>Keep the conversation going</strong>
-              <small>What to bring to your next visit</small>
-            </span>
-            {showPlan ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-          </button>
-          {showPlan ? (
-            <div className="care-plan-detail">
-              <p>
-                Bring questions or observations you’d like to discuss. Review
-                what felt useful and what you want to focus on next.
-              </p>
+        <p className="care-completion-proof">
+          {formatDate(appointment.start)} · {provider.name}
+        </p>
+        {published ? (
+          <>
+            <div className="care-plan">
+              <h2>Your care plan</h2>
+              <p>Published by {provider.firstName}</p>
+              <button
+                type="button"
+                className="care-plan-summary"
+                onClick={() => setShowPlan((value) => !value)}
+                aria-expanded={showPlan}
+              >
+                <FileText size={22} />
+                <span>
+                  <strong>Your visit summary</strong>
+                  <small>What we discussed and what’s next</small>
+                </span>
+                {showPlan ? (
+                  <ChevronDown size={18} />
+                ) : (
+                  <ChevronRight size={18} />
+                )}
+              </button>
+              {showPlan && (
+                <div className="care-plan-detail">
+                  <p>
+                    You made space to talk about what brought you here, your
+                    goals, and the questions you want to explore.
+                  </p>
+                  <p>
+                    For your next conversation, bring any observations or
+                    questions you’d like to discuss. Your care team is available
+                    through Messages.
+                  </p>
+                </div>
+              )}
             </div>
-          ) : null}
-        </div>
-        <div className="care-followup-invitation">
-          <CalendarDays size={23} />
-          <div>
-            <h2>
-              {state.followupAppointment
-                ? "Your next visit is booked"
-                : "Keep building on today"}
-            </h2>
+            <div className="care-followup-invitation">
+              <CalendarDays size={23} />
+              <div>
+                <h2>
+                  {state.followupAppointment &&
+                  state.followupAppointment.status !== "cancelled"
+                    ? "Your next visit is booked"
+                    : "Keep the same connection"}
+                </h2>
+                <p>
+                  {state.followupAppointment &&
+                  state.followupAppointment.status !== "cancelled"
+                    ? formatSlot(state.followupAppointment.slotId, {
+                        short: true,
+                      })
+                    : `${provider.firstName} recommends a follow-up in ${state.carePlan.followupWeeks} weeks.`}
+                </p>
+                <small>{costDescription(state, true)}</small>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="care-plan-pending" role="status">
+            <FileText size={27} />
+            <h2>Your care plan is on its way</h2>
             <p>
-              {state.followupAppointment
-                ? formatSlot(state.followupAppointment.slotId, { short: true })
-                : `Your next visit with ${provider.firstName} can be in 2 weeks.`}
+              {provider.firstName} is finishing your visit summary. We’ll let
+              you know when it’s ready; it will always be here in your portal.
             </p>
-            <small>{costDescription(state, true)}</small>
           </div>
-        </div>
-        <div className="care-postvisit-actions">
-          <button type="button" onClick={() => go("feedback")}>
-            <Heart size={19} />
-            {state.feedbackSaved
+        )}
+        <CareLink
+          icon={<MessageCircle size={20} />}
+          title="Ask your care team"
+          detail="Questions about your visit or next steps"
+          onClick={() => go("portal-messages")}
+        />
+        <CareLink
+          icon={<Heart size={20} />}
+          title={
+            state.feedbackSaved
               ? "Your feedback is saved"
-              : "How was your visit?"}
-            <ChevronRight size={17} />
-          </button>
-        </div>
-        <details
-          className="care-message"
-          open={messageOpen}
-          onToggle={(event) => setMessageOpen(event.currentTarget.open)}
-        >
-          <summary>
-            <MessageCircle size={19} />
-            <span>Ask your care team</span>
-            <ChevronRight size={17} />
-          </summary>
-          {latestMessage ? (
-            <div
-              className="care-saved-message"
-              role={messageSent ? "status" : undefined}
-            >
-              <span>
-                <Check size={15} />
-                Saved on this device
-              </span>
-              <p>{latestMessage.body}</p>
-              <small>
-                Not delivered ·{" "}
-                {new Intl.DateTimeFormat("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                }).format(new Date(latestMessage.at))}
-              </small>
-            </div>
-          ) : null}
-          <form onSubmit={sendMessage}>
-            <label htmlFor="care-message">What would you like to ask?</label>
-            <textarea
-              id="care-message"
-              rows={3}
-              value={state.careMessage}
-              onChange={(e) => {
-                update({ careMessage: e.target.value });
-                setMessageSent(false);
-              }}
-              placeholder="A question about your next step"
-              enterKeyHint="done"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  e.currentTarget.form?.requestSubmit();
-                }
-              }}
-            />
-            <p>For non-urgent questions. Save a draft to come back to later.</p>
-            <Button type="submit" variant="secondary" loading={busy}>
-              Save draft
-            </Button>
-          </form>
-        </details>
+              : "How did your visit feel?"
+          }
+          detail={
+            state.feedbackSaved
+              ? "Thank you for sharing your experience"
+              : "A quick, optional check-in"
+          }
+          done={state.feedbackSaved}
+          onClick={() => go("feedback")}
+        />
       </Page>
     );
   }
 
   if (state.step === "followup") {
-    if (appointment.status !== "completed")
+    if (
+      appointment.status !== "completed" ||
+      state.carePlan.status !== "published"
+    )
       return (
         <Page
-          title="One visit at a time"
-          subtitle="You and your clinician can discuss follow-up at your first visit."
+          title="Your next step, together"
+          subtitle="Your clinician’s follow-up recommendation will appear with your care plan."
           footer={returnHome}
         >
-          <AppointmentContext state={state} />
+          <Notice>
+            Your visit and care plan stay available in your portal.
+          </Notice>
         </Page>
       );
-    if (state.followupAppointment)
+    if (
+      state.followupAppointment &&
+      state.followupAppointment.status !== "cancelled"
+    )
       return (
         <Page
           title="Your next step is in place"
           subtitle={`More time with ${provider.firstName}, when you need it.`}
-          footer={
-            <Button onClick={() => go("complete")}>
-              Back to your care plan
-            </Button>
-          }
+          footer={returnHome}
         >
           <AppointmentPanel
             state={state}
@@ -1124,37 +1382,30 @@ export function CareScreens(props: ScreenProps) {
             onCalendar={() => calendar(state.followupAppointment!)}
           />
           {statusNote}
-          <Notice tone="success">Your follow-up is confirmed.</Notice>
+          <Notice tone="success">
+            Your follow-up is confirmed. Your reminders are scheduled.
+          </Notice>
           <CareLink
-            icon={<Mail size={21} />}
-            title="Your follow-up reminders"
-            detail={
-              state.followupReminderScheduled
-                ? "24 hours and 1 hour before"
-                : "Choose your reminder preferences"
-            }
-            onClick={() => go("reminders")}
+            icon={<CalendarDays size={20} />}
+            title="Manage your visits"
+            detail="All your appointments in one place"
+            onClick={() => go("portal-visits")}
           />
         </Page>
       );
     const options = followupSlots.filter(
       (slot) => slot.providerId === appointment.providerId,
     );
-    const book = async () => {
-      if (!followupId) {
-        setError("Choose a time for your follow-up.");
-        return;
-      }
-      await act(async () => {
-        const followup = await api.bookFollowup(followupId);
-        await api.scheduleReminders(followup.id);
+    const book = () =>
+      void act(async () => {
+        if (!followupId) throw new Error("Choose a time for your follow-up.");
+        await api.bookFollowup(followupId);
         return true;
       });
-    };
     return (
       <Page
         title="Keep the same connection"
-        subtitle={`A follow-up with ${provider.firstName}. A little time to see how things are going.`}
+        subtitle={`${provider.firstName} recommends meeting again in ${state.carePlan.followupWeeks} weeks.`}
         footer={
           <>
             <Button disabled={!followupId} loading={busy} onClick={book}>
@@ -1193,12 +1444,13 @@ export function CareScreens(props: ScreenProps) {
             >
               <span>{formatDate(slot, true)}</span>
               <strong>{formatTime(slot)} CT</strong>
-              {followupId === slot.id ? <Check size={18} /> : null}
+              {followupId === slot.id && <Check size={18} />}
             </button>
           ))}
         </div>
         <p className="care-quiet">
-          All times in Central Time. Follow-up is your choice.
+          All times in Central Time. No charge today; your saved payment method
+          stays on file.
         </p>
       </Page>
     );
@@ -1223,30 +1475,18 @@ export function CareScreens(props: ScreenProps) {
       }
       const success = await act(async () => {
         await api.saveDraft("visit-feedback");
-        return true;
-      });
-      if (success) {
         update({ feedbackSaved: true });
-        go("complete");
-      }
-    };
-    const discussExperience = async (changeProvider = false) => {
-      const success = await act(async () => {
-        await api.saveDraft("visit-feedback");
         return true;
       });
-      if (success) {
-        update({
-          feedbackSaved: true,
-          careMessage:
-            state.careMessage ||
-            (changeProvider
-              ? "I’d like to discuss finding a different provider for my next visit."
-              : "I’d like to talk about my first visit and what could feel better next time."),
-        });
-        setMessageOpen(true);
-        go("complete");
-      }
+      if (success) go("complete");
+    };
+    const contact = (changeProvider: boolean) => {
+      update({
+        careMessage: changeProvider
+          ? "I’d like to discuss finding a different provider for my next visit."
+          : "I’d like to talk about my first visit and what could feel better next time.",
+      });
+      go("portal-messages");
     };
     return (
       <Page
@@ -1290,29 +1530,22 @@ export function CareScreens(props: ScreenProps) {
           <span>Could be better</span>
           <span>Felt great</span>
         </div>
-        {state.rating > 0 && state.rating <= 2 ? (
+        {state.rating > 0 && state.rating <= 2 && (
           <div className="care-feedback-recovery">
             <h2>Let’s make the next step better</h2>
-            <p>You can draft a question or ask about a different provider.</p>
+            <p>
+              Your care team can help with a concern or a different provider.
+            </p>
             <div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => discussExperience(false)}
-              >
+              <button type="button" onClick={() => contact(false)}>
                 Ask the care team
               </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => discussExperience(true)}
-              >
+              <button type="button" onClick={() => contact(true)}>
                 Discuss another provider
               </button>
             </div>
-            <small>Start a draft. Nothing changes until you decide.</small>
           </div>
-        ) : null}
+        )}
         <Field
           label="Anything you’d like us to know?"
           hint="Optional. Your feedback helps shape the experience."
