@@ -18,16 +18,17 @@ import {
   runIdentity,
   runMatch,
   runRecords,
-  setAgentPace,
+  sendCode,
   slotLabel,
+  verifyCode,
   type ChatContext,
   type ChatPatch,
 } from "./agent";
 import { fitsPreference, inventory } from "./inventory";
 import { reconcile } from "./reconcile";
-import { initialChatJourney, type ChatJourney, type ChatState } from "./state";
+import { DISCOVERED_PLAN } from "../model/fixtures";
+import { PREVIEW_CODE, initialChatJourney, type ChatJourney, type ChatState } from "./state";
 
-setAgentPace(0);
 inventory();
 
 type Seed = Partial<Omit<ChatJourney, "chat" | "profile">> & { profile?: Partial<Profile>; chat?: Partial<ChatState> };
@@ -442,4 +443,49 @@ test("a records search that finishes after a restart writes nothing", async () =
   assert.equal(p.state.chat.recordsFound, null);
   assert.equal(p.state.chat.jobs.records, undefined);
   assert.equal(p.state.chat.receipts.length, 0);
+});
+
+test("the texted code is sent and checked through the mock API, and a text that doesn't arrive can be sent again", async () => {
+  const p = patient({ scenario: "code-not-delivered", profile: { phone: "5125550148" } });
+  await sendCode(p.ctx);
+  assert.match(p.state.chat.codeError, /didn’t go through/);
+  assert.equal(p.state.chat.codeSentAt, null, "a failed text isn't counted as sent");
+  await sendCode(p.ctx);
+  assert.equal(p.state.chat.codeError, "");
+  assert.ok(p.state.chat.codeSentAt);
+  assert.equal(await verifyCode(p.ctx, "000000"), false);
+  assert.equal(p.state.chat.codeVerified, false);
+  assert.equal(await verifyCode(p.ctx, PREVIEW_CODE), true);
+});
+
+test("insurance discovery and clinician matching answer through the mock API, and recover from a failure", async () => {
+  const insured = patient({ scenario: "coverage-not-found", coverage: "insurance", payer: "Aetna", memberId: "" });
+  await runBenefits(insured.ctx);
+  assert.equal(insured.state.chat.jobs.benefits?.status, "failed");
+  assert.equal(insured.state.chat.jobs.benefits?.note, "not-found");
+  assert.equal(insured.state.memberId, "", "nothing is assumed when no plan is found");
+  await runBenefits(insured.ctx);
+  assert.equal(insured.state.memberId, DISCOVERED_PLAN.memberId, "trying again finds the member ID");
+
+  const searching = patient({ scenario: "calendars-unavailable", coverage: "selfpay", conditions: ["Anxiety"], chat: { availability: ["evenings"] } });
+  await runMatch(searching.ctx);
+  assert.equal(searching.state.chat.jobs.match?.status, "failed");
+  assert.equal(Boolean(searching.state.chat.match), false, "no clinicians are shown from a failed search");
+  await runMatch(searching.ctx);
+  assert.equal(searching.state.chat.jobs.match?.status, "done");
+  assert.ok(searching.state.chat.match?.offerIds.length, "trying again finds clinicians");
+});
+
+test("the ID check and the summary share can fail once and then go through, and every call is logged", async () => {
+  const id = patient({ scenario: "id-unreadable" });
+  assert.deepEqual(await id.ctx.api.verifyPhotoId(), { status: "unreadable" });
+  assert.deepEqual(await id.ctx.api.verifyPhotoId(), { status: "verified" }, "a retake goes through");
+  assert.deepEqual(
+    id.state.events.filter((event) => event.service === "Persona").map((event) => event.outcome),
+    ["pending", "error", "pending", "success"],
+  );
+
+  const share = patient({ scenario: "share-failed" });
+  await assert.rejects(share.ctx.api.shareVisitSummary(), /didn’t accept/);
+  assert.ok((await share.ctx.api.shareVisitSummary()).sentAt);
 });

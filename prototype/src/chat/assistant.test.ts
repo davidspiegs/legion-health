@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { applyJourneyPatch } from "../model/journey-state";
 import type { JourneyState } from "../model/types";
-import { setAgentPace, type ChatContext, type ChatPatch } from "./agent";
+import type { ChatContext, ChatPatch } from "./agent";
 import { clinicianFirst, reminderTimes } from "./agent";
 import {
   addAsk,
@@ -18,7 +18,6 @@ import { inventory } from "./inventory";
 import { momentState } from "./moments";
 import type { Ask, ChatJourney } from "./state";
 
-setAgentPace(0);
 inventory();
 
 function context(start: ChatJourney): ChatContext & { state: () => ChatJourney } {

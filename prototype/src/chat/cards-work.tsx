@@ -440,6 +440,7 @@ function MatchWork({ state }: CardProps) {
   const job = state.chat.jobs.match;
   const result = state.chat.match;
   const settled = job?.status === "done" && !!result;
+  const failed = job?.status === "failed";
   const inputs = matchInputs(state);
   // While matching runs, the criteria being applied appear first; their counts land with the result.
   const criteria = useMemo(() => {
@@ -453,11 +454,13 @@ function MatchWork({ state }: CardProps) {
   return (
     <WorkCard
       state={state}
-      phase={settled ? "done" : "running"}
+      phase={settled ? "done" : failed ? "failed" : "running"}
       icon={UserSearch}
       title={
         !settled
-          ? "Looking for clinicians who fit"
+          ? failed
+            ? "Couldn’t reach clinicians’ calendars"
+            : "Looking for clinicians who fit"
           : found
             ? `Found ${found} ${found === 1 ? "clinician" : "clinicians"} who fit`
             : searched
@@ -465,7 +468,11 @@ function MatchWork({ state }: CardProps) {
               : "How I searched"
       }
       detail={
-        settled ? undefined : payerFor(state) ? "Checking focus, insurance and openings" : "Checking focus and openings"
+        settled || failed
+          ? undefined
+          : payerFor(state)
+            ? "Checking focus, insurance and openings"
+            : "Checking focus and openings"
       }
       source="Legion directory and calendars"
       at={job?.finishedAt}

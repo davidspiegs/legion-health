@@ -953,6 +953,9 @@
 .vs-act-text {
   min-width: 0;
 }
+.vs-act small.is-error {
+  color: var(--chat-crisis);
+}
 .vs-act small {
   display: block;
   margin-top: 2px;

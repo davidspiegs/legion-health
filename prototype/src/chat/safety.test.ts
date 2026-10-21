@@ -11,13 +11,12 @@ import { applyJourneyPatch } from "../model/journey-state";
 import type { Appointment, JourneyState } from "../model/types";
 import { deriveTranscript } from "./engine";
 import { SCRIPT } from "./script";
-import { runBenefits, setAgentPace, type ChatContext, type ChatPatch } from "./agent";
+import { runBenefits, type ChatContext, type ChatPatch } from "./agent";
 import { PREVIEW_CODE, initialChatJourney, type ChatJourney } from "./state";
 import { inventory } from "./inventory";
 import { momentState } from "./moments";
 import { SCREEN } from "./safety";
 
-setAgentPace(0);
 inventory();
 
 function patient(seed: Partial<ChatJourney> = {}) {

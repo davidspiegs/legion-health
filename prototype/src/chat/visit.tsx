@@ -1602,6 +1602,8 @@ function Complete({ state, ctx }: CardProps) {
   const who = clinicianFor(state);
   const [arriving] = useState(() => !state.chat.completeSeen);
   const [downloaded, setDownloaded] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState("");
   const target = shareTarget(state);
   const shared = state.chat.receipts.some((item) => item.action.includes(SHARED));
   const followup = followupOf(state);
@@ -1620,9 +1622,18 @@ function Complete({ state, ctx }: CardProps) {
 
   // Receipts never carry what the patient typed, so a named doctor is "the doctor you named" there.
   const share = () => {
-    if (shared || !target) return;
-    if (target.network) {
-      receipt(ctx, `Sent ${SHARED} to ${target.network}`, "Metriport health network (simulated)");
+    if (shared || sharing || !target) return;
+    const network = target.network;
+    if (network) {
+      setSharing(true);
+      setShareError("");
+      void ctx.api
+        .shareVisitSummary()
+        .then(
+          () => receipt(ctx, `Sent ${SHARED} to ${network}`, "Metriport health network (simulated)"),
+          (issue: unknown) => setShareError(issue instanceof Error ? issue.message : "That didn’t send. Try again."),
+        )
+        .finally(() => setSharing(false));
       return;
     }
     addTask(
@@ -1741,7 +1752,7 @@ function Complete({ state, ctx }: CardProps) {
             <button
               type="button"
               className={`vs-act ${shared ? "is-done" : ""}`}
-              disabled={shared}
+              disabled={shared || sharing}
               onClick={share}
             >
               <span className="vs-act-icon" aria-hidden="true">
@@ -1753,13 +1764,19 @@ function Complete({ state, ctx }: CardProps) {
               </span>
               <span className="vs-act-text">
                 {shareLine.title}
-                <small>{shareLine.detail}</small>
+                <small className={shareError && !sharing ? "is-error" : undefined}>
+                  {sharing ? "Sending through the health network, simulated" : shareError || shareLine.detail}
+                </small>
               </span>
             </button>
           ) : null}
         </div>
         <p className="vs-sr" role="status">
-          {[downloaded ? "Summary downloaded" : "", shareLine && shared ? "Summary shared" : ""]
+          {[
+            downloaded ? "Summary downloaded" : "",
+            shareLine && shared ? "Summary shared" : "",
+            shareError ? "The summary didn’t send" : "",
+          ]
             .filter(Boolean)
             .join(". ")}
         </p>

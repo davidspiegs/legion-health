@@ -607,6 +607,10 @@ const choose: Node = {
   enterKey: (s) => matchInputs(s),
   say: (s) => {
     const blocks: AgentBlock[] = [work("match")];
+    if (s.chat.jobs.match?.status === "failed") {
+      blocks.push(say("failed", "I couldn’t reach clinicians’ calendars just now. Let’s try that again."));
+      return blocks;
+    }
     const match = s.chat.match;
     if (s.chat.jobs.match?.status !== "done" || !match) return blocks;
     if (!match.offerIds.length) {
@@ -634,7 +638,9 @@ const choose: Node = {
     return blocks;
   },
   input: (s) =>
-    s.chat.jobs.match?.status === "done"
+    s.chat.jobs.match?.status === "failed"
+      ? { kind: "single", options: [{ value: "__retry", label: "Try again", primary: true }] }
+      : s.chat.jobs.match?.status === "done"
       ? {
           kind: "single",
           options: [
@@ -652,6 +658,10 @@ const choose: Node = {
       : null,
   after: () => [work("hold")],
   submit: async (value, ctx) => {
+    if (value === "__retry") {
+      void runMatch(ctx);
+      return false;
+    }
     if (value === "__more") {
       ctx.update({ chat: { showMore: true } });
       return false;
@@ -704,6 +714,9 @@ const phone: Node = {
       chat: { codeVerified: false, codeSentAt: null },
     });
     await sendCode(ctx);
+    // A text that didn't go through is said here, under the number; "Send code" tries again.
+    const { codeSentAt, codeError } = ctx.get().chat;
+    if (!codeSentAt && codeError) throw new Error(codeError);
   },
 };
 
@@ -724,7 +737,7 @@ const code: Node = {
   answer: (s) => (s.chat.codeVerified ? { text: "Code verified", editable: false } : null),
   submit: async (value, ctx) => {
     if (value === "__resend") return void (await sendCode(ctx));
-    verifyCode(ctx, String(value).replace(/\D/g, ""));
+    await verifyCode(ctx, String(value).replace(/\D/g, ""));
   },
 };
 

@@ -5,7 +5,11 @@ import {
   slots,
   followupSlots,
   validateBirth,
+  DISCOVERED_PLAN,
+  PREVIEW_CODE,
+  VERIFIED_RECORD,
 } from "./fixtures";
+import { match } from "../chat/inventory";
 import type {
   Appointment,
   Eligibility,
@@ -15,6 +19,9 @@ import type {
   ServiceName,
   PaymentSetup,
   Notification,
+  IdentityLookup,
+  InsuranceDiscovery,
+  PhotoIdResult,
 } from "./types";
 import {
   eligibilityInputKey,
@@ -45,6 +52,8 @@ export function createMockApi({
   } | null = null;
   const delay = (ms = delayMs) =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
+  /** A service's own response time, or none when the API runs without delays (tests). */
+  const pace = (ms: number) => (delayMs ? ms : 0);
   const emit = (
     service: ServiceName,
     operation: string,
@@ -1237,6 +1246,114 @@ export function createMockApi({
             ],
           });
         },
+      );
+    },
+    sendVerificationCode() {
+      return run(
+        "verification.send",
+        "Verified",
+        "verification_code.sent",
+        "Simulated text sent; no SMS delivered",
+        () => {
+          if (consumeFault("code-not-delivered"))
+            throw new Error("That text didn’t go through. Try sending the code again.");
+          return { sentAt: new Date().toISOString() };
+        },
+        undefined,
+        pace(700),
+      );
+    },
+    checkVerificationCode(code) {
+      return run(
+        "verification.check",
+        "Verified",
+        "verification_code.checked",
+        "Simulated code accepted",
+        () => ({ valid: code === PREVIEW_CODE }),
+        (result) =>
+          result.valid ? { outcome: "success", detail: "Simulated code accepted" } : { outcome: "error", detail: "Simulated code didn’t match" },
+        pace(300),
+      );
+    },
+    lookupIdentity() {
+      const { profile } = getState();
+      return run<IdentityLookup>(
+        `identity:${profile.phone}:${profile.year}-${profile.month}-${profile.day}`,
+        "Verified",
+        "identity.lookup",
+        "Fictional identity record returned; no identity network contacted",
+        () =>
+          getState().scenario === "identity-not-found"
+            ? { status: "not-found" }
+            : { status: "found", record: VERIFIED_RECORD },
+        (result) =>
+          result.status === "found"
+            ? { outcome: "success", detail: "Fictional identity record returned; no identity network contacted" }
+            : { outcome: "error", detail: "Simulated lookup found no record for this number and birth date" },
+        pace(1300),
+      );
+    },
+    discoverInsurance() {
+      return run<InsuranceDiscovery>(
+        "insurance.discovery",
+        "Sohar",
+        "insurance.discovery",
+        "Fictional plan and member ID returned; no payer contacted",
+        () => {
+          const { payer, memberId } = getState();
+          if (payer && memberId) return { status: "found", payer, memberId };
+          if (consumeFault("coverage-not-found")) return { status: "not-found" };
+          return { status: "found", payer: payer || DISCOVERED_PLAN.payer, memberId: memberId || DISCOVERED_PLAN.memberId };
+        },
+        (result) =>
+          result.status === "found"
+            ? { outcome: "success", detail: "Fictional plan and member ID returned; no payer contacted" }
+            : { outcome: "error", detail: "Simulated search found no plan; nothing was assumed" },
+        pace(1200),
+      );
+    },
+    matchClinicians({ conditions, payer, availability, coverage }) {
+      return run(
+        `match:${JSON.stringify([conditions, payer, availability, coverage])}`,
+        "Clinician directory",
+        "clinicians.matched",
+        "Fictional clinicians ranked by focus, plan and openings",
+        () => {
+          if (consumeFault("calendars-unavailable"))
+            throw new Error("Clinicians’ calendars didn’t answer.");
+          return match(conditions, payer, availability, new Date(), coverage);
+        },
+        undefined,
+        pace(1500),
+      );
+    },
+    verifyPhotoId() {
+      return run<PhotoIdResult>(
+        "photo-id.verify",
+        "Persona",
+        "photo_id.verified",
+        "Simulated ID and selfie match; no images captured",
+        () => (consumeFault("id-unreadable") ? { status: "unreadable" } : { status: "verified" }),
+        (result) =>
+          result.status === "verified"
+            ? { outcome: "success", detail: "Simulated ID and selfie match; no images captured" }
+            : { outcome: "error", detail: "Simulated ID photo couldn’t be read" },
+        pace(1200),
+      );
+    },
+    shareVisitSummary() {
+      return run(
+        "summary.share",
+        "Metriport",
+        "visit_summary.shared",
+        "Simulated summary delivered over the health network",
+        () => {
+          if (consumeFault("share-failed"))
+            throw new Error("The health network didn’t accept the summary. Try again.");
+          return { sentAt: new Date().toISOString() };
+        },
+        undefined,
+        pace(900),
       );
     },
   };

@@ -1,3 +1,5 @@
+import type { MatchResult } from "../chat/inventory";
+
 export type Step =
   | "welcome"
   | "fit-state"
@@ -49,7 +51,12 @@ export type Scenario =
   | "care-plan-delayed"
   | "signin-expired"
   | "reminder-failed"
-  | "identity-not-found";
+  | "identity-not-found"
+  | "code-not-delivered"
+  | "coverage-not-found"
+  | "calendars-unavailable"
+  | "id-unreadable"
+  | "share-failed";
 export type Coverage = "selfpay" | "insurance";
 export type ServiceName =
   | "Profile"
@@ -62,7 +69,10 @@ export type ServiceName =
   | "Reminders"
   | "Video"
   | "Encounter"
-  | "Care team";
+  | "Care team"
+  | "Verified"
+  | "Persona"
+  | "Clinician directory";
 export interface Profile {
   firstName: string;
   lastName: string;
@@ -234,6 +244,23 @@ export interface JourneyState {
   events: ServiceEvent[];
   faultsUsed: string[];
 }
+export interface IdentityRecord {
+  firstName: string;
+  lastName: string;
+  address: string;
+  city: string;
+  zip: string;
+  sexAtBirth: "Female" | "Male";
+}
+export type IdentityLookup = { status: "found"; record: IdentityRecord } | { status: "not-found" };
+export type InsuranceDiscovery = { status: "found"; payer: string; memberId: string } | { status: "not-found" };
+export interface MatchRequest {
+  conditions: string[];
+  payer: string;
+  availability: string[];
+  coverage: Coverage;
+}
+export type PhotoIdResult = { status: "verified" } | { status: "unreadable" };
 export interface MockApi {
   saveDraft(stage: string): Promise<void>;
   getProviders(): Promise<Provider[]>;
@@ -266,6 +293,19 @@ export interface MockApi {
   reschedule(slotId: string): Promise<void>;
   sendCareMessage(): Promise<void>;
   replyToCareMessage(): Promise<void>;
+  /** Texts a sign-in code to the phone on file (Verified, simulated). */
+  sendVerificationCode(): Promise<{ sentAt: string }>;
+  checkVerificationCode(code: string): Promise<{ valid: boolean }>;
+  /** Name and address from the phone number and birth date (Verified, simulated). */
+  lookupIdentity(): Promise<IdentityLookup>;
+  /** Plan and member ID for the patient (Sohar insurance discovery, simulated). */
+  discoverInsurance(): Promise<InsuranceDiscovery>;
+  /** Clinicians ranked by focus, plan and openings (Legion directory and calendars, simulated). */
+  matchClinicians(request: MatchRequest): Promise<MatchResult>;
+  /** Matches a selfie to a photo ID (Persona, simulated). */
+  verifyPhotoId(): Promise<PhotoIdResult>;
+  /** Sends the visit summary to the patient's doctor over the health network (Metriport, simulated). */
+  shareVisitSummary(): Promise<{ sentAt: string }>;
 }
 export interface ScreenProps {
   state: JourneyState;

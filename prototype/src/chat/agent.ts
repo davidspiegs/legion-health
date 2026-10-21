@@ -1,9 +1,8 @@
 import type { Appointment, MockApi, Slot } from "../model/types";
 import { followupSlots, formatDate, formatTime, slots, validateBirth } from "../model/fixtures";
 import { eligibilityInputKey, journeyNow } from "../model/journey-state";
-import { clinicianById, fitsPreference, inventory, match } from "./inventory";
+import { clinicianById, fitsPreference, inventory } from "./inventory";
 import {
-  PREVIEW_CODE,
   type Benefits,
   type CareTask,
   type ChatJob,
@@ -43,12 +42,6 @@ export interface ChatContext {
   };
 }
 
-let pace = 1;
-/** Tests run the simulated vendors without their preview latency. */
-export function setAgentPace(factor: number) {
-  pace = factor;
-}
-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms * pace));
 
 function setJob(ctx: ChatContext, job: JobId, next: Partial<ChatJob>) {
   const jobs = ctx.get().chat.jobs;
@@ -309,11 +302,12 @@ export async function runMatch(ctx: ChatContext) {
   const before = availabilityIn(job?.inputs);
   const startedAt = Date.now();
   setJob(ctx, "match", { status: "running", startedAt, inputs });
-  // Live matching took several seconds in the audit; the preview keeps a short, honest wait.
-  await wait(1500);
+  const result = await ctx.api
+    .matchClinicians({ conditions: s.conditions, payer: payerFor(s), availability: s.chat.availability, coverage: s.coverage })
+    .catch(() => null);
   const current = ctx.get();
   if (matchInputs(current) !== inputs || current.chat.jobs.match?.startedAt !== startedAt) return;
-  const result = match(s.conditions, payerFor(s), s.chat.availability, new Date(), s.coverage);
+  if (!result) return setJob(ctx, "match", { status: "failed", finishedAt: Date.now(), inputs });
   const offerIds = result.offers.map((offer) => offer.clinician.id);
   const rankedIds = result.ranked.map((offer) => offer.clinician.id);
   const reasons = Object.fromEntries(result.ranked.map((offer) => [offer.clinician.id, offer.reasons]));
@@ -403,16 +397,25 @@ export async function runHold(ctx: ChatContext, slotId: string): Promise<boolean
 export async function sendCode(ctx: ChatContext) {
   const phone = ctx.get().profile.phone;
   const current = begin(ctx, "code");
-  await wait(700);
+  const sent = await ctx.api.sendVerificationCode().then(
+    () => "",
+    (issue: unknown) => (issue instanceof Error ? issue.message : "That text didn’t go through. Try sending the code again."),
+  );
   // A restart, or a new number while this one was sending, makes this send stale.
   if (!current() || ctx.get().profile.phone !== phone) return drop(ctx, "code", current);
+  if (sent) {
+    ctx.update({ chat: { codeError: sent } });
+    setJob(ctx, "code", { status: "failed", finishedAt: Date.now() });
+    return;
+  }
   ctx.update({ chat: { codeSentAt: Date.now(), codeError: "" } });
   setJob(ctx, "code", { status: "done", finishedAt: Date.now() });
   receipt(ctx, "Texted a sign-in code to your phone", "Verified (simulated)");
 }
 
-export function verifyCode(ctx: ChatContext, code: string): boolean {
-  if (code !== PREVIEW_CODE) {
+export async function verifyCode(ctx: ChatContext, code: string): Promise<boolean> {
+  const { valid } = await ctx.api.checkVerificationCode(code);
+  if (!valid) {
     ctx.update({
       chat: { codeError: "That code didn’t match. Check the newest text, or send a new code." },
     });
@@ -422,15 +425,7 @@ export function verifyCode(ctx: ChatContext, code: string): boolean {
   return true;
 }
 
-/** Fictional record returned by the identity network for the preview persona. */
-export const VERIFIED_RECORD = {
-  firstName: "Alex",
-  lastName: "Rivera",
-  address: "418 Maple Hollow Dr",
-  city: "Austin",
-  zip: "78745",
-  sexAtBirth: "Female" as const,
-};
+export { VERIFIED_RECORD } from "../model/fixtures";
 
 const identityKey = (s: ChatJourney) =>
   fingerprint(JSON.stringify([s.profile.phone, s.profile.month, s.profile.day, s.profile.year]));
@@ -446,25 +441,22 @@ export async function runIdentity(ctx: ChatContext) {
   const job = s.chat.jobs.identity;
   if (job?.status === "running" && runKey(job) === key) return;
   const current = begin(ctx, "identity", key);
-  await wait(1300);
+  const lookup = await ctx.api.lookupIdentity().catch(() => null);
   const now = ctx.get();
   // A restart, a new number or birth date, or details settled another way make this answer stale.
   if (!current() || !now.chat.dobEntered || now.chat.identity !== "" || identityKey(now) !== key)
     return drop(ctx, "identity", current);
-  if (now.scenario === "identity-not-found") {
+  if (lookup?.status !== "found") {
     ctx.update({ chat: { identity: "not-found" } });
     // The job keeps the outcome, so the conversation can tell later that details were added by hand.
     setJob(ctx, "identity", { status: "failed", finishedAt: Date.now(), note: "not-found" });
     return;
   }
-  const { sexAtBirth, ...profile } = VERIFIED_RECORD;
+  const { sexAtBirth, ...profile } = lookup.record;
   ctx.update({ profile: { ...now.profile, ...profile }, chat: { identity: "found", sexAtBirth } });
   setJob(ctx, "identity", { status: "done", finishedAt: Date.now() });
   receipt(ctx, "Found your name and address from your phone number", "Verified (simulated)");
 }
-
-const DISCOVERED_PAYER = "Blue Cross Blue Shield of Texas";
-const DISCOVERED_MEMBER_ID = "W2N48217";
 
 /** What a benefits run depends on: coverage, the plan details, and who discovery searches for. */
 const benefitsInputs = (s: ChatJourney) =>
@@ -491,11 +483,16 @@ export async function runBenefits(ctx: ChatContext) {
   const current = begin(ctx, "benefits", "", { note: "finding" });
   let expected = benefitsInputs(s);
   const still = () => current() && benefitsInputs(ctx.get()) === expected;
-  await wait(1200);
+  const discovery = await ctx.api.discoverInsurance().catch(() => null);
   if (!still()) return drop(ctx, "benefits", current);
   const found = ctx.get();
-  const payer = found.payer || DISCOVERED_PAYER;
-  const memberId = found.memberId || DISCOVERED_MEMBER_ID;
+  if (discovery?.status !== "found") {
+    // Nothing is assumed: the patient tries again, pays themself, or gets help from a person.
+    setJob(ctx, "benefits", { status: "failed", finishedAt: Date.now(), note: "not-found" });
+    receipt(ctx, "Couldn’t find a plan from your details", "Sohar insurance discovery (simulated)");
+    return;
+  }
+  const { payer, memberId } = discovery;
   // The patient picked this plan, or asked Wren to find it.
   const askedToFind = found.chat.payerChoice === "unsure" || found.chat.payMethod === "unsure";
   const via: Benefits["via"] = payerFor(found) || (found.payer && !askedToFind) ? "chosen" : "discovery";

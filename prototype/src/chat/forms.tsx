@@ -1822,6 +1822,7 @@ function Viewfinder({ face, captured }: { face: boolean; captured: boolean }) {
 function IdCheckSheet({ state, ctx, close }: SheetProps) {
   const [step, setStep] = useState<IdStep>(state.chat.idCheck === "done" ? "verified" : "consent");
   const [captured, setCaptured] = useState(false);
+  const [error, setError] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
   const opened = useRef(true);
   const later = useTimers();
@@ -1846,15 +1847,26 @@ function IdCheckSheet({ state, ctx, close }: SheetProps) {
   const capture = (next: "selfie" | "verifying") => {
     if (captured) return;
     setCaptured(true);
+    setError("");
     later(700, () => {
       setCaptured(false);
       setStep(next);
-      if (next === "verifying")
-        later(1200, () => {
+      if (next !== "verifying") return;
+      // An unreadable photo goes back to the ID step to retake it; nothing is marked verified.
+      const retake = (message: string) => {
+        setError(message);
+        setStep("id");
+      };
+      void ctx.api.verifyPhotoId().then(
+        (result) => {
+          if (result.status !== "verified")
+            return retake("Your ID photo was hard to read. Retake it in good light, with all four corners in the frame.");
           ctx.update({ chat: { idCheck: "done" } });
           receipt(ctx, "Verified your photo ID", "Persona (simulated)");
           setStep("verified");
-        });
+        },
+        () => retake("The ID check didn’t go through. Try again."),
+      );
     });
   };
 
@@ -1937,6 +1949,12 @@ function IdCheckSheet({ state, ctx, close }: SheetProps) {
           </p>
         </div>
         <Viewfinder face={face} captured={captured} />
+        {error && !face ? (
+          <p className="fm-error" role="alert">
+            <CircleAlert size={15} aria-hidden="true" />
+            {error}
+          </p>
+        ) : null}
         <p className="fm-note fm-center">Preview: no camera is used, and nothing is recorded.</p>
       </>
     );

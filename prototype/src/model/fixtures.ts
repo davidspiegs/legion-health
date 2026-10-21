@@ -359,3 +359,19 @@ export function initialState(): JourneyState {
     faultsUsed: [],
   };
 }
+
+/** The texted sign-in code in this preview; any other code is rejected. */
+export const PREVIEW_CODE = "246810";
+
+/** The fictional record the identity network returns for the preview persona. */
+export const VERIFIED_RECORD = {
+  firstName: "Alex",
+  lastName: "Rivera",
+  address: "418 Maple Hollow Dr",
+  city: "Austin",
+  zip: "78745",
+  sexAtBirth: "Female" as const,
+};
+
+/** What insurance discovery finds when the patient doesn't know their plan or member ID. */
+export const DISCOVERED_PLAN = { payer: "Blue Cross Blue Shield of Texas", memberId: "W2N48217" };

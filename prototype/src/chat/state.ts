@@ -306,7 +306,7 @@ export function jobStatus(s: ChatJourney, job: JobId): ChatJob["status"] {
   return s.chat.jobs[job]?.status ?? "idle";
 }
 
-export const PREVIEW_CODE = "246810";
+export { PREVIEW_CODE } from "../model/fixtures";
 
 /** Where the preview keeps the conversation in this browser. v2: one safety question. */
 export const STORAGE_KEY = "legion-chat-preview-v2";

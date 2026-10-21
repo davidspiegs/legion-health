@@ -1695,11 +1695,29 @@ const MOMENTS: { id: Moment; title: string; detail: string }[] = [
 
 const SCENARIOS: { value: Scenario; title: string; where: string; moment?: Moment }[] = [
   { value: "standard", title: "Everything goes smoothly", where: "Every service answers normally" },
+  {
+    value: "calendars-unavailable",
+    title: "Calendars don’t answer",
+    where: `When ${ASSISTANT.name} looks for clinicians`,
+    moment: "start",
+  },
   { value: "slot-taken", title: "Someone takes the time", where: "When you pick a time", moment: "clinician" },
+  {
+    value: "code-not-delivered",
+    title: "Code text doesn’t arrive",
+    where: `When ${ASSISTANT.name} texts your code`,
+    moment: "booking",
+  },
   {
     value: "identity-not-found",
     title: "Phone lookup finds nothing",
     where: "After you enter your birth date",
+    moment: "booking",
+  },
+  {
+    value: "coverage-not-found",
+    title: "No plan found",
+    where: `When ${ASSISTANT.name} looks up your plan`,
     moment: "booking",
   },
   {
@@ -1727,9 +1745,16 @@ const SCENARIOS: { value: Scenario; title: string; where: string; moment?: Momen
     where: `When ${ASSISTANT.name} looks for records`,
     moment: "booked",
   },
+  { value: "id-unreadable", title: "ID photo can’t be read", where: "When you verify your photo ID", moment: "booked" },
   { value: "clinician-late", title: "Clinician running late", where: "In the waiting room", moment: "visit-day" },
   { value: "connection-lost", title: "Visit disconnects", where: "During the visit", moment: "visit-day" },
   { value: "care-plan-delayed", title: "Plan takes longer", where: "After the visit", moment: "visit-day" },
+  {
+    value: "share-failed",
+    title: "Summary doesn’t send",
+    where: "When you share your summary with your doctor",
+    moment: "complete",
+  },
 ];
 
 const REMINDER_TITLES: Record<string, string> = {
