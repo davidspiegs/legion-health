@@ -51,10 +51,12 @@ Safari in an **iPhone 17 Pro, iOS 26.4 Simulator**, controlled through native CU
 - Name: Continue remained above the keyboard; native Next moved first → last name and brought the next field into view. Accessory Done restored full layout without the stuck blank offset.
 - Email: appropriate `@` keyboard appeared. Done restored the full viewport; keyboard Go advanced directly to Phone.
 - Phone: number pad appeared, editing retained `(202) 555-0148` formatting, and Review my visit worked while the keyboard remained open.
-- Checkout: number-pad taps formatted the synthetic card correctly. Native accessory arrows appeared disabled and expiration was partly below the fixed action. This triggered an explicit keyboard-next refinement before deployment; final verification is recorded below.
+- Checkout: number-pad taps formatted the synthetic card correctly. Native accessory arrows initially appeared disabled and expiration was partly below the fixed action. The explicit keyboard-next refinement was then retested successfully on native iOS: card → expiry → CVC → ZIP retained the keyboard and revealed each field. Review authorization dismissed the keyboard, restored the viewport, and focused the still-unchecked acknowledgment; confirmation remained disabled.
 - Native captures: `/tmp/legion-ios-qa/name-done-restored.png`, `email-keyboard-open.png`, `email-done-restored.png`, `phone-numberpad.png`, `checkout-card-numberpad.png`. These are 790 × 1700 screenshots including Simulator chrome; exact CSS viewport dimensions were not instrumented.
 
-Physical iPhone, Android keyboards, real autofill, assistive-technology output, larger accessibility text sizes, and actual media/network behavior remain unverified. The full first-visit walkthrough was performed in mobile-sized Chromium; the native Simulator pass focused on keyboard behavior. Native Simulator control became intermittently unavailable after the card-number check.
+Physical iPhone, Android keyboards, real autofill, assistive-technology output, larger accessibility text sizes, and actual media/network behavior remain unverified. The full first-visit walkthrough was performed in mobile-sized Chromium; the native Simulator pass focused on keyboard behavior. Native Simulator control briefly became unavailable but recovered for the final field-progression retest. Invalid-field recovery was checked in Chromium, not separately on native iOS.
+
+Final native checkout evidence: `/tmp/legion-ios-qa/checkout-security-keyboard-next.png`, `checkout-zip-keyboard-review.png`, and `checkout-review-authorization-unchecked.png`. No consent or booking submission occurred in the native Simulator pass.
 
 ### Numeric-keyboard follow-up
 
@@ -62,7 +64,13 @@ Checkout and Account card editing now have a sticky Next action while typing: ca
 
 ## Hosted preview
 
-Deployment and hosted smoke-check details will be recorded after the final build is uploaded. The prior preview is not evidence for these changes.
+- [Updated protected preview](https://legion-health-assignment-4prcit9y3-davidspiegs-projects.vercel.app)
+- [Jump through the journey](https://legion-health-assignment-4prcit9y3-davidspiegs-projects.vercel.app/?review=1)
+- Deployment `dpl_57c7MzULHD23ou7U5kbS7Jj9RUbw`: READY, preview (`target: null`, `productionUrl: null`), Vercel authentication protection enabled. Application source commit: `636177f` on `assignment/journey-audit`.
+- Hosted assets observed: `index-D8-jVRKw.css`, `index-BXntiZZ9.js`.
+- At 390 × 844, rendered and inspected checkout, portal Home, and completed-visit summary using the explicitly labelled reviewer fixtures. Both checkout acknowledgments were unchecked and confirmation disabled. Portal navigation, appointment context, plan, follow-up, care-team and feedback controls rendered. Document width matched viewport width (390px); no console warnings/errors were returned.
+- Hosted checks are a deployment smoke test, not a second full patient walkthrough. The fresh end-to-end journey was completed locally as recorded above. No hosted payment or booking was submitted. The hosted test path was reset to Welcome before handoff.
+- Hosted screenshots: `/tmp/legion-portal-qa/hosted-checkout-390.png`, `hosted-home-390.png`, `hosted-completed-390.png`. Vercel's floating review toolbar is hosting chrome, not part of the patient application.
 
 ## Boundaries
 
