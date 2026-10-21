@@ -18,6 +18,7 @@ import { joinAvailability } from "../model/journey-state";
 import { clinicianFirst, lateFees, stamp, type ChatContext } from "./agent";
 import { FIRST_VISIT_LENGTH, PREVIEW } from "./env";
 import { answerQuestion, type GuideAnswer } from "./guide-ai";
+import { CLINICIANS } from "./inventory";
 import { flagRisk } from "./safety";
 import { booked, priceLine } from "./script";
 import type { Ask, AskActionId, ChatJourney } from "./state";
@@ -81,16 +82,18 @@ export function quickActions(s: ChatJourney): QuickAction[] {
       { id: "rx", label: "Prescription question", icon: Pill },
       support,
     ];
-  // A short action second, so on a phone the third one peeks in at the edge and the row reads as scrollable.
+  // Most asked first. MyChart is offered in the chat; it's here only for someone who said "Not now".
   return [
     s.visitDay
       ? { id: "join", label: "Join my visit", icon: Video }
       : { id: "when", label: "When is my visit?", icon: CalendarClock },
     { id: "reschedule", label: "Reschedule", icon: CalendarSync },
-    ...(s.chartImport ? [] : [{ id: "chart" as const, label: "Import from MyChart", icon: FileHeart }]),
-    ...(s.chat.prep !== "yes" && !s.visitDay ? [{ id: "prep" as const, label: "Help me get ready", icon: Sparkles }] : []),
     message,
     { id: "billing", label: "What will I pay?", icon: Receipt },
+    ...(s.chat.prep !== "yes" && !s.visitDay ? [{ id: "prep" as const, label: "Help me get ready", icon: Sparkles }] : []),
+    ...(s.chat.chart === "later" && !s.chartImport
+      ? [{ id: "chart" as const, label: "Import MyChart", icon: FileHeart }]
+      : []),
     support,
     ...previewActions(s),
   ];
@@ -157,11 +160,18 @@ function actionsFor(intent: GuideAnswer["intent"]): AskActionId[] {
 }
 
 const ASKS_WHEN = /\b(?:when|what time|what day|which day|what date|date|time|today|tonight|tomorrow|how early|how soon)\b/;
-/** The clinician's own name counts: "when do I see Maya?" is a question about the visit. */
-const aboutVisit = (first: string) =>
-  new RegExp(
-    String.raw`\b(?:visits?|appointments?|appts?|sessions?|follow[\s-]?ups?|(?:see|seeing|meet|meeting)\s+(?:${first.toLowerCase()}|my clinician|the clinician|her|him|them))\b`,
+/** The clinician's own name counts: "when do I see Dr. Chen?" (or Maya, or Chen) is a question about the visit. */
+const aboutVisit = (who: string) => {
+  const surname = who.toLowerCase().replace(/^dr\.?\s*/, "");
+  const names = [`(?:dr\\.?\\s*)?${surname}`, ...(clinicianFirstNameFor(surname) ? [clinicianFirstNameFor(surname)!] : [])];
+  return new RegExp(
+    String.raw`\b(?:visits?|appointments?|appts?|sessions?|follow[\s-]?ups?|(?:see|seeing|meet|meeting)\s+(?:${names.join("|")}|my clinician|the clinician|the doctor|my doctor|her|him|them))\b`,
   );
+};
+/** The given name of the clinician with this surname, lowercased, for matching typed questions. */
+function clinicianFirstNameFor(surname: string): string | undefined {
+  return CLINICIANS.find((c) => c.name.toLowerCase().endsWith(` ${surname}`))?.firstName.toLowerCase();
+}
 const ABOUT_COST = /\b(?:costs?|pay|paying|price|charge|charged|copay|co-pay|bill|billed|owe|fees?)\b|\bhow much\b(?!\s+(?:time|longer))/;
 const ABOUT_CHECKIN = /\bcheck[\s-]?in\b/;
 /** Asking to change the time is a reschedule, not a question about when. */

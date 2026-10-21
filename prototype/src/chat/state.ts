@@ -150,6 +150,8 @@ export interface ChatState {
   benefitsAccepted: boolean;
   /** After a missed plan lookup, the patient said they don't have their card with them. */
   memberIdSkipped: boolean;
+  /** The MyChart offer after prep: not asked yet, skipped, or the import's progress. */
+  chart: "" | "later" | "connecting" | "done" | "failed";
   benefitsChoice: "" | "selfpay";
   aiNotes: boolean;
   controlledAck: boolean;
@@ -253,6 +255,7 @@ export function initialChat(): ChatState {
     benefits: null,
     benefitsAccepted: false,
     memberIdSkipped: false,
+    chart: "",
     benefitsChoice: "",
     aiNotes: false,
     controlledAck: false,

@@ -265,6 +265,7 @@ test("golden path: an insured patient reaches a clinician-completed first visit"
   assert.equal(p.appointment()?.status, "confirmed", "booking is its own confirmed step");
   assert.ok(p.cards().includes("booked"));
   await p.say("prep", "later");
+  await p.say("mychart", "later");
   await p.say("ready", "ok");
   // Visit day (a reviewer would use the preview skip).
   const start = new Date(p.appointment()!.start).getTime();

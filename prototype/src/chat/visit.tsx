@@ -43,7 +43,7 @@ import { downloadCalendar, saveFile } from "./cards-booked";
 import { STAGES } from "./engine";
 import { ASSISTANT, PREVIEW } from "./env";
 import { mentionsCrisis } from "./guide-ai";
-import { clinicianById } from "./inventory";
+import { clinicianById, formalName } from "./inventory";
 import { AssistantAvatar, LegionMark, markShown } from "./parts";
 import { SUPPORT_LINES, flagRisk, screenPatientLines } from "./safety";
 import type {
@@ -76,8 +76,8 @@ function clinicianFor(s: ChatJourney): Who {
   return c
     ? {
         name: c.name,
-        first: c.firstName,
-        First: c.firstName,
+        first: formalName(c),
+        First: formalName(c),
         initials: c.initials,
         credential: c.credential,
         photo: c.photo,

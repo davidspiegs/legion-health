@@ -7,6 +7,7 @@ import {
   addTask,
   clinicianFirst,
   clinicianName,
+  connectChart,
   createAccount,
   followupOptions,
   matchInputs,
@@ -1524,6 +1525,53 @@ export const prepFinished = (s: ChatJourney) =>
     prepPassed(s) ||
     (briefSettled(s) && (!medicationPath(s) || !!s.chat.idCheck)));
 
+/** Bringing the chart from MyChart: asked once after prep, with its own card, and always skippable. */
+const chartOffer: Node = {
+  id: "mychart",
+  stage: "visit",
+  applies: (s) =>
+    prepFinished(s) && (s.chat.chart !== "" || (!s.visitDay && s.encounter.status === "not_started" && !s.chartImport)),
+  say: (s) => [
+    say(
+      "ask",
+      `One more thing, and it’s optional: if another doctor’s office uses MyChart, I can bring your chart over so ${clinicianFirst(s.appointment!.providerId)} has it before your visit.`,
+    ),
+    card("mychart"),
+  ],
+  // While it connects, the card shows the progress and there's nothing to answer.
+  input: (s) =>
+    s.chat.chart === "connecting"
+      ? null
+      : {
+          kind: "single",
+          options: [
+            { value: "later", label: "Not now" },
+            { value: "connect", label: s.chat.chart === "failed" ? "Try again" : "Connect MyChart", primary: true },
+          ],
+        },
+  answer: (s) =>
+    s.chat.chart === "later"
+      ? { text: "Not now", editable: false }
+      : s.chat.chart === "done"
+        ? { text: "Connect MyChart", editable: false }
+        : null,
+  after: (s) =>
+    s.chat.chart === "done" && s.chartImport
+      ? [
+          say(
+            "ack",
+            `Done. ${clinicianFirst(s.appointment!.providerId)} will have your chart from ${s.chartImport.organization} before your visit.`,
+          ),
+        ]
+      : s.chat.chart === "later"
+        ? [say("ack", "No problem. You can bring it anytime before your visit from the options below.")]
+        : [],
+  submit: async (value, ctx) => {
+    if (value === "later") return ctx.update({ chat: { chart: "later" } });
+    await connectChart(ctx);
+  },
+};
+
 const ready: Node = {
   id: "ready",
   stage: "visit",
@@ -1536,10 +1584,6 @@ const ready: Node = {
         : s.profile.sms
           ? `You’re ready. I’ll text you ${reminderTimes(s)} your visit. You can reply to reschedule.`
           : `You’re ready. Texts are off, so your reminders come by email ${reminderTimes(s)} your visit.`,
-    ),
-    say(
-      "mychart",
-      `Anytime before your visit, you can also bring your chart from MyChart, and I’ll share it with ${clinicianFirst(s.appointment!.providerId)}.`,
     ),
   ],
   input: (s) =>
@@ -1780,6 +1824,7 @@ export const SCRIPT: Node[] = [
   note,
   brief,
   idCheck,
+  chartOffer,
   ready,
   waitingForVisit,
   reminder,

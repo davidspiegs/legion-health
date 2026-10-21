@@ -2,7 +2,7 @@ import { CalendarPlus, CalendarX2, Check, CreditCard, RefreshCw, Video } from "l
 import { formatDate, formatTime } from "../model/fixtures";
 import { lateFees, reminderTimes } from "./agent";
 import { FIRST_VISIT_LENGTH } from "./env";
-import { clinicianById } from "./inventory";
+import { clinicianById, formalName } from "./inventory";
 import { priceLine } from "./script";
 import type { CardMap, CardProps } from "./registry";
 import "./cards-booked.css";
@@ -58,7 +58,7 @@ function Booked({ state, ctx }: CardProps) {
   const start = appointment.start;
   const clinician = clinicianById(appointment.providerId);
   const name = clinician ? `${clinician.name}, ${clinician.credential}` : "Your clinician";
-  const first = clinician?.firstName ?? "your clinician";
+  const first = clinician ? formalName(clinician) : "your clinician";
   const cancelled = appointment.status === "cancelled";
   const done = state.encounter.status === "completed";
   // Calendar and reschedule belong to a visit that hasn't started; a checked-in visit can't move.

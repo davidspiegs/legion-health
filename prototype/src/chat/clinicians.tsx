@@ -13,15 +13,7 @@ import {
   slotLabel,
   type ChatContext,
 } from "./agent";
-import {
-  CLINICIANS,
-  clinicianById,
-  fitsPreference,
-  inventory,
-  match,
-  type Clinician,
-  type MatchOffer,
-} from "./inventory";
+import { CLINICIANS, clinicianById, fitsPreference, inventory, match, type Clinician, type MatchOffer, formalName } from "./inventory";
 import type { CardMap, CardProps, SheetMap, SheetProps } from "./registry";
 import { medicationPath } from "./script";
 import type { ChatJourney } from "./state";
@@ -514,7 +506,7 @@ function BestFit({
         <p>“{clinician.intro}”</p>
       </blockquote>
       {reasons.length ? (
-        <ul className="cl-reasons" aria-label={`Why ${clinician.firstName} fits`}>
+        <ul className="cl-reasons" aria-label={`Why ${formalName(clinician)} fits`}>
           {reasons.map((reason) => (
             <li key={reason}>
               <Check size={16} strokeWidth={2.5} className="cl-check" aria-hidden="true" />
@@ -531,7 +523,7 @@ function BestFit({
             </p>
             <TimeZoneNote short />
           </div>
-          <div className="cl-grid is-dated" role="group" aria-label={`${clinician.firstName}’s next open times`}>
+          <div className="cl-grid is-dated" role="group" aria-label={`${formalName(clinician)}’s next open times`}>
             {times.map((slot) => (
               <TimeChip
                 key={slot.id}
@@ -593,7 +585,7 @@ function OtherFit({
         </div>
       </div>
       {times.length ? (
-        <div className="cl-grid is-dated" role="group" aria-label={`${clinician.firstName}’s next open times`}>
+        <div className="cl-grid is-dated" role="group" aria-label={`${formalName(clinician)}’s next open times`}>
           {times.map((slot) => (
             <TimeChip
               key={slot.id}
@@ -1028,7 +1020,7 @@ function NewTime({ state, ctx, close }: SheetProps) {
         />
       ) : (
         <Empty ctx={ctx}>
-          {clinician?.firstName ?? "Your clinician"} has no other open times in the next 9 days. The care
+          {clinician ? formalName(clinician) : "Your clinician"} has no other open times in the next 9 days. The care
           team can help find one.
         </Empty>
       )}

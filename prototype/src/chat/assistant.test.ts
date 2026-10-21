@@ -100,9 +100,17 @@ test("after the first visit, a question about when points to the follow-up", asy
   assert.deepEqual(reply.actions, ["followup"]);
 });
 
-test("a short action comes second, so the next one peeks in on a phone", () => {
-  assert.equal(quickActions(momentState("booked"))[1].id, "reschedule");
-  assert.equal(quickActions(momentState("visit-day"))[1].id, "reschedule");
+test("MyChart is offered in the chat first, and among the actions only after Not now", () => {
+  const s = momentState("booked");
+  assert.ok(!quickActions(s).some((action) => action.id === "chart"));
+  const later = { ...s, chat: { ...s.chat, chart: "later" as const } };
+  assert.ok(quickActions(later).some((action) => action.id === "chart"));
+  assert.ok(!quickActions({ ...later, chartImport: { organization: "Austin Family Medicine", importedAt: "", conditions: [], medications: [], allergies: [], labResults: 0, visitNotes: 0 } }).some((action) => action.id === "chart"));
+});
+
+test("Wren calls the clinician by title and surname", () => {
+  const s = momentState("booked");
+  assert.match(quickActions(s).find((action) => action.id === "message")!.label, /^Message Dr\.\s/);
 });
 
 test("patients are told only about the reminders actually scheduled", () => {

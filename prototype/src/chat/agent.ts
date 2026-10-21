@@ -1,7 +1,7 @@
 import type { Appointment, MockApi, Slot } from "../model/types";
 import { followupSlots, formatDate, formatTime, slots, validateBirth } from "../model/fixtures";
 import { eligibilityInputKey, journeyNow } from "../model/journey-state";
-import { clinicianById, fitsPreference, inventory } from "./inventory";
+import { clinicianById, fitsPreference, formalName, inventory } from "./inventory";
 import {
   type Benefits,
   type CareTask,
@@ -167,7 +167,7 @@ function releasedTime(id: string): { providerId: string; time: string } | null {
 export function releaseNotice(s: ChatJourney): string {
   const released = releasedTime(s.chat.releasedSlot);
   const clinician = released ? clinicianById(released.providerId) : undefined;
-  const who = clinician?.firstName ?? "The clinician you picked";
+  const who = clinician ? formalName(clinician) : "The clinician you picked";
   if (s.chat.holdNotice === "not-covered") {
     const plan = payerFor(s) || s.chat.benefits?.payer || "your plan";
     return `${who} isn’t in network with ${plan}, so I let that time go. These clinicians are.`;
@@ -177,7 +177,7 @@ export function releaseNotice(s: ChatJourney): string {
     return `${who} doesn’t focus on ${EITHER_LIST.format(specific.map(conditionWord))}, so I let that time go. These clinicians do.`;
   const words = s.chat.availability.flatMap((pref) => (RELEASE_HOURS[pref] ? [RELEASE_HOURS[pref]] : []));
   const fit = words.length ? EITHER_LIST.format(words) : "the times you picked";
-  const held = released ? `Your ${released.time} time${clinician ? ` with ${clinician.firstName}` : ""}` : "The time you held";
+  const held = released ? `Your ${released.time} time${clinician ? ` with ${formalName(clinician)}` : ""}` : "The time you held";
   return `${held} doesn’t fit ${fit}, so I let it go. Pick a time that works.`;
 }
 
@@ -232,7 +232,8 @@ export function clinicianName(id: string): string {
 }
 
 export function clinicianFirst(id: string): string {
-  return clinicianById(id)?.firstName ?? "your clinician";
+  const clinician = clinicianById(id);
+  return clinician ? formalName(clinician) : "your clinician";
 }
 
 /** The plan the patient picked. A plan that discovery found isn't a choice, so it doesn't narrow matching. */
@@ -639,6 +640,19 @@ export const RECORDS_FIXTURE = {
   allergy: "Penicillin (rash)",
   pharmacy: { name: "CVS Pharmacy", address: "2508 S Congress Ave, Austin" },
 };
+
+/** The clinic in the patient's records, or the one in the fictional chart. */
+export const chartOrganization = (s: ChatJourney) =>
+  s.chat.recordsFound?.sources.find((source) => source.kind === "clinic")?.name ?? "Austin Family Medicine";
+
+/** Imports the chart the patient chose to share in MyChart. The card in the chat follows each state. */
+export async function connectChart(ctx: ChatContext) {
+  ctx.update({ chat: { chart: "connecting" } });
+  const chart = await ctx.api.importChart(chartOrganization(ctx.get())).catch(() => null);
+  if (!chart) return void ctx.update({ chat: { chart: "failed" } });
+  ctx.update({ chat: { chart: "done" } });
+  receipt(ctx, `Imported your chart from ${chart.organization}`, "Epic MyChart (simulated)", "You");
+}
 
 /** Searches for records the patient allowed. Safe to call again: it runs only while a search is needed. */
 export async function runRecords(ctx: ChatContext) {

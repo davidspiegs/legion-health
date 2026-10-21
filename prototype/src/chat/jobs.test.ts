@@ -25,6 +25,7 @@ import {
   type ChatPatch,
 } from "./agent";
 import { fitsPreference, inventory } from "./inventory";
+import { momentState } from "./moments";
 import { reconcile } from "./reconcile";
 import { SCRIPT } from "./script";
 import { DISCOVERED_PLAN } from "../model/fixtures";
@@ -533,4 +534,18 @@ test("a MyChart import can fail once, then brings in the chart", async () => {
   assert.equal(chart.organization, "Austin Family Medicine");
   assert.ok(chart.conditions.length && chart.medications.length);
   assert.equal(p.state.chartImport?.organization, "Austin Family Medicine");
+});
+
+test("Wren asks about MyChart once after prep, and the card follows the import", async () => {
+  const p = patient();
+  const s = momentState("booked");
+  p.update({ ...s, scenario: "mychart-unavailable", chat: { ...s.chat, prep: "later" } });
+  const node = SCRIPT.find((item) => item.id === "mychart")!;
+  assert.ok(node.applies!(p.state), "asked right after prep");
+  await node.submit!("connect", p.ctx);
+  assert.equal(p.state.chat.chart, "failed");
+  await node.submit!("connect", p.ctx);
+  assert.equal(p.state.chat.chart, "done");
+  assert.ok(p.state.chartImport);
+  assert.equal(node.answer(p.state)?.text, "Connect MyChart");
 });

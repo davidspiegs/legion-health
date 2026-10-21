@@ -105,28 +105,10 @@ export function QuickActions({
   onPick: (id: string) => void;
   busy?: boolean;
 }) {
-  const row = useRef<HTMLDivElement>(null);
-  // On a phone the row scrolls sideways; a fade shows at whichever edge has more.
-  const [more, setMore] = useState({ before: false, after: false });
-  useEffect(() => {
-    const el = row.current;
-    if (!el) return;
-    // When an action leaves the row (like one just used), the row starts from the beginning again.
-    el.scrollTo({ left: 0 });
-    const update = () => {
-      const before = el.scrollLeft > 4;
-      const after = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
-      setMore((last) => (last.before === before && last.after === after ? last : { before, after }));
-    };
-    update();
-    el.addEventListener("scroll", update, { passive: true });
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
-    observer?.observe(el);
-    return () => {
-      el.removeEventListener("scroll", update);
-      observer?.disconnect();
-    };
-  }, [actions.length]);
+  // A last action left alone on its row spans it, in the two-column phone grid and the three-column desktop one.
+  const asks = actions.filter((action) => action.tone !== "preview").length;
+  const lastAsk = asks - 1;
+  const widen = `${asks % 2 === 1 ? "wide-2" : ""} ${asks % 3 === 1 ? "wide-3" : ""}`.trim();
   // A second tap on the same action before the first has landed would ask twice.
   const lastPick = useRef({ id: "", at: 0 });
   const pick = (id: string) => {
@@ -136,17 +118,12 @@ export function QuickActions({
     onPick(id);
   };
   return (
-    <div
-      ref={row}
-      className={`quick-actions ${more.before ? "more-before" : ""} ${more.after ? "more-after" : ""}`}
-      role="group"
-      aria-label={`Ask ${ASSISTANT.name}`}
-    >
+    <div className="quick-actions" role="group" aria-label={`Ask ${ASSISTANT.name}`}>
       {actions.map(({ id, label, icon: Icon, tone }, index) => (
         <button
           type="button"
           key={id}
-          className={`quick-action ${tone === "preview" ? "preview" : ""}`}
+          className={`quick-action ${tone === "preview" ? "preview" : ""} ${index === lastAsk ? widen : ""}`}
           style={{ ["--i" as string]: index }}
           disabled={busy}
           onClick={() => pick(id)}

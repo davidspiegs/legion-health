@@ -15,6 +15,10 @@ export interface Clinician extends Provider {
   intro: string;
 }
 
+/** How Wren and the patient refer to a clinician: "Dr. Chen". Every fictional clinician holds a doctorate (DNP). */
+// A no-break space keeps "Dr." and the surname on one line.
+export const formalName = (clinician: { name: string }) => `Dr.\u00A0${clinician.name.trim().split(/\s+/).pop()}`;
+
 const ALL_PAYERS = [
   "Aetna",
   "Blue Cross Blue Shield of Texas",
@@ -30,7 +34,7 @@ export const CLINICIANS: Clinician[] = [
     firstName: "Maya",
     initials: "MC",
     title: "Psychiatric nurse practitioner",
-    credential: "PMHNP-BC",
+    credential: "DNP, PMHNP-BC",
     photo: "/images/maya-chen.jpg",
     focuses: ["ADHD", "Anxiety", "Life transitions"],
     languages: ["English"],
@@ -53,7 +57,7 @@ export const CLINICIANS: Clinician[] = [
     firstName: "Jordan",
     initials: "JE",
     title: "Psychiatric nurse practitioner",
-    credential: "PMHNP-BC",
+    credential: "DNP, PMHNP-BC",
     focuses: ["ADHD", "Depression", "Sleep"],
     languages: ["English"],
     description:
@@ -73,7 +77,7 @@ export const CLINICIANS: Clinician[] = [
     firstName: "Priya",
     initials: "PR",
     title: "Psychiatric nurse practitioner",
-    credential: "PMHNP-BC",
+    credential: "DNP, PMHNP-BC",
     focuses: ["Depression", "Anxiety", "PTSD"],
     languages: ["English", "Hindi"],
     description:
@@ -93,7 +97,7 @@ export const CLINICIANS: Clinician[] = [
     firstName: "Daniel",
     initials: "DO",
     title: "Psychiatric nurse practitioner",
-    credential: "PMHNP-BC",
+    credential: "DNP, PMHNP-BC",
     focuses: ["Bipolar Disorder", "Depression", "Anxiety"],
     languages: ["English"],
     description: "Steady, practical care, with the reasoning behind every option.",
@@ -112,7 +116,7 @@ export const CLINICIANS: Clinician[] = [
     firstName: "Elena",
     initials: "ER",
     title: "Psychiatric nurse practitioner",
-    credential: "PMHNP-BC",
+    credential: "DNP, PMHNP-BC",
     focuses: ["ADHD", "PTSD", "Anxiety"],
     languages: ["English", "Spanish"],
     description: "Care that respects your pace and your culture. Hablo español.",

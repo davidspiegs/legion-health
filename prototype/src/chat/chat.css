@@ -1011,61 +1011,41 @@ button.bubble:active {
   color: var(--muted);
 }
 
-/* After booking: things to ask for in one tap, above a composer for anything else. */
+/* After booking: everything there is to ask for, in a calm two-column grid above the composer. */
 .quick-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  margin: 0 calc(var(--chat-gap-side) * -1);
-  padding: 2px var(--chat-gap-side);
-  /* Snapping lines the first action up with the composer, not the screen edge. */
-  scroll-padding-inline: var(--chat-gap-side);
-  scrollbar-width: none;
-}
-.quick-actions::-webkit-scrollbar {
-  display: none;
-}
-/* A fade at an edge says there are more actions that way. */
-.quick-actions.more-after {
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
-}
-.quick-actions.more-before {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px);
-  mask-image: linear-gradient(to right, transparent, #000 48px);
-}
-.quick-actions.more-before.more-after {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
-  mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
 }
 .quick-action {
-  position: relative;
-  flex: none;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 7px;
-  min-height: 40px;
-  padding: 0 15px;
-  border-radius: 999px;
-  border: 1px solid var(--chat-chip);
+  gap: 9px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--chat-line);
   background: white;
   color: var(--ink);
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 550;
-  scroll-snap-align: start;
-  box-shadow: 0 1px 1px rgba(12, 22, 48, 0.04);
+  line-height: 1.25;
+  text-align: left;
   animation: reply-in 380ms var(--chat-ease) both;
-  animation-delay: calc(var(--i, 0) * 30ms);
+  animation-delay: calc(var(--i, 0) * 24ms);
   transition:
     transform 140ms var(--chat-ease),
-    border-color 160ms ease;
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 .quick-action svg {
+  flex: none;
   color: var(--blue);
 }
 .quick-action:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: scale(0.98);
+  background: var(--chat-agent);
 }
 @media (hover: hover) {
   .quick-action:hover:not(:disabled) {
@@ -1073,12 +1053,34 @@ button.bubble:active {
   }
 }
 
+.quick-action.wide-2 {
+  grid-column: 1 / -1;
+}
+/* On short phones the grid is tighter, so the conversation keeps its room. */
+@media (max-width: 760px) and (max-height: 720px) {
+  .quick-actions {
+    gap: 6px;
+  }
+  .quick-action {
+    min-height: 40px;
+    padding: 6px 10px;
+    gap: 8px;
+    font-size: 13.5px;
+  }
+  .quick-action.preview {
+    min-height: 36px;
+  }
+}
+
+/* The reviewer shortcut spans the row, so it reads as separate from what a patient would ask. */
 .quick-action.preview {
+  grid-column: 1 / -1;
+  justify-content: center;
+  min-height: 40px;
   border-style: dashed;
   border-color: #b9c4dc;
   color: var(--muted);
   font-weight: 500;
-  box-shadow: none;
 }
 .quick-action.preview svg {
   color: var(--muted);
@@ -1262,12 +1264,15 @@ button.bubble:active {
   .chat-dock .dock-widget .reply-confirm {
     max-width: none;
   }
-  /* With a mouse, a sideways scroller hides actions; they wrap instead. */
+  /* The wider column fits three across. */
   .quick-actions {
-    flex-wrap: wrap;
-    overflow: visible;
-    margin: 0;
-    padding: 2px 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .quick-action.wide-2 {
+    grid-column: auto;
+  }
+  .quick-action.wide-3 {
+    grid-column: 1 / -1;
   }
 }
 

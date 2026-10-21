@@ -17,7 +17,7 @@ Draft for David's recording. Times are targets. Everything shown is the prototyp
 5. **Agreements in plain language,** unchecked, with AI note-taking as a separate switch. Card on file, nothing charged. Booked is its own step.
 6. **Edit anything.** Change availability from evenings to mornings: matching re-runs, the evening hold is let go with a stated reason, and only the dependent steps are asked again.
 7. **Preparation that's useful and finite.** Records found, a medication and allergy confirmed against the pharmacy record, and a brief the patient approves (with what the clinician will see).
-8. **After booking, Wren stays.** Tap "When is my visit?", type a question, message Maya and watch the care team's reply arrive in the thread.
+8. **After booking, Wren stays.** Wren offers to bring the chart from MyChart, in the chat. The actions sit in a grid, all visible: tap "When is my visit?", type a question, message Dr. Chen and watch the care team's reply arrive in the thread.
 9. **Visit day** (Preview: skip). Reminder, check-in, the waiting room, the visit, a clinician-signed plan, follow-up booked, "first visit complete."
 
 ## Under the hood (2:45 to 3:45)

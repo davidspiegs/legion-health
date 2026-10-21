@@ -32,7 +32,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { formatPhone, validateBirth } from "../model/fixtures";
-import { clinicianFirst, receipt, runBenefits, type ChatContext } from "./agent";
+import { chartOrganization, clinicianFirst, receipt, runBenefits, type ChatContext } from "./agent";
 import { addAsk } from "./assistant";
 import { ASSISTANT, PREVIEW } from "./env";
 import type {
@@ -2021,15 +2021,92 @@ function IdCheckSheet({ state, ctx, close }: SheetProps) {
 
 export const FORM_CARDS: CardMap = {
   agreements: (props) => <AgreementsCard {...props} />,
+  mychart: (props) => <ChartCard {...props} />,
 };
 
 /* ============================================================== MyChart */
 
-type ChartStep = "consent" | "connecting" | "done" | "failed";
+/** The MyChart offer in the chat: what's shared, then the import's progress and result, in place. */
+function ChartCard({ state }: CardProps) {
+  const status = state.chat.chart;
+  const chart = state.chartImport;
+  const organization = chart?.organization ?? chartOrganization(state);
+  const doctor = clinicianFirst(state.appointment!.providerId);
+  const done = status === "done" && chart ? chart : null;
+  const [title, sub] =
+    status === "connecting"
+      ? ["Connecting to MyChart", `Bringing your chart from ${organization}`]
+      : done
+        ? ["Chart imported", `From ${done.organization}, shared with ${doctor}`]
+        : status === "failed"
+          ? ["MyChart didn’t connect", "Nothing was shared. You can try again, or skip it."]
+          : status === "later"
+            ? ["Your chart from MyChart", "Skipped for now. You can bring it anytime before your visit."]
+            : ["Your chart from MyChart", "You sign in to MyChart and choose what to share."];
+  const mark =
+    status === "connecting" ? (
+      <LoaderCircle size={20} className="fm-spin" />
+    ) : done ? (
+      <Check size={20} strokeWidth={2.6} />
+    ) : status === "failed" ? (
+      <CircleAlert size={20} strokeWidth={2.2} />
+    ) : (
+      <FileHeart size={20} strokeWidth={1.9} />
+    );
+  return (
+    <section className={`card-shell fm-chart-card is-${status || "offer"}`} aria-label="Your chart from MyChart">
+      <div className="fm-chart-head">
+        <span className="fm-chart-mark" aria-hidden="true">
+          {mark}
+        </span>
+        <div>
+          <h3 className="card-title">{title}</h3>
+          <p className="fm-chart-sub">{sub}</p>
+        </div>
+      </div>
+      {done ? (
+        <ul className="fm-chart-facts">
+          <li>
+            <strong>Conditions</strong>
+            {done.conditions.join(", ")}
+          </li>
+          <li>
+            <strong>Medications</strong>
+            {done.medications.join(", ")}
+          </li>
+          <li>
+            <strong>Allergies</strong>
+            {done.allergies.join(", ")}
+          </li>
+          <li>
+            <strong>Also</strong>
+            {counted(done.labResults, "lab result")} and {counted(done.visitNotes, "visit note")}
+          </li>
+        </ul>
+      ) : status === "" || status === "failed" ? (
+        <>
+          <ul className="fm-chart-items">
+            <li>
+              <Pill size={16} strokeWidth={2} aria-hidden="true" />
+              Conditions, medications and allergies
+            </li>
+            <li>
+              <FlaskConical size={16} strokeWidth={2} aria-hidden="true" />
+              Lab results
+            </li>
+            <li>
+              <FileText size={16} strokeWidth={2} aria-hidden="true" />
+              Notes from past visits
+            </li>
+          </ul>
+          <p className="fm-chart-note">Preview: no MyChart account is used, and nothing leaves your browser.</p>
+        </>
+      ) : null}
+    </section>
+  );
+}
 
-/** The clinic in the patient's records, or the one in the fictional chart. */
-const chartOrganization = (s: ChatJourney) =>
-  s.chat.recordsFound?.sources.find((source) => source.kind === "clinic")?.name ?? "Austin Family Medicine";
+type ChartStep = "consent" | "connecting" | "done" | "failed";
 
 const counted = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
