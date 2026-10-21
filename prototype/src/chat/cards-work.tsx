@@ -32,7 +32,16 @@ import {
 import { formatTime } from "../model/fixtures";
 import { journeyNow } from "../model/journey-state";
 import type { Notification } from "../model/types";
-import { VERIFIED_RECORD, clinicianFirst, clinicianName, matchInputs, payerFor, slotById, slotLabel } from "./agent";
+import {
+  VERIFIED_RECORD,
+  clinicianFirst,
+  clinicianName,
+  matchInputs,
+  payerFor,
+  reminderTimes,
+  slotById,
+  slotLabel,
+} from "./agent";
 import { ASSISTANT } from "./env";
 import { inventory, match } from "./inventory";
 import type { CardMap, CardProps } from "./registry";
@@ -1061,7 +1070,7 @@ function VisitDayCard({ state }: CardProps) {
           <p className="wk-foot">Legion messaging (simulated)</p>
         </>
       ) : (
-        <p className="wk-foot">Reminders go out the day before and an hour before your visit (simulated)</p>
+        <p className="wk-foot">Reminders go out {reminderTimes(state)} your visit (simulated)</p>
       )}
     </section>
   );

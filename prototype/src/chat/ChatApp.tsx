@@ -107,6 +107,16 @@ function restore(): ChatJourney {
               ([, job]) => (job as { status?: string })?.status !== "running",
             ),
           ),
+          // A typed question still being answered when the page closed can't finish now.
+          asks: ((saved.chat.asks || []) as Ask[]).map((ask) =>
+            ask.status === "thinking"
+              ? {
+                  ...ask,
+                  status: "done" as const,
+                  answer: "This question didn’t finish before the page reloaded. Ask it again and I’ll answer.",
+                }
+              : ask,
+          ),
         },
       };
       return withKnownSlots(restored);
@@ -452,6 +462,43 @@ function ChatApp() {
     return () => observer.disconnect();
   }, [dockNode?.id, editing, homeOpen]);
 
+  // Turning the phone, or the keyboard opening, resizes the thread: the newest line stays in view.
+  useEffect(() => {
+    const follow = () => {
+      const el = thread.current;
+      if (!el || !pinned.current || editing) return;
+      // The current question stays in view: all of it when it fits, otherwise from its first line.
+      const active = transcriptRef.current.active?.node.id;
+      const start = active ? el.querySelector<HTMLElement>(`.thread-item[data-node="${active}"]`) : null;
+      const bottom = Math.min(tailTop(el), el.scrollHeight - el.clientHeight);
+      autoScrollUntil.current = Date.now() + 300;
+      el.scrollTo({ top: start ? Math.min(bottom, start.offsetTop - 12) : bottom });
+    };
+    // The shell takes its new height a frame later (useMobileViewport), so follow once it has settled.
+    // Text reflows as the width changes, which moves the scroll position; that isn't the reader
+    // scrolling away, so whether the thread was following is read before the layout moves.
+    let timer = 0;
+    let wasPinned = false;
+    const onResize = () => {
+      if (!timer) wasPinned = pinned.current;
+      autoScrollUntil.current = Date.now() + 600;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = 0;
+        if (!wasPinned) return;
+        pinned.current = true;
+        follow();
+      }, 180);
+    };
+    window.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+    };
+  }, [editing]);
+
   // Changing an answer brings it into view and moves focus to the controls that change it.
   useEffect(() => {
     if (!editing) return;
@@ -522,6 +569,11 @@ function ChatApp() {
 
   // ---------------------------------------------------------------- after booking
   const homeActions = quickActions(state);
+  // Keeping an answer drops the error its change raised, so it doesn't sit under the next question.
+  const keepAnswer = () => {
+    setEditing(null);
+    setError("");
+  };
   const anchorNow = () => transcriptRef.current.active?.node.id ?? visible[visible.length - 1]?.nodeId ?? "hello";
   const scrollToNode = (nodeId: string) =>
     thread.current
@@ -553,6 +605,7 @@ function ChatApp() {
         addAsk(ctx, anchorNow(), {
           question: "I need to reschedule",
           answer: `Here are ${first}’s open times. Pick one and I’ll move your visit.`,
+          awaiting: "move",
         });
         setSheet({ name: "reschedule" });
         break;
@@ -750,7 +803,7 @@ function ChatApp() {
                   pending={pending || busy || (!settled && !editingNode)}
                   error={error || (dockNode.id === "code" ? state.chat.codeError : "") || undefined}
                   onSubmit={(value) => void answer(value)}
-                  onCancel={editingNode ? () => setEditing(null) : undefined}
+                  onCancel={editingNode ? keepAnswer : undefined}
                 />
               ) : dockInput.kind === "widget" ? (
                 <div className="dock-inner dock-widget">
@@ -760,7 +813,7 @@ function ChatApp() {
                     </button>
                   )}
                   {editingNode ? (
-                    <button type="button" className="dock-link" onClick={() => setEditing(null)}>
+                    <button type="button" className="dock-link" onClick={keepAnswer}>
                       Keep my answer
                     </button>
                   ) : null}
@@ -773,7 +826,7 @@ function ChatApp() {
                     initial={dockValue}
                     busy={busy || pending}
                     onAnswer={(value) => void answer(value)}
-                    onCancel={editingNode ? () => setEditing(null) : undefined}
+                    onCancel={editingNode ? keepAnswer : undefined}
                   />
                   {error ? (
                     <p className="composer-error" role="alert">

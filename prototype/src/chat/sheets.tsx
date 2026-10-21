@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { formatPhone } from "../model/fixtures";
 import type { Notification, Profile, Scenario } from "../model/types";
-import { addTask, clinicianName, receipt, skipToVisitDay, track, type ChatContext } from "./agent";
+import { addTask, clinicianName, receipt, reminderTimes, skipToVisitDay, track, type ChatContext } from "./agent";
 import {
   STAGES,
   deriveTranscript,
@@ -1519,7 +1519,7 @@ function Choices({ state, ctx }: { state: ChatJourney; ctx: ChatContext }) {
         label="Text reminders"
         description={
           hasPhone
-            ? "A text the day before and an hour before your visit."
+            ? `A text ${reminderTimes(state)} your visit.`
             : "Available once you add a mobile number."
         }
         checked={hasPhone && state.profile.sms}
@@ -1648,8 +1648,8 @@ function SkipSheet({ state, ctx, close }: SheetProps) {
       <div className="sh-preview">
         <ReviewerNote>Preview only. Real patients wait for their visit day.</ReviewerNote>
         <p className="sh-body">
-          In real life, the days before your visit would pass here, and Legion would remind you
-          the day before and an hour before.
+          In real life, the time before your visit would pass here, and Legion would remind you{" "}
+          {reminderTimes(state)}.
         </p>
         <p className="sh-body">
           Skipping moves the preview clock to 14 minutes before your visit, just after check{"\u2011"}in opens.

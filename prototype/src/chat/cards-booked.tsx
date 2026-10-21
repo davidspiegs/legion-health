@@ -1,11 +1,14 @@
 import { CalendarPlus, CalendarX2, Check, CreditCard, RefreshCw, Video } from "lucide-react";
 import { formatDate, formatTime } from "../model/fixtures";
+import { reminderTimes } from "./agent";
 import { lateFees } from "./clinicians";
 import { FIRST_VISIT_LENGTH } from "./env";
 import { clinicianById } from "./inventory";
 import { priceLine } from "./script";
 import type { CardMap, CardProps } from "./registry";
 import "./cards-booked.css";
+
+const upperFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** Hands the patient a generated file to keep, such as a calendar invite or a visit summary. */
 export function saveFile(name: string, text: string, type: string) {
@@ -68,7 +71,7 @@ function Booked({ state, ctx }: CardProps) {
     (state.chat.prep === "yes" && (state.chat.briefApproved || state.chat.briefSkipped));
   const steps = [
     { label: "Get ready", detail: "Optional, about three minutes", done: prepped },
-    { label: "Reminders", detail: "The day before and an hour before", done: state.visitDay },
+    { label: "Reminders", detail: upperFirst(reminderTimes(state)), done: state.visitDay },
     { label: "Your video visit", detail: `With ${first}, about ${FIRST_VISIT_LENGTH}`, done },
     { label: `Your plan from ${first}`, detail: "Reviewed and signed by your clinician", done: state.carePlan.status === "published" },
   ];

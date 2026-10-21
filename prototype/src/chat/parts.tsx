@@ -61,8 +61,41 @@ export function QuickActions({
   onPick: (id: string) => void;
   busy?: boolean;
 }) {
+  const row = useRef<HTMLDivElement>(null);
+  // On a phone the row scrolls sideways; a fade shows at whichever edge has more.
+  const [more, setMore] = useState({ before: false, after: false });
+  useEffect(() => {
+    const el = row.current;
+    if (!el) return;
+    const update = () => {
+      const before = el.scrollLeft > 4;
+      const after = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+      setMore((last) => (last.before === before && last.after === after ? last : { before, after }));
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer?.disconnect();
+    };
+  }, [actions.length]);
+  // A second tap on the same action before the first has landed would ask twice.
+  const lastPick = useRef({ id: "", at: 0 });
+  const pick = (id: string) => {
+    const at = Date.now();
+    if (lastPick.current.id === id && at - lastPick.current.at < 900) return;
+    lastPick.current = { id, at };
+    onPick(id);
+  };
   return (
-    <div className="quick-actions" role="group" aria-label={`Ask ${ASSISTANT.name}`}>
+    <div
+      ref={row}
+      className={`quick-actions ${more.before ? "more-before" : ""} ${more.after ? "more-after" : ""}`}
+      role="group"
+      aria-label={`Ask ${ASSISTANT.name}`}
+    >
       {actions.map(({ id, label, icon: Icon, tone }, index) => (
         <button
           type="button"
@@ -70,7 +103,7 @@ export function QuickActions({
           className={`quick-action ${tone === "preview" ? "preview" : ""}`}
           style={{ ["--i" as string]: index }}
           disabled={busy}
-          onClick={() => onPick(id)}
+          onClick={() => pick(id)}
         >
           <Icon size={16} strokeWidth={2} aria-hidden="true" />
           {label}
@@ -96,13 +129,20 @@ export function PatientBubble({
   onEdit: () => void;
   enter: boolean;
 }) {
+  // A new answer lands right under the finger that sent it; a quick second tap shouldn't reopen it.
+  const [armed, setArmed] = useState(!enter);
+  useEffect(() => {
+    if (armed) return;
+    const timer = setTimeout(() => setArmed(true), 750);
+    return () => clearTimeout(timer);
+  }, [armed]);
   return (
     <div className={`msg from-patient ${enter ? "enter" : ""}`}>
       {editable ? (
         <button
           type="button"
           className={`bubble ${latest ? "is-latest" : ""}`}
-          onClick={onEdit}
+          onClick={armed ? onEdit : undefined}
           aria-label={`Change your answer: ${text}`}
         >
           <span>{text}</span>

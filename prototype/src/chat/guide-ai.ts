@@ -512,7 +512,11 @@ const EMERGENCY: RegExp[] = [
 
 const INTENTS: { intent: GuideAnswer["intent"]; pattern: RegExp }[] = [
   { intent: "medication", pattern: /\b(?:med|meds|medication|medications|adderall|vyvanse|ritalin|stimulants?|ssris?|prescri\w*|refills?|dose|doses|dosage|pills?|xanax|lexapro|zoloft|sertraline|wellbutrin)\b/ },
-  { intent: "changes", pattern: /\b(?:cancel\w*|reschedul\w*|refunds?|(?:move|change|switch) my (?:visit|appointment|time))\b/ },
+  {
+    intent: "changes",
+    pattern:
+      /\b(?:cancel\w*|reschedul\w*|refunds?)\b|\b(?:move|change|switch|push)\b(?:\s+\w+){0,3}?\s+(?:visit|appointment|time|date|day)\b|\b(?:a different|another|an earlier|a later|a new) (?:time|day|date)\b/,
+  },
   { intent: "cost", pattern: /\b(?:cost|costs|price|how much|pay|fee|fees|charge|charged|expensive|afford|copay|deductible|hsa|fsa)\b/ },
   { intent: "insurance", pattern: /\b(?:insurance|insured|insurer|cover|covers|covered|coverage|in-network|in network|out-of-network|out of network|my plan|aetna|cigna|blue ?cross|blue ?shield|bcbs\w*|united|uhc|oscar|humana|medicare|medicaid|tri ?care|kaiser|ambetter|molina|anthem|well ?care)\b/ },
   { intent: "visits", pattern: /\b(?:video|zoom|camera|in-person|in person|visits?|appointments?|sessions?|therapy|therapist)\b/ },

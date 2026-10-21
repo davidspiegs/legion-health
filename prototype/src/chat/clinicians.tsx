@@ -3,7 +3,7 @@ import { Check, CircleAlert, Clock3, Info, LoaderCircle } from "lucide-react";
 import type { Slot } from "../model/types";
 import { formatDate, formatTime } from "../model/fixtures";
 import { journeyNow } from "../model/journey-state";
-import { clinicianName, payerFor, receipt, releaseNotice, slotLabel, type ChatContext } from "./agent";
+import { clinicianFirst, clinicianName, payerFor, receipt, releaseNotice, slotLabel, type ChatContext } from "./agent";
 import {
   CLINICIANS,
   clinicianById,
@@ -171,6 +171,23 @@ export async function settleMove(ctx: ChatContext, slotId: string, fee: boolean)
   });
   const appointment = ctx.get().appointment;
   if (!appointment) return;
+  // A move asked for in the conversation is confirmed there too.
+  const asks = ctx.get().chat.asks;
+  if (asks.some((ask) => ask.awaiting === "move"))
+    ctx.update({
+      chat: {
+        asks: asks.map((ask) =>
+          ask.awaiting === "move"
+            ? {
+                ...ask,
+                awaiting: undefined,
+                answer: `Done. Your visit with ${clinicianFirst(appointment.providerId)} is now ${slotLabel(slotId)} Central.`,
+                actions: ["calendar"],
+              }
+            : ask,
+        ),
+      },
+    });
   const queued = await ctx.api.scheduleReminders(appointment.id).then(
     () => true,
     () => false,

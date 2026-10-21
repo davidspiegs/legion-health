@@ -1011,6 +1011,19 @@ button.bubble:active {
 .quick-actions::-webkit-scrollbar {
   display: none;
 }
+/* A fade at an edge says there are more actions that way. */
+.quick-actions.more-after {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+}
+.quick-actions.more-before {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px);
+  mask-image: linear-gradient(to right, transparent, #000 48px);
+}
+.quick-actions.more-before.more-after {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
+}
 .quick-action {
   position: relative;
   flex: none;

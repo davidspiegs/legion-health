@@ -23,10 +23,11 @@ import type { Ask, AskActionId, ChatJourney } from "./state";
 
 /*
  * Once the onboarding questions are done, the conversation stays open: the patient
- * can ask for common things in one tap, or type anything. One-tap requests are
- * answered from the booking itself. Typed questions go to a language model behind
- * /api/assistant when the deployment has one, after the local crisis check, with
- * Legion's stated policies as the fallback.
+ * can ask for common things in one tap, or type anything. One-tap requests, and
+ * typed questions about the booking's own facts (when it is, what it costs, when
+ * check-in opens), are answered from the booking itself. Other typed questions go
+ * to a language model behind /api/assistant when the deployment has one, after the
+ * local crisis check, with Legion's stated policies as the fallback.
  */
 
 export type QuickId =
@@ -78,12 +79,13 @@ export function quickActions(s: ChatJourney): QuickAction[] {
       { id: "rx", label: "Prescription question", icon: Pill },
       support,
     ];
+  // A short action second, so on a phone the third one peeks in at the edge and the row reads as scrollable.
   return [
     s.visitDay
       ? { id: "join", label: "Join my visit", icon: Video }
       : { id: "when", label: "When is my visit?", icon: CalendarClock },
-    ...(s.chat.prep !== "yes" && !s.visitDay ? [{ id: "prep" as const, label: "Help me get ready", icon: Sparkles }] : []),
     { id: "reschedule", label: "Reschedule", icon: CalendarSync },
+    ...(s.chat.prep !== "yes" && !s.visitDay ? [{ id: "prep" as const, label: "Help me get ready", icon: Sparkles }] : []),
     message,
     { id: "billing", label: "What will I pay?", icon: Receipt },
     support,
@@ -109,7 +111,14 @@ export function billingLine(s: ChatJourney): string {
 export function addAsk(
   ctx: ChatContext,
   anchor: string,
-  ask: { question: string; answer?: string; status?: Ask["status"]; actions?: AskActionId[]; messageId?: string },
+  ask: {
+    question: string;
+    answer?: string;
+    status?: Ask["status"];
+    actions?: AskActionId[];
+    messageId?: string;
+    awaiting?: Ask["awaiting"];
+  },
 ): string {
   const s = ctx.get();
   const id = `ask-${s.chat.asks.length + 1}-${Date.now().toString(36)}`;
@@ -139,6 +148,37 @@ function actionsFor(intent: GuideAnswer["intent"]): AskActionId[] {
   if (intent === "timing" || intent === "visits") return ["calendar"];
   if (intent === "medication" || intent === "clinician" || intent === "other") return ["message"];
   return [];
+}
+
+const ASKS_WHEN = /\b(?:when|what time|what day|which day|what date|date|time)\b/;
+const ABOUT_VISIT = /\b(?:visit|appointment|session|follow-?up)\b/;
+const ABOUT_COST = /\b(?:cost|costs|pay|paying|price|charge|charged|copay|co-pay|bill|billed|owe|fee|fees)\b/;
+const ABOUT_CHECKIN = /\bcheck[\s-]?in\b/;
+/** Asking to change the time is a reschedule, not a question about when. */
+const WANTS_CHANGE = /\b(?:change|move|reschedule|cancel|different|another|earlier|later|push)\b/;
+
+/** Facts about this patient's own booking, answered from the booking as the one-tap answers are. */
+function bookingAnswer(s: ChatJourney, question: string): { answer: string; actions: AskActionId[] } | null {
+  if (!booked(s)) return null;
+  const q = question.toLowerCase().replace(/’/g, "'");
+  if (WANTS_CHANGE.test(q)) return null;
+  const first = clinicianFirst(s.appointment!.providerId);
+  if (ABOUT_CHECKIN.test(q) && ASKS_WHEN.test(q) && s.encounter.status === "not_started")
+    return joinAvailability(s) === "open"
+      ? { answer: `Check-in is open now, right here. ${first} will let you in at the start of your visit.`, actions: ["join"] }
+      : { answer: checkInOpensLine(s), actions: [] };
+  if (ASKS_WHEN.test(q) && ABOUT_VISIT.test(q)) {
+    if (s.encounter.status !== "completed") return { answer: visitWhenLine(s), actions: ["calendar"] };
+    const next = s.followupAppointment?.status === "confirmed" ? s.followupAppointment : null;
+    return next
+      ? {
+          answer: `Your follow-up with ${clinicianFirst(next.providerId)} is ${formatDate(next.start)} at ${formatTime(next.start)} Central, by video.`,
+          actions: [],
+        }
+      : { answer: `Your first visit with ${first} is done. Want to book a follow-up?`, actions: ["followup"] };
+  }
+  if (ABOUT_COST.test(q)) return { answer: billingLine(s), actions: ["message"] };
+  return null;
 }
 
 /** Only what the model needs to answer logistics: no story, notes, or safety answers. */
@@ -199,6 +239,8 @@ export async function answerTyped(ctx: ChatContext, question: string): Promise<{
     flagRisk(ctx, "help", question);
     return { answer: local.text, actions: ["support"] };
   }
+  const fromBooking = bookingAnswer(ctx.get(), question);
+  if (fromBooking) return fromBooking;
   const live = await askModel(ctx.get(), question);
   if (live) return live;
   if (local.forClinician) {

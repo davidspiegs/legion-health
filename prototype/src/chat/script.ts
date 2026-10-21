@@ -12,6 +12,7 @@ import {
   matchInputs,
   receipt,
   releaseNotice,
+  reminderTimes,
   runBenefits,
   runBooking,
   runBrief,
@@ -25,6 +26,7 @@ import {
   verifyCode,
   type ChatContext,
 } from "./agent";
+import { PREVIEW } from "./env";
 import { RISK_ORDER, SCREEN, addFlags, flagRisk, screenFlags, screenLevel } from "./safety";
 import type { ChatJourney, ChatState, RiskSource } from "./state";
 
@@ -1570,8 +1572,8 @@ const ready: Node = {
       s.chat.prep === "later"
         ? `Okay. I’ll check in before ${appointmentDay(s)}, and you can prepare anytime from here.`
         : s.profile.sms
-          ? "You’re ready. I’ll text you the day before and an hour before your visit. You can reply to reschedule."
-          : "You’re ready. Texts are off, so your reminders come by email the day before and an hour before your visit.",
+          ? `You’re ready. I’ll text you ${reminderTimes(s)} your visit. You can reply to reschedule.`
+          : `You’re ready. Texts are off, so your reminders come by email ${reminderTimes(s)} your visit.`,
     ),
   ],
   input: (s) =>
@@ -1580,7 +1582,7 @@ const ready: Node = {
       : {
           kind: "single",
           options: [
-            { value: "skip", label: "Preview: skip to visit day", tone: "preview" },
+            ...(PREVIEW ? [{ value: "skip", label: "Preview: skip to visit day", tone: "preview" as const }] : []),
             { value: "ok", label: "Sounds good", primary: true },
           ],
         },
@@ -1814,6 +1816,7 @@ const followup: Node = {
 const complete: Node = {
   id: "complete",
   stage: "visit",
+  ends: true,
   applies: (s) =>
     visitDone(s) && s.carePlan.status === "published" && (!!s.chat.followup || !!s.followupAppointment),
   say: () => [card("complete")],

@@ -167,3 +167,16 @@ test("an optional step whose moment has passed is left out unanswered, and kept 
   const kept = deriveTranscript(day, { prep: "yes", visitDay: true, checkedIn: false });
   assert.ok(kept.items.some((item) => item.nodeId === "prep" && item.from === "patient"), "an answered step stays in the record");
 });
+
+test("reaching the finish line fills the progress, though it has nothing to answer", () => {
+  const ending: ChatNode<Toy>[] = [
+    script[0],
+    { id: "done", stage: "story", ends: true, say: () => [{ kind: "text", id: "bye", text: "All set" }], answer: () => null },
+  ];
+  const progress = stageProgress(deriveTranscript(ending, { greeted: true, topic: "", state: "", time: "" }));
+  assert.equal(progress.fraction, 1);
+  const waiting = stageProgress(
+    deriveTranscript([script[0], { ...ending[1], ends: undefined }], { greeted: true, topic: "", state: "", time: "" }),
+  );
+  assert.equal(waiting.fraction, 0.5, "a message that isn't the finish line still counts as a step left");
+});

@@ -188,6 +188,26 @@ export function releaseNotice(s: ChatJourney): string {
   return `${held} doesn’t fit ${fit}, so I let it go. Pick a time that works.`;
 }
 
+/**
+ * The reminders a patient is told about are the ones actually scheduled: a visit
+ * booked for later today gets no day-before reminder. Before any are scheduled,
+ * and in preview moments, this is the policy.
+ */
+export function reminderTimes(s: ChatJourney): string {
+  const appointment = s.appointment;
+  const scheduled = appointment
+    ? s.notifications.filter(
+        (item) =>
+          item.kind === "reminder" &&
+          item.status !== "cancelled" &&
+          item.id.startsWith(`${appointment.id}:${appointment.slotId}:`),
+      )
+    : [];
+  const has = (minutes: number) => scheduled.some((item) => item.id.endsWith(`:reminder-${minutes}`));
+  if (!scheduled.length || has(24 * 60)) return "the day before and an hour before";
+  return has(60) ? "an hour before" : "15 minutes before";
+}
+
 export function slotLabel(slotId: string, withDay = true): string {
   const slot = slotById(slotId);
   if (slot) return withDay ? `${formatDate(slot, true)}, ${formatTime(slot)}` : formatTime(slot);
@@ -580,7 +600,7 @@ export async function runBooking(ctx: ChatContext) {
       "Legion scheduling",
     );
     if (reminded)
-      receipt(ctx, "Scheduled reminders the day before and an hour before", "Legion messaging (simulated)");
+      receipt(ctx, `Scheduled reminders ${reminderTimes(ctx.get())}`, "Legion messaging (simulated)");
     // Self-pay patients get the written estimate the No Surprises Act requires with their confirmation.
     const s = ctx.get();
     if (s.coverage === "selfpay" || s.chat.benefitsChoice === "selfpay")

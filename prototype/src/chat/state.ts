@@ -87,6 +87,8 @@ export interface Ask {
   actions?: AskActionId[];
   /** A message sent to the care team; their reply shows under it. */
   messageId?: string;
+  /** Answered again when the visit actually moves, so the conversation confirms it. */
+  awaiting?: "move";
 }
 
 export interface RecordsFound {

@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { applyJourneyPatch } from "../model/journey-state";
 import type { JourneyState } from "../model/types";
 import { setAgentPace, type ChatContext, type ChatPatch } from "./agent";
-import { addAsk, answerTyped, billingLine, quickActions, settleAsk } from "./assistant";
+import { reminderTimes } from "./agent";
+import { addAsk, answerTyped, billingLine, quickActions, settleAsk, visitWhenLine } from "./assistant";
 import { inventory } from "./inventory";
 import { momentState } from "./moments";
 import type { ChatJourney } from "./state";
@@ -68,4 +69,47 @@ test("asks keep their place and settle in place", () => {
   assert.equal(ask.status, "done");
   assert.match(ask.answer, /\$25 estimated copay/);
   assert.match(ask.answer, /\$100/);
+});
+
+test("typed questions about the booking are answered from the booking", async () => {
+  const ctx = context(momentState("booked"));
+  for (const question of ["When is my visit?", "what time is my appointment", "When’s my visit with Maya?"]) {
+    const reply = await answerTyped(ctx, question);
+    assert.equal(reply.answer, visitWhenLine(ctx.state()), question);
+    assert.deepEqual(reply.actions, ["calendar"]);
+  }
+  const cost = await answerTyped(ctx, "How much will I pay for the visit?");
+  assert.equal(cost.answer, billingLine(ctx.state()));
+  const move = await answerTyped(ctx, "Can I change the time of my visit?");
+  assert.deepEqual(move.actions, ["reschedule"], "asking to change the time is a reschedule");
+  assert.notEqual(move.answer, visitWhenLine(ctx.state()));
+});
+
+test("after the first visit, a question about when points to the follow-up", async () => {
+  const done = momentState("complete");
+  const reply = await answerTyped(context({ ...done, followupAppointment: null }), "When is my next visit?");
+  assert.match(reply.answer, /done/);
+  assert.deepEqual(reply.actions, ["followup"]);
+});
+
+test("a short action comes second, so the next one peeks in on a phone", () => {
+  assert.equal(quickActions(momentState("booked"))[1].id, "reschedule");
+  assert.equal(quickActions(momentState("visit-day"))[1].id, "reschedule");
+});
+
+test("patients are told only about the reminders actually scheduled", () => {
+  const s = momentState("booked");
+  const appointment = s.appointment!;
+  const reminder = (minutes: number) => ({
+    id: `${appointment.id}:${appointment.slotId}:sms:reminder-${minutes}`,
+    appointmentId: appointment.id,
+    channel: "sms" as const,
+    kind: "reminder" as const,
+    scheduledAt: appointment.start,
+    status: "queued" as const,
+  });
+  assert.equal(reminderTimes({ ...s, notifications: [] }), "the day before and an hour before", "the policy, before any are scheduled");
+  assert.equal(reminderTimes({ ...s, notifications: [reminder(1440), reminder(60), reminder(15)] }), "the day before and an hour before");
+  assert.equal(reminderTimes({ ...s, notifications: [reminder(60), reminder(15)] }), "an hour before", "booked for later today");
+  assert.equal(reminderTimes({ ...s, notifications: [reminder(15)] }), "15 minutes before", "booked at the last minute");
 });

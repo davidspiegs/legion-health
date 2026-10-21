@@ -75,6 +75,8 @@ export interface ChatAnswer {
 export interface ChatNode<S, C = unknown> {
   id: string;
   stage: ChatStage;
+  /** The journey's finish line: once it's reached, there's nothing left to do. */
+  ends?: boolean;
   /** Whether the node belongs to the journey for this state (branching). */
   applies?: (s: S) => boolean;
   say: (s: S) => AgentBlock[];
@@ -204,7 +206,9 @@ export function stageProgress<S, C>(transcript: Transcript<S, C>): {
   const inStage = transcript.path.filter(
     (step) => step.stage === transcript.stage,
   );
-  const done = inStage.filter((step) => step.answered).length;
+  // The finish line has nothing to answer; reaching it completes the stage.
+  const finished = transcript.active?.node.ends ? transcript.active.node.id : "";
+  const done = inStage.filter((step) => step.answered || step.id === finished).length;
   const fraction = inStage.length ? done / inStage.length : 1;
   const remaining = transcript.path.filter(
     (step) => !step.answered && step.stage !== "visit",
