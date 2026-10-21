@@ -577,6 +577,7 @@ const when: Node = {
     confirm: "Continue",
     options: WHEN,
     alternate: { label: "Whatever’s soonest", value: "__soonest" },
+    alternateFirst: true,
   }),
   value: (s) => s.chat.availability.filter((v) => v !== "soonest"),
   answer: (s) =>

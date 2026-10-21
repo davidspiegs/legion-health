@@ -631,6 +631,17 @@ button.bubble:active {
 .replies.grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+/* A one-tap answer that skips the choices, above them. */
+.chip.reply.reply-first {
+  justify-content: center;
+  color: var(--chat-blue-text);
+}
+@media (min-width: 761px) {
+  .chat-dock .reply-first {
+    max-width: 500px;
+    margin-left: auto;
+  }
+}
 .chip.reply {
   width: 100%;
   min-height: 52px;

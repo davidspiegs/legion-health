@@ -39,6 +39,8 @@ export type ChatInput =
       /** Options that clear every other selection when chosen (e.g. "I'm not sure"). */
       exclusive?: string[];
       alternate?: { label: string; value: string };
+      /** Show the alternate as a full-width answer above the options, not a link below. */
+      alternateFirst?: boolean;
     }
   | { kind: "confirm-list"; items: string[]; yes: string; no: string }
   | {

@@ -329,8 +329,14 @@ export function ChoiceControls({
         if (input.exclusive?.includes(value)) return [value];
         return [...current.filter((v) => !input.exclusive?.includes(v)), value];
       });
+    const first = input.alternateFirst ? input.alternate : undefined;
     return (
       <div className="dock-inner">
+        {first ? (
+          <button type="button" className="chip reply reply-first" disabled={busy} onClick={() => answerOnce(first.value)}>
+            {first.label}
+          </button>
+        ) : null}
         <div className="replies grid" {...group("Choose all that apply")}>
           {input.options.map((option, index) => (
             <button
@@ -357,9 +363,9 @@ export function ChoiceControls({
         >
           {selected.length > 1 ? `${input.confirm} with ${selected.length}` : input.confirm}
         </button>
-        {input.alternate || cancel ? (
+        {(input.alternate && !first) || cancel ? (
           <div className="dock-links">
-            {input.alternate ? (
+            {input.alternate && !first ? (
               <button type="button" className="dock-link" onClick={() => answerOnce(input.alternate!.value)}>
                 {input.alternate.label}
               </button>
