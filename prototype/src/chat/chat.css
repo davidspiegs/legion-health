@@ -407,6 +407,10 @@ button.bubble:active {
 .msg.from-patient.enter {
   transform-origin: 100% 100%;
 }
+/* Cards take a moment longer to settle in than a text bubble. */
+.msg.is-card.enter {
+  animation-duration: 560ms;
+}
 @keyframes msg-in {
   from {
     opacity: 0;

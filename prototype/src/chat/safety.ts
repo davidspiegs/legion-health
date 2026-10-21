@@ -34,15 +34,15 @@ export interface ScreenQuestion {
 export const SCREEN: ScreenQuestion[] = [
   {
     id: "now",
-    // Legion's live fit check, word for word.
-    ask: "Do you need immediate help to stay safe? Are you in immediate danger of harming yourself or someone else?",
+    // Legion's live fit check question, worded so "yes" means safe.
+    ask: "Are you safe right now? That means you’re not in immediate danger of harming yourself or someone else.",
     record: (value) =>
-      value === "unsafe" ? "Said they need immediate help to stay safe, or weren’t sure" : "Said they’re safe right now",
-    mine: (value) =>
-      value === "unsafe" ? "you need immediate help to stay safe, or you’re not sure" : "you’re safe right now",
+      value === "unsafe" ? "Said they don’t feel safe right now, or weren’t sure" : "Said they’re safe right now",
+    mine: (value) => (value === "unsafe" ? "you don’t feel safe right now, or you’re not sure" : "you’re safe right now"),
+    // Values name the risk (none, or unsafe), not the words on the buttons.
     options: [
-      { value: "no", label: "No, I’m safe right now" },
-      { value: "unsafe", label: "Yes, or I’m not sure" },
+      { value: "no", label: "Yes, I’m safe right now" },
+      { value: "unsafe", label: "No, I don’t feel safe / Not sure" },
     ],
   },
 ];

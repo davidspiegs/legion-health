@@ -11,7 +11,7 @@ Draft for David's recording. Times are targets. Everything shown is the prototyp
 ## Demo: one conversation, the patient taps, Wren does the work (0:30 to 2:45)
 
 1. **A person-like assistant, honestly disclosed.** "Hi, I’m Wren" in a messaging header. The first card says once, plainly, that Wren is an AI, not a person, and that clinicians make every decision (Texas HB 149).
-2. **Story, not screening.** Conditions as Legion's real choices, or "in my own words" with a read-back the patient confirms. Three logistics checks in one tap. The live fit check's safety question, word for word: "Yes, or I’m not sure" ends with crisis resources, as it does today. No screening is added.
+2. **Story, not screening.** Conditions as Legion's real choices, or "in my own words" with a read-back the patient confirms. Three logistics checks in one tap. The live fit check's safety question, worded so yes means safe ("Are you safe right now?"): "No, I don’t feel safe / Not sure" ends with crisis resources, as it does today. No screening is added.
 3. **Matching with receipts.** The work card shows how the directory narrowed; the best fit and three real evening times are visible immediately. Tap a time: held, not booked.
 4. **Four typed fields.** Phone, code, birth date, then "Is this you?" from the identity network. Coverage was verified while the patient typed their email: plan, network, $25 estimate, source.
 5. **Agreements in plain language,** unchecked, with AI note-taking as a separate switch. Card on file, nothing charged. Booked is its own step.

@@ -1161,7 +1161,7 @@ function allergyShown(s: ChatJourney, text: string): string {
 
 /** Short name for the safety question, kept to its own words (SCREEN in safety.ts). */
 const SCREEN_LABEL: Record<ScreenItem, string> = {
-  now: "Thoughts of harming yourself or someone else right now",
+  now: "Safe right now",
 };
 
 /** Answers worth seeing again. Confirmations and flow choices are left out. */

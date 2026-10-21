@@ -49,10 +49,12 @@ export function useReveal(
     }
     const previous = items[items.indexOf(next) - 1];
     const afterPatient = !previous || previous.from === "patient";
-    // A messaging rhythm: a beat after the patient's answer, then time in proportion
-    // to what was just shown. The thread shows the typing indicator meanwhile.
+    // A messaging rhythm: a thinking beat after the patient's answer, then time in proportion
+    // to what was just shown, a little more before a card. The thread shows the typing
+    // indicator meanwhile.
     const shown = previous?.from === "agent" && previous.block.kind === "text" ? previous.block.text.length : 40;
-    const delay = afterPatient ? 520 : Math.min(950, Math.max(420, shown * 13));
+    const least = next.block.kind === "text" ? 700 : 950;
+    const delay = afterPatient ? 900 : Math.min(1500, Math.max(least, shown * 17));
     timer.current = window.setTimeout(reveal, delay);
     return () => window.clearTimeout(timer.current);
     // The head of the queue is the only pacing trigger.

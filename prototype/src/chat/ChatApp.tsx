@@ -445,7 +445,7 @@ function ChatApp() {
     if (last && last.offsetHeight > el.clientHeight * 0.7) {
       el.scrollTo({ top: last.offsetTop - 12, behavior: reduced ? "auto" : "smooth" });
     } else {
-      el.scrollTo({ top: tailTop(el), behavior: typing || reduced ? "auto" : "smooth" });
+      el.scrollTo({ top: el.scrollHeight, behavior: typing || reduced ? "auto" : "smooth" });
     }
   }, [visible.length, settled, editing, typing, dockInput?.kind, reduced, threadTail]);
 
@@ -457,7 +457,7 @@ function ChatApp() {
     const observer = new ResizeObserver(() => {
       if (!pinned.current || editing) return;
       autoScrollUntil.current = Date.now() + 300;
-      list.scrollTo({ top: tailTop(list) });
+      list.scrollTo({ top: list.scrollHeight });
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -470,7 +470,7 @@ function ChatApp() {
       if (!el || !pinned.current || editing) return;
       const items = [...el.querySelectorAll<HTMLElement>(".thread-item")];
       const active = transcriptRef.current.active?.node.id;
-      const bottom = Math.min(tailTop(el), el.scrollHeight - el.clientHeight);
+      const bottom = el.scrollHeight - el.clientHeight;
       autoScrollUntil.current = Date.now() + 300;
       // Anything newer than the question, like a typed question and its answer, keeps the bottom in view.
       if (!active || items[items.length - 1]?.dataset.node !== active) return el.scrollTo({ top: bottom });
@@ -1145,18 +1145,6 @@ function ThreadIntro() {
       <small>Preview with fictional data. Nothing is sent or charged.</small>
     </div>
   );
-}
-
-/**
- * Where "the newest line in view" lands. Until the first answer, Wren's intro
- * shows whole or not at all, so the first screen never opens on half an avatar.
- */
-function tailTop(el: HTMLElement): number {
-  const intro = el.querySelector<HTMLElement>(".thread-intro");
-  const bottom = el.scrollHeight - el.clientHeight;
-  if (intro && !el.querySelector("[data-answer]") && bottom > 8 && bottom < intro.offsetTop + intro.offsetHeight)
-    return 0;
-  return el.scrollHeight;
 }
 
 /** The reason for the current question, opened under it on request. */

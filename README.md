@@ -6,7 +6,7 @@ Research, journey documentation, and implementation will be developed on a separ
 
 ## Current phase: Wren, Legion's conversational onboarding
 
-The prototype now opens as **one conversation with Wren, Legion’s virtual assistant, from hello to a clinician-completed first visit**. Patients mostly tap; Wren does the work in the background (finding their details, checking coverage, ranking clinicians with reasons, holding and booking a time, gathering records, drafting a brief for the clinician) and every action leaves a receipt. Licensed clinicians make every medical decision, safety rules are deterministic, a person on the care team owns every follow-up, and any answer can be changed. Safety screening is Legion’s live fit-check question, unchanged.
+The prototype now opens as **one conversation with Wren, Legion’s virtual assistant, from hello to a clinician-completed first visit**. Patients mostly tap; Wren does the work in the background (finding their details, checking coverage, ranking clinicians with reasons, holding and booking a time, gathering records, drafting a brief for the clinician) and every action leaves a receipt. Licensed clinicians make every medical decision, safety rules are deterministic, a person on the care team owns every follow-up, and any answer can be changed. Safety screening is Legion’s live fit-check question, worded so “yes” means safe, with nothing added.
 
 - [Design proposal: Wren onboarding](docs/chat-onboarding-design.md)
 - [Language evals: crisis detection and read-back accuracy](docs/language-evals.md)
