@@ -48,7 +48,8 @@ export type Scenario =
   | "clinician-late"
   | "care-plan-delayed"
   | "signin-expired"
-  | "reminder-failed";
+  | "reminder-failed"
+  | "identity-not-found";
 export type Coverage = "selfpay" | "insurance";
 export type ServiceName =
   | "Profile"

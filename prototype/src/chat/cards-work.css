@@ -1,0 +1,993 @@
+/*
+ * Work cards: Wren visibly doing something for the patient, each ending in a
+ * receipt of where the answer came from. Live work gets the motion: a status
+ * circle with a travelling arc, a title a soft light passes over, and steps that
+ * resolve with a check. Finished work folds into a one-line summary.
+ */
+
+/* --------------------------------------------------------------- Work card */
+.card-shell.wk-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
+  padding: 14px 16px 15px 14px;
+  transition:
+    padding 300ms var(--chat-ease),
+    box-shadow 300ms var(--chat-ease),
+    border-color 200ms ease;
+}
+/* Finished work steps back: tighter, no lift, a summary rather than a box. */
+.card-shell.wk-card.is-settled {
+  padding: 12px 14px 12px 12px;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.04);
+}
+
+/* The status circle. */
+.wk-status {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--chat-wash);
+  color: var(--blue);
+}
+/* Live work: a slow arc travels the rim. */
+.wk-status.is-running::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0turn,
+    rgba(58, 104, 233, 0) 0turn,
+    rgba(58, 104, 233, 0) 0.5turn,
+    rgba(58, 104, 233, 0.85) 1turn
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+  animation: wk-spin 1.2s linear infinite;
+}
+/* Waiting on someone else: a still clock, amber, never a fill. */
+.wk-status.is-pending {
+  background: #f3f5f9;
+  color: var(--chat-wait);
+}
+.wk-status.is-failed {
+  background: #f2f4f8;
+  color: #848fa2;
+}
+.wk-check {
+  display: block;
+  width: 20px;
+  height: 20px;
+  overflow: visible;
+}
+.wk-check path,
+.wk-tick path {
+  fill: none;
+  stroke: var(--blue);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+}
+.wk-check path {
+  stroke-width: 2.4;
+}
+/* Done: the circle pops, a ring breathes out once, and the check draws itself. */
+.msg.enter .wk-status.is-done,
+.wk-status.is-done.is-new {
+  animation: wk-pop 460ms var(--chat-ease) both;
+}
+.wk-status.is-done.is-new::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: wk-ping 760ms 80ms ease-out both;
+  pointer-events: none;
+}
+.msg.enter .wk-check path,
+.wk-status.is-new .wk-check path {
+  animation: wk-draw 360ms 140ms var(--chat-ease) both;
+}
+
+/* Words. Their first line sits on the circle's center. */
+.wk-text {
+  min-width: 0;
+  padding-top: 5px;
+}
+.wk-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.wk-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  color: var(--ink);
+}
+.wk-title.is-waiting {
+  color: var(--chat-wait);
+}
+.wk-title.is-new,
+.wk-detail.is-new {
+  animation: wk-swap 260ms var(--chat-ease) both;
+}
+/* While the work runs, a soft light passes over the title. */
+.wk-card.is-running .wk-title {
+  background-image: linear-gradient(100deg, var(--ink) 0 38%, #9ba7bd 50%, var(--ink) 62% 100%);
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: wk-shimmer 2.3s cubic-bezier(0.45, 0.1, 0.4, 1) infinite;
+}
+.wk-card.is-running .wk-title.is-new {
+  animation:
+    wk-swap 260ms var(--chat-ease) both,
+    wk-shimmer 2.3s cubic-bezier(0.45, 0.1, 0.4, 1) infinite;
+}
+.wk-detail,
+.wk-note {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  line-height: 1.42;
+  color: var(--muted);
+}
+/* What still holds after the work is done, such as nothing being booked yet. */
+.wk-note {
+  color: #2f3849;
+}
+/* The receipt: where the answer came from and when, in a quiet line. */
+.wk-receipt {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 12px;
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.wk-card.is-running .wk-receipt,
+.wk-card.is-pending .wk-receipt {
+  margin-top: 10px;
+}
+.wk-code {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Folding: a finished card opens its steps again from anywhere on it. */
+.wk-toggle {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin: -5px -7px -5px 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #8a94a6;
+  display: grid;
+  place-items: center;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+.wk-toggle svg {
+  transition: transform 280ms var(--chat-ease);
+}
+.wk-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.wk-toggle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+}
+.wk-toggle:focus-visible {
+  outline: none;
+}
+.wk-card:has(.wk-toggle:focus-visible) {
+  outline: 2px solid #1f4fd1;
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .wk-card.is-foldable:hover {
+    border-color: #d8dfeb;
+  }
+  .wk-card.is-foldable:hover .wk-toggle {
+    background: #f2f4f8;
+    color: #4b5466;
+  }
+}
+.wk-card.is-foldable:active .wk-toggle {
+  background: #eceff4;
+}
+
+.wk-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 360ms var(--chat-ease),
+    opacity 260ms ease;
+}
+.wk-body.is-closed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 360ms var(--chat-ease),
+    opacity 180ms ease,
+    visibility 0s 360ms;
+}
+.wk-body-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.wk-body-pad {
+  padding: 13px 0 2px;
+}
+.wk-card.is-settled .wk-body-pad {
+  padding: 12px 0 8px;
+}
+
+/* Steps: phases of one job (benefits) or the sources it searched (records). */
+.wk-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 9px;
+}
+.wk-step {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: center;
+  font-size: 14px;
+  line-height: 20px;
+  color: #283041;
+  transition: color 200ms ease;
+}
+.wk-step.is-queued {
+  color: var(--muted);
+}
+.wk-step-mark {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.wk-step-mark i {
+  display: block;
+}
+.is-queued > .wk-step-mark i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px #c6cedb;
+}
+.is-active > .wk-step-mark i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #d9e2f8;
+  border-top-color: var(--blue);
+  animation: wk-spin 0.9s linear infinite;
+}
+.is-done > .wk-step-mark {
+  background: var(--chat-wash);
+}
+.wk-tick {
+  display: block;
+  width: 14px;
+  height: 14px;
+  overflow: visible;
+}
+.wk-tick path {
+  stroke-width: 2.3;
+}
+.msg.enter .is-done > .wk-step-mark,
+.is-done > .wk-step-mark.is-new {
+  animation: wk-pop 400ms var(--chat-ease) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+.msg.enter .wk-tick path,
+.wk-step-mark.is-new .wk-tick path {
+  animation: wk-draw 280ms var(--chat-ease) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 90ms);
+}
+.is-waiting > .wk-step-mark {
+  color: var(--chat-wait);
+}
+.is-none > .wk-step-mark {
+  background: #f2f4f8;
+}
+.is-none > .wk-step-mark i {
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: #a7b0be;
+}
+.wk-step-value {
+  font-size: 13.5px;
+  color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.msg.enter .wk-step-value,
+.wk-step-value.is-new {
+  animation: wk-fade 220ms ease both;
+}
+/* Short labels with longer values, such as a plan name. */
+.wk-steps.is-pairs .wk-step {
+  grid-template-columns: 18px 64px minmax(0, 1fr);
+}
+.wk-steps.is-pairs .wk-step-value {
+  font-size: 14px;
+  color: #283041;
+  text-align: left;
+}
+.wk-body.is-reopened .wk-step {
+  animation: wk-rise 280ms var(--chat-ease) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+
+/* Funnel: how the directory narrowed to the patient's matches. */
+.wk-funnel {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 11px;
+}
+.wk-funnel li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 6px;
+  align-items: baseline;
+}
+.wk-funnel-label {
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: #283041;
+  transition: color 240ms ease;
+}
+/* Criteria still being checked read as pending until their counts land. */
+.wk-funnel:not(.is-settled) .wk-funnel-label {
+  color: var(--muted);
+}
+.wk-funnel-count {
+  font-size: 13.5px;
+  line-height: 1.35;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.wk-funnel-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 2px;
+  background: #eef1f6;
+  overflow: hidden;
+}
+/* While the directory is read, the empty bars wait under a slow sweep. */
+.wk-funnel:not(.is-settled) .wk-funnel-bar {
+  background: linear-gradient(90deg, #eef1f6 0%, #dfe6f3 45%, #eef1f6 90%) 0 0 / 240% 100%;
+  animation: wk-sweep 1.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 120ms);
+}
+.wk-funnel-bar i {
+  display: block;
+  height: 100%;
+  width: var(--w);
+  min-width: 4px;
+  border-radius: inherit;
+  background: #c4d2f6;
+  transform-origin: left center;
+}
+.wk-funnel li.is-result .wk-funnel-label {
+  color: var(--ink);
+  font-weight: 600;
+}
+.wk-funnel li.is-result .wk-funnel-count {
+  color: var(--chat-blue-text);
+}
+.wk-funnel li.is-result .wk-funnel-bar i {
+  background: var(--blue);
+}
+/* First reveal: rows rise in turn. Counts that land later, or a reopened card, replay the narrowing. */
+.msg.enter .wk-funnel li {
+  animation: wk-rise 280ms var(--chat-ease) both;
+  animation-delay: calc(var(--i, 0) * 100ms);
+}
+.wk-funnel-bar i.is-new,
+.wk-body.is-reopened .wk-funnel-bar i {
+  animation: wk-grow 560ms var(--chat-ease) both;
+  animation-delay: calc(var(--i, 0) * 90ms + 60ms);
+}
+.wk-funnel-count.is-new,
+.wk-body.is-reopened .wk-funnel-count {
+  animation: wk-fade 240ms ease both;
+  animation-delay: calc(var(--i, 0) * 90ms + 140ms);
+}
+
+/* A line under folded-away steps, such as how matches were ranked. */
+.wk-caption {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+/* ------------------------------------------------------------ Result cards */
+.card-shell.wk-result {
+  padding: 16px;
+}
+.wk-result-title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.wk-result-sub {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.wk-foot {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+/* A foot after a list sits under a hairline, so the list ends cleanly. */
+.wk-identity .wk-foot,
+.wk-benefits .wk-foot,
+.wk-records .wk-foot,
+.wk-visitday .wk-foot {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eef1f6;
+}
+
+/* Identity: the name leads, then each detail with where it came from. */
+.wk-id-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.wk-id-name {
+  margin: 0;
+  min-width: 0;
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.wk-id-name.is-missing {
+  font-weight: 500;
+  color: var(--muted);
+}
+.wk-facts {
+  margin: 12px 0 0;
+  display: grid;
+}
+.wk-fact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 3px;
+  padding: 11px 0;
+  border-top: 1px solid #eef1f6;
+}
+.wk-fact:last-child {
+  padding-bottom: 2px;
+}
+.wk-fact dt {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+.wk-fact-value {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.wk-fact-value.is-missing {
+  font-weight: 400;
+  color: var(--muted);
+}
+/* Provenance reads like the visit brief's source tags, so the two speak one language. */
+.wk-fact-tag {
+  grid-column: 2;
+  grid-row: 1;
+  flex: none;
+  margin: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f2f4f8;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  color: #4d5869;
+  white-space: nowrap;
+}
+.wk-fact-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Benefits: the plan, the estimate as the number that matters, then what was confirmed. */
+.wk-plan {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: center;
+}
+.wk-plan-icon,
+.wk-source-icon {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--chat-wash);
+  color: var(--blue);
+}
+.wk-plan-icon {
+  width: 36px;
+  height: 36px;
+}
+.wk-plan-text {
+  min-width: 0;
+}
+.wk-plan-name {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.wk-plan-meta {
+  margin: 1px 0 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.wk-cost {
+  margin-top: 14px;
+  padding: 12px 14px 13px;
+  border-radius: 16px;
+  background: #f7f9fc;
+}
+.wk-cost-label {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.wk-cost-value {
+  margin: 1px 0 0;
+  font-size: 15px;
+  line-height: 1.2;
+  color: #2f3849;
+}
+.wk-cost-value strong {
+  margin-right: 3px;
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.wk-cost-sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.wk-cost.is-open .wk-cost-sub {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #3d4657;
+}
+.wk-cost.is-open .wk-cost-sub svg {
+  flex: none;
+  color: #8a94a6;
+}
+.wk-checks {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.wk-checks li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: center;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ink);
+}
+.wk-checks li.is-open {
+  color: var(--muted);
+}
+.wk-checkdot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--chat-wash);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+}
+.is-open > .wk-checkdot {
+  background: #f1f3f7;
+  color: #9aa3b2;
+}
+
+/* Records found: one row per source. */
+.wk-sources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.wk-source {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: center;
+  padding: 11px 0;
+}
+.wk-source:first-child {
+  padding-top: 0;
+}
+.wk-source:last-child {
+  padding-bottom: 0;
+}
+.wk-source + .wk-source {
+  border-top: 1px solid #eef1f6;
+}
+.wk-source-icon {
+  width: 36px;
+  height: 36px;
+}
+.wk-source-name {
+  display: block;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.006em;
+  color: var(--ink);
+}
+.wk-source-meta {
+  display: block;
+  margin-top: 1px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Baseline: two gentle segmented meters, never a red-to-green scale. */
+.wk-scores {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.wk-score-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14.5px;
+  line-height: 1.35;
+}
+.wk-score-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+.wk-score-scale {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.wk-score-value {
+  margin-left: auto;
+  font-size: 13.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.wk-score-value strong {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.wk-meter {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+}
+.wk-meter i {
+  height: 6px;
+  border-radius: 3px;
+  background: #e9edf4;
+}
+.wk-meter i.is-on {
+  background: var(--blue);
+}
+.msg.enter .wk-meter i.is-on {
+  animation: wk-segment 300ms var(--chat-ease) both;
+  animation-delay: calc(var(--i, 0) * 50ms + 160ms);
+}
+
+/* Visit day: marks the jump in time, with the reminders that went out. */
+.wk-day {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  column-gap: 13px;
+  align-items: center;
+}
+/* A small calendar page: the month on a blue band, the date below. */
+.wk-day-tile {
+  width: 46px;
+  height: 50px;
+  border-radius: 12px;
+  border: 1px solid #e3e8f1;
+  background: white;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 17px minmax(0, 1fr);
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.06);
+}
+.wk-day-month {
+  display: grid;
+  place-items: center;
+  background: var(--blue);
+  color: white;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 650;
+}
+.wk-day-date {
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.wk-sent {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid #eef1f6;
+  display: grid;
+  gap: 9px;
+}
+.wk-sent li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: center;
+  font-size: 14px;
+  line-height: 20px;
+  color: #283041;
+}
+.wk-sent-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--chat-wash);
+  color: var(--blue);
+}
+.wk-sent-ago {
+  color: var(--muted);
+}
+.wk-sent li.is-failed {
+  color: var(--muted);
+}
+.wk-sent li.is-failed .wk-sent-mark {
+  background: #f2f4f8;
+  color: #9aa3b2;
+}
+.wk-sent-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #8a94a6;
+}
+.wk-visitday .wk-sent + .wk-foot {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* Read by screen readers in place of a relative time that keeps changing. */
+.wk-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* No stranded single words in titles and explanations. */
+.wk-title,
+.wk-detail,
+.wk-note,
+.wk-step-label,
+.wk-step-value,
+.wk-foot,
+.wk-result-sub,
+.wk-cost-sub,
+.wk-fact-note {
+  text-wrap: pretty;
+}
+
+/* ------------------------------------------------------------------ Motion */
+@keyframes wk-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@keyframes wk-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+@keyframes wk-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -40% 0;
+  }
+}
+/* A small overshoot, then rest. */
+@keyframes wk-pop {
+  0% {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.07);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes wk-ping {
+  from {
+    box-shadow: 0 0 0 0 rgba(58, 104, 233, 0.28);
+  }
+  to {
+    box-shadow: 0 0 0 11px rgba(58, 104, 233, 0);
+  }
+}
+@keyframes wk-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+/* A crossfade that never leaves the line blank. */
+@keyframes wk-swap {
+  from {
+    opacity: 0.3;
+    transform: translateY(2px);
+  }
+}
+@keyframes wk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes wk-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes wk-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes wk-segment {
+  from {
+    background-color: #e9edf4;
+  }
+}
+
+/* Windows high contrast has no gradient text; the title stays plain. */
+@media (forced-colors: active) {
+  .wk-card.is-running .wk-title {
+    background: none;
+    color: CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wk-card,
+  .wk-card *,
+  .wk-card *::before,
+  .wk-card *::after,
+  .wk-result *,
+  .wk-result *::before,
+  .wk-result *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  /* Still: the title reads plainly and the arc becomes a quiet ring. */
+  .wk-card.is-running .wk-title {
+    background: none;
+    color: var(--ink);
+  }
+  .wk-status.is-running::before {
+    background: none;
+    -webkit-mask: none;
+    mask: none;
+    box-shadow: inset 0 0 0 1.5px rgba(58, 104, 233, 0.45);
+  }
+  .is-active > .wk-step-mark i {
+    border-color: var(--blue);
+  }
+  .wk-funnel:not(.is-settled) .wk-funnel-bar {
+    background: #eef1f6;
+  }
+}

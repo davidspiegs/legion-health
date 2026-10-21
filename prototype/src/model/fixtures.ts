@@ -77,7 +77,7 @@ export const providers: Provider[] = [
     firstName: "Maya",
     initials: "MC",
     title: "Psychiatric nurse practitioner",
-    photo: "/images/maya-chen.png",
+    photo: "/images/maya-chen.jpg",
     focuses: ["ADHD", "Anxiety", "Life transitions"],
     description:
       "A thoughtful, collaborative approach. We’ll find a plan that fits your everyday life.",
@@ -176,6 +176,25 @@ export const followupSlots: Slot[] = [
   },
 ];
 
+/**
+ * The conversation generates its own fictional inventory relative to today, so
+ * a reviewer never sees past dates. Registering it here lets the existing
+ * scheduling adapter validate holds and bookings exactly as it does for fixtures.
+ */
+export function extendInventory(extra: {
+  providers?: Provider[];
+  slots?: Slot[];
+  followupSlots?: Slot[];
+}) {
+  const add = <T extends { id: string }>(target: T[], items: T[] = []) => {
+    for (const item of items)
+      if (!target.some((existing) => existing.id === item.id)) target.push(item);
+  };
+  add(providers, extra.providers);
+  add(slots, extra.slots);
+  add(followupSlots, extra.followupSlots);
+}
+
 export function getProvider(id: string): Provider {
   const provider = providers.find((item) => item.id === id);
   if (!provider) throw new Error("Choose a provider to continue.");
@@ -250,6 +269,8 @@ export function validateBirth(
   )
     return "Check your date of birth.";
   const today = new Date();
+  // A date in the future is a typo, not a minor.
+  if (birth > today) return "Check your date of birth.";
   const adultCutoff = new Date(
     Date.UTC(
       today.getUTCFullYear() - 18,

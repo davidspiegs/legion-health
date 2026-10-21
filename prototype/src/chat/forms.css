@@ -1,0 +1,1847 @@
+/* Booking forms: agreements, a card on file, details, another plan and photo ID.
+   Calm and exact, thumb first: one job per element, and the next action always in reach. */
+
+:where(.fm-sheet, .fm-dock, .fm-agree-card, .fm-field, .fm-fieldset) {
+  --fm-line: #e6ebf3;
+  --fm-rule: #eef1f6;
+  --fm-panel: #f7f9fc;
+  --fm-edge: #cfd6e3;
+  --fm-edge-hover: #a9b4c8;
+  --fm-text: #1b2333;
+  --fm-soft-text: #3d4757;
+  --fm-ease: var(--chat-ease, cubic-bezier(0.22, 1, 0.36, 1));
+  --fm-spring: var(--chat-spring, cubic-bezier(0.32, 0.72, 0, 1));
+  --fm-ok: var(--chat-ok, #13824f);
+  --fm-crisis: var(--chat-crisis, #b42318);
+  --fm-link: var(--chat-blue-text, #2d57d2);
+  --fm-wash: var(--chat-wash, #eef3ff);
+}
+
+.fm-sr {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------- sheet layout */
+
+.fm-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.fm-lead {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--fm-soft-text);
+  text-wrap: pretty;
+}
+.fm-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.fm-center {
+  text-align: center;
+}
+.fm-fields {
+  display: grid;
+  gap: 18px;
+}
+.fm-groups {
+  gap: 20px;
+}
+.fm-group {
+  display: grid;
+  gap: 14px;
+}
+.fm-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.fm-row-city {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+}
+
+/* ------------------------------------------------------------- fields */
+
+.fm-field {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+}
+.fm-label {
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.003em;
+  color: #27303f;
+}
+.fm-control {
+  position: relative;
+  min-width: 0;
+}
+.fm-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 52px;
+  padding: 0 15px;
+  border: 1px solid var(--fm-edge);
+  border-radius: 14px;
+  background: white;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.04);
+  -webkit-appearance: none;
+  appearance: none;
+  transition:
+    border-color 180ms ease,
+    box-shadow 200ms var(--fm-ease),
+    background-color 180ms ease;
+}
+.fm-control.has-adornment .fm-input {
+  padding-right: 60px;
+}
+.fm-adornment {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  pointer-events: none;
+}
+.fm-input::placeholder {
+  color: #8a94a6;
+  opacity: 1;
+}
+/* A 2px ring, the same language as the composer, so focus never rests on a faint halo. */
+.fm-field .fm-input:focus {
+  box-shadow:
+    0 0 0 1px var(--blue),
+    0 0 0 5px rgba(58, 104, 233, 0.13);
+}
+.fm-input:disabled {
+  background: #f6f7fa;
+  color: #8b95a7;
+  box-shadow: none;
+}
+@media (hover: hover) {
+  .fm-input:hover:not(:focus):not(:disabled):not([aria-invalid="true"]) {
+    border-color: var(--fm-edge-hover);
+  }
+}
+.fm-input[aria-invalid="true"] {
+  border-color: var(--fm-crisis);
+  background: #fffafa;
+}
+.fm-field .fm-input[aria-invalid="true"]:focus {
+  border-color: var(--fm-crisis) !important;
+  box-shadow:
+    0 0 0 1px var(--fm-crisis),
+    0 0 0 5px rgba(180, 35, 24, 0.11);
+}
+.fm-hint,
+.fm-error {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+.fm-hint {
+  color: var(--muted);
+}
+.fm-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-weight: 500;
+  color: var(--fm-crisis);
+  animation: fm-in 220ms var(--fm-ease) both;
+}
+.fm-error svg {
+  flex: none;
+  margin-top: 1.5px;
+}
+
+/* ------------------------------------------------------------- choices */
+
+/* Native radios under a visual layer, so keyboard and screen readers get the real control. */
+.fm-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.fm-fieldset > legend {
+  margin-bottom: 8px;
+}
+.fm-seg label,
+.fm-tiles label {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.fm-seg input,
+.fm-tiles input {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Segmented: the chosen side lifts, and the lift slides between them. */
+.fm-seg {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--seg-n, 2), minmax(0, 1fr));
+  padding: 4px;
+  border-radius: 15px;
+  background: #eef1f6;
+}
+.fm-seg-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / var(--seg-n, 2));
+  border-radius: 11px;
+  background: white;
+  box-shadow:
+    0 1px 2px rgba(0, 6, 20, 0.1),
+    0 0 0 1px rgba(0, 6, 20, 0.04),
+    0 6px 14px -8px rgba(12, 22, 48, 0.32);
+  transform: translateX(calc(var(--seg-i, 0) * 100%));
+  transition:
+    transform 320ms var(--fm-spring),
+    opacity 180ms ease;
+}
+.fm-seg-thumb.is-empty {
+  opacity: 0;
+}
+.fm-seg label > span {
+  position: relative;
+  z-index: 1;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  font-size: 15.5px;
+  font-weight: 550;
+  color: #4a5465;
+  transition: color 180ms ease;
+}
+.fm-seg input:checked + span {
+  color: var(--ink);
+  font-weight: 600;
+}
+.fm-seg input:focus-visible + span {
+  outline: 2px solid #1f4fd1;
+  outline-offset: -2px;
+}
+.fm-fieldset.is-invalid .fm-seg {
+  box-shadow: inset 0 0 0 1px var(--fm-crisis);
+  background: #fdf1f0;
+}
+
+/* Tiles: a longer list, two to a row, each one a full-size target. */
+.fm-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.fm-tiles label > span {
+  position: relative;
+  height: 100%;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid var(--fm-edge);
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.04);
+  font-size: 15px;
+  font-weight: 550;
+  line-height: 1.25;
+  color: var(--ink);
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 140ms var(--fm-ease);
+}
+.fm-choice-text {
+  min-width: 0;
+  text-wrap: balance;
+}
+.fm-tile-mark {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid white;
+  background: var(--blue);
+  color: white;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 6px -2px rgba(46, 87, 212, 0.6);
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 160ms ease,
+    transform 300ms var(--fm-spring);
+}
+@media (hover: hover) {
+  .fm-tiles input:not(:checked):hover + span {
+    border-color: var(--fm-edge-hover);
+    background: #fbfcfe;
+  }
+}
+.fm-tiles input:active + span {
+  transform: scale(0.985);
+}
+.fm-tiles input:checked + span {
+  border-color: var(--blue);
+  background: var(--fm-wash);
+  box-shadow: inset 0 0 0 1px var(--blue);
+}
+.fm-tiles input:checked + span .fm-tile-mark {
+  opacity: 1;
+  transform: none;
+}
+.fm-tiles input:focus-visible + span {
+  outline: 2px solid #1f4fd1;
+  outline-offset: 2px;
+}
+.fm-fieldset.is-invalid .fm-tiles input:not(:checked) + span {
+  border-color: #e2aaa4;
+}
+
+/* Fields scrolled into view (by focus, Tab or an error) stop above the sticky footer, never behind it. */
+.fm-input,
+.fm-card-input,
+.fm-seg input,
+.fm-tiles input,
+.fm-check-input {
+  scroll-margin: 24px 0 128px;
+}
+
+/* ------------------------------------------------------------- sticky actions */
+
+/* The primary action stays in reach while a long form scrolls beneath it. */
+.fm-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 14px;
+  /* Transparent on top, so content fades as it passes under; solid where the buttons sit. */
+  background: linear-gradient(rgba(255, 255, 255, 0), white 14px);
+  /* A stuck footer sits above the sheet's bottom padding; this paints over content scrolling
+     through that strip without adding scrollable area the way a pseudo-element would. */
+  box-shadow: 0 calc(28px + env(safe-area-inset-bottom, 0px)) 0 16px white;
+}
+.fm-foot-note {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.fm-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  gap: 10px;
+}
+
+/* ------------------------------------------------------------- buttons */
+
+.fm-primary,
+.fm-secondary,
+.fm-applepay {
+  position: relative;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 20px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-size: 16px;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+  text-align: center;
+  overflow: hidden;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 200ms ease,
+    color 180ms ease,
+    transform 140ms var(--fm-ease);
+}
+.fm-primary {
+  border: 1px solid var(--blue);
+  background: var(--blue);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 8px 18px -10px rgba(46, 87, 212, 0.85);
+}
+.fm-primary svg {
+  color: white;
+}
+.fm-secondary {
+  border: 1px solid var(--chat-chip, #d5dcea);
+  background: white;
+  color: var(--ink);
+  font-weight: 550;
+  box-shadow: 0 1px 1px rgba(12, 22, 48, 0.04);
+}
+.fm-secondary svg {
+  color: var(--blue);
+}
+/* Apple Pay's own look: black, white type, nothing else. */
+.fm-applepay {
+  border: 1px solid #000;
+  background: #000;
+  color: white;
+  font-weight: 450;
+}
+.fm-applepay strong {
+  font-weight: 650;
+}
+@media (hover: hover) {
+  .fm-primary:hover:not(:disabled):not(.is-waiting) {
+    border-color: #2f5ad6;
+    background: #2f5ad6;
+  }
+  .fm-secondary:hover:not(:disabled) {
+    border-color: #a9b7d3;
+    background: #fbfcfe;
+  }
+  .fm-applepay:hover:not(:disabled) {
+    background: #1c1c1e;
+  }
+}
+.fm-primary:active:not(:disabled),
+.fm-secondary:active:not(:disabled),
+.fm-applepay:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.fm-primary:disabled,
+.fm-secondary:disabled,
+.fm-applepay:disabled {
+  opacity: 1;
+}
+/* Unavailable reads as unavailable; working keeps its color and shows motion instead. */
+.fm-primary:disabled:not([aria-busy="true"]):not(.is-done),
+.fm-primary.is-waiting {
+  border-color: #c7d1e4;
+  background: #c7d1e4;
+  box-shadow: none;
+}
+.fm-secondary:disabled:not([aria-busy="true"]) {
+  color: #8b95a7;
+}
+.fm-applepay:disabled:not(.is-busy) {
+  opacity: 0.5;
+}
+.fm-primary[aria-busy="true"]::after,
+.fm-applepay.is-busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.22) 50%, transparent 70%);
+  background-size: 240% 100%;
+  animation: fm-sheen 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+/* A capture that just succeeded is a confirmation, not an unavailable button. */
+.fm-primary.is-done {
+  border-color: var(--fm-ok);
+  background: var(--fm-ok);
+  box-shadow: none;
+}
+.fm-spin {
+  animation: fm-spin 900ms linear infinite;
+}
+@keyframes fm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A text link with a full-size touch area that doesn't move the layout. */
+.fm-inline-link,
+.fm-fill {
+  position: relative;
+}
+.fm-inline-link::after,
+.fm-fill::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100% + 12px, 44px);
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+.fm-inline-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fm-link);
+  font-size: inherit;
+  font-weight: 600;
+  line-height: inherit;
+  text-align: left;
+}
+
+/* ------------------------------------------------------------- status */
+
+.fm-status {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--fm-ok);
+}
+.fm-problem {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff3f2;
+  color: var(--fm-crisis);
+  font-size: 14px;
+  line-height: 1.45;
+  animation: fm-in 220ms var(--fm-ease) both;
+}
+.fm-problem svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* ------------------------------------------------------------- dock widgets */
+
+.fm-dock {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.fm-dock-note {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-align: center;
+}
+.fm-dock-note svg {
+  flex: none;
+}
+.fm-dock-error {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--fm-crisis);
+  text-align: center;
+}
+
+/* Agreements in the dock: one row per agreement, the whole row checks its box. */
+.fm-agree-list {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  border: 1px solid #e3e8f1;
+  border-radius: 18px;
+  background: white;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.04);
+}
+.fm-agree-row {
+  position: relative;
+  transition: background-color 220ms var(--fm-ease);
+}
+.fm-agree-row + .fm-agree-row {
+  border-top: 1px solid var(--fm-rule);
+}
+.fm-agree-row.is-checked {
+  background: #f6f9ff;
+}
+.fm-agree-label {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  column-gap: 12px;
+  padding: 11px 14px 12px;
+  cursor: pointer;
+}
+.fm-agree-row.is-notice .fm-agree-label {
+  cursor: default;
+}
+.fm-agree-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+/* The title line leaves room for Read; the summary under it gets the full width. */
+.fm-agree-title {
+  min-height: 22px;
+  padding-right: 54px;
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.006em;
+  color: var(--ink);
+}
+.fm-agree-short {
+  font-size: 13.5px;
+  line-height: 1.38;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.fm-read {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  min-width: 52px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--fm-link);
+  font-size: 14.5px;
+  font-weight: 600;
+  transition: background-color 160ms ease;
+}
+@media (hover: hover) {
+  .fm-read:hover {
+    background: var(--fm-wash);
+  }
+}
+.fm-read:active {
+  background: var(--fm-wash);
+}
+
+/* The box: unchecked until the patient checks it, with a small pop when they do. */
+.fm-check-input {
+  position: absolute;
+  z-index: 1;
+  top: 11px;
+  left: 14px;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.fm-box,
+.fm-agree-mark {
+  width: 24px;
+  height: 24px;
+  margin-top: -1px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+}
+.fm-box {
+  /* 3:1 against white and the checked row's tint. */
+  border: 1.5px solid #8390a8;
+  background: white;
+  color: white;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 220ms ease;
+}
+.fm-box svg {
+  opacity: 0;
+  transform: scale(0.4) rotate(-12deg);
+  transition:
+    opacity 120ms ease,
+    transform 320ms var(--fm-spring);
+}
+.fm-check-input:checked + .fm-box {
+  border-color: var(--blue);
+  background: var(--blue);
+  animation: fm-tick 340ms var(--fm-spring);
+}
+.fm-check-input:checked + .fm-box svg {
+  opacity: 1;
+  transform: none;
+}
+.fm-check-input:focus-visible + .fm-box {
+  outline: 2px solid #1f4fd1;
+  outline-offset: 2px;
+}
+.fm-agree-mark {
+  background: var(--fm-wash);
+  color: var(--blue);
+}
+/* Agree pressed early: what's left lights up once, then waits with a blue box. */
+.fm-agree-row.is-nudged .fm-box {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(58, 104, 233, 0.16);
+}
+.fm-agree-row.is-nudged[data-nudge="1"] {
+  animation: fm-nudge-a 1000ms var(--fm-ease);
+}
+.fm-agree-row.is-nudged[data-nudge="0"] {
+  animation: fm-nudge-b 1000ms var(--fm-ease);
+}
+
+/* The optional AI choice sits apart from the agreements, on its own tint. */
+.fm-switch-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 8px 12px 14px;
+  border-radius: 18px;
+  background: var(--fm-panel);
+  color: var(--ink);
+}
+.fm-switch-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.fm-switch-label {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.006em;
+  cursor: pointer;
+}
+.fm-switch-more {
+  display: block;
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+.fm-switch-description {
+  color: var(--muted);
+  cursor: pointer;
+}
+.fm-switch-row.is-disabled .fm-switch-label,
+.fm-switch-row.is-disabled .fm-switch-description {
+  cursor: default;
+}
+.fm-switch-button {
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.fm-switch-button:disabled {
+  opacity: 0.5;
+}
+/* The state in words, so on and off never rest on color alone. */
+.fm-switch-state {
+  width: 3ch;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: right;
+}
+.fm-switch-row.is-on .fm-switch-state {
+  color: var(--ink);
+}
+/* The off track holds 3:1 against the row and the thumb. */
+.fm-switch {
+  position: relative;
+  flex: none;
+  width: 50px;
+  height: 30px;
+  border-radius: 15px;
+  background: #8692a9;
+  transition: background-color 240ms ease;
+}
+.fm-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  color: var(--blue);
+  box-shadow:
+    0 2px 4px rgba(0, 6, 20, 0.2),
+    0 0 0 0.5px rgba(0, 6, 20, 0.05);
+  display: grid;
+  place-items: center;
+  transition: transform 320ms var(--fm-spring);
+}
+.fm-switch-thumb svg {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.fm-switch-row.is-on .fm-switch {
+  background: var(--blue);
+}
+.fm-switch-row.is-on .fm-switch-thumb {
+  transform: translateX(20px);
+}
+.fm-switch-row.is-on .fm-switch-thumb svg {
+  opacity: 1;
+}
+
+/* Agree stays at the bottom of the dock while the list scrolls on short screens. */
+.fm-sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: grid;
+  gap: 6px;
+  margin-top: -4px;
+  padding-top: 10px;
+  background: linear-gradient(rgba(255, 255, 255, 0), white 12px);
+  /* Paints the dock's bottom padding while the button is stuck over scrolling rows. */
+  box-shadow: 0 calc(14px + env(safe-area-inset-bottom, 0px)) 0 14px white;
+}
+.fm-nudge {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 550;
+  line-height: 1.4;
+  color: var(--fm-link);
+  text-align: center;
+  animation: fm-in 220ms var(--fm-ease) both;
+}
+/* Kept in place while empty, so it can announce the moment it has something to say. */
+.fm-nudge:not(.is-shown) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* Card on file in the dock: the fastest option first, full width on a phone, a pair on wider screens. */
+.fm-pay {
+  gap: 10px;
+}
+@media (min-width: 600px) {
+  .fm-pay {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fm-pay > :not(button) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ------------------------------------------------------------- agreements in the thread */
+
+.fm-agree-card {
+  display: grid;
+  gap: 12px;
+}
+.fm-agree-card h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.fm-agree-card-head {
+  display: grid;
+  gap: 4px;
+}
+.fm-agree-card-when {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.fm-tick {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--fm-ok);
+  color: white;
+  display: grid;
+  place-items: center;
+}
+/* Each document stays one tap away, as quiet chips rather than a second checklist. */
+.fm-doc-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 6px;
+}
+.fm-doc-chip {
+  min-height: 38px;
+  padding: 0 11px 0 9px;
+  border: 1px solid var(--fm-line);
+  border-radius: 999px;
+  background: var(--fm-panel);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 140ms var(--fm-ease);
+}
+.fm-doc-chip svg {
+  color: var(--blue);
+}
+.fm-doc-chip:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) {
+  .fm-doc-chip:hover {
+    border-color: #c9d3e6;
+    background: white;
+  }
+}
+.fm-doc-chip {
+  position: relative;
+}
+.fm-doc-chip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 44px;
+  transform: translateY(-50%);
+}
+.fm-agree-card-foot {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--fm-rule);
+  font-size: 13.5px;
+  line-height: 1.42;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------- reading an agreement */
+
+.fm-doc {
+  gap: 18px;
+}
+.fm-doc-head {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.fm-doc-hero {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--fm-wash);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+}
+.fm-doc-head h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.016em;
+  color: var(--ink);
+}
+.fm-doc-summary {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--fm-panel);
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--fm-text);
+  text-wrap: pretty;
+}
+.fm-doc-sections {
+  display: grid;
+  margin-top: -4px;
+}
+.fm-doc-section {
+  display: grid;
+  gap: 4px;
+  padding: 14px 0;
+}
+.fm-doc-section + .fm-doc-section {
+  border-top: 1px solid var(--fm-rule);
+}
+.fm-doc-section h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -0.006em;
+  color: var(--ink);
+}
+.fm-doc-section p {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #2a3445;
+  text-wrap: pretty;
+}
+.fm-doc-choice {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--ink);
+}
+/* Notes for reviewers carry the preview's dashed edge, so they never read as policy. */
+.fm-doc-note {
+  padding: 10px 12px;
+  border: 1px dashed #c3cde3;
+  border-radius: 12px;
+}
+
+/* ------------------------------------------------------------- card on file */
+
+.fm-summary {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--fm-panel);
+}
+.fm-summary-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: white;
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.08);
+}
+.fm-summary-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.fm-summary-copy p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--fm-soft-text);
+  text-wrap: pretty;
+}
+.fm-summary-copy .fm-summary-title {
+  font-size: 15.5px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -0.008em;
+  color: var(--ink);
+}
+
+/* The card's own fields share one box, the way payment forms do. */
+.fm-cardset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.fm-cardset > legend {
+  margin-bottom: 8px;
+}
+.fm-card {
+  border: 1px solid var(--fm-edge);
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.04);
+  transition: background-color 180ms ease;
+}
+.fm-card.is-locked {
+  background: #f6f7fa;
+  box-shadow: none;
+}
+.fm-card-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--fm-edge);
+}
+.fm-card-cell {
+  position: relative;
+  min-width: 0;
+  transition: background-color 180ms ease;
+}
+.fm-card-cell.is-number {
+  border-radius: 13px 13px 0 0;
+}
+.fm-card-cell.is-expiry {
+  border-radius: 0 0 0 13px;
+}
+.fm-card-cell.is-cvc {
+  border-left: 1px solid var(--fm-edge);
+  border-radius: 0 0 13px 0;
+}
+.fm-card-cell::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: -1px;
+  border-radius: 14px 14px 0 0;
+  box-shadow: inset 0 0 0 0 transparent;
+  pointer-events: none;
+  transition: box-shadow 180ms ease;
+}
+.fm-card-cell.is-expiry::after {
+  border-radius: 0 0 0 14px;
+}
+.fm-card-cell.is-cvc::after {
+  border-radius: 0 0 14px 0;
+}
+.fm-card-cell:focus-within::after {
+  box-shadow: inset 0 0 0 2px var(--blue);
+}
+.fm-card-cell.is-invalid {
+  background: #fff8f7;
+}
+.fm-card-cell.is-invalid::after {
+  box-shadow: inset 0 0 0 1.5px var(--fm-crisis);
+}
+.fm-card-cell.is-invalid:focus-within::after {
+  box-shadow: inset 0 0 0 2px var(--fm-crisis);
+}
+.fm-card-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 52px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.fm-card .fm-card-input:focus {
+  outline: 0;
+  box-shadow: none;
+}
+.fm-card-input::placeholder {
+  color: #8a94a6;
+  opacity: 1;
+}
+.fm-card-input:disabled {
+  color: #8b95a7;
+}
+.fm-card-cell.is-number .fm-card-input {
+  padding-right: 68px;
+}
+.fm-card-brand {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  color: #97a1b3;
+  pointer-events: none;
+}
+.fm-card-brand.is-known {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: #eef1f6;
+  color: #27303f;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  animation: fm-pop 260ms var(--fm-spring) both;
+}
+.fm-card-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+/* A reviewer shortcut, dashed like the preview code in the composer. */
+.fm-fill {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px dashed #b9c4dc;
+  border-radius: 999px;
+  background: white;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 550;
+}
+.fm-fill:disabled {
+  opacity: 0.5;
+}
+.fm-callout {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #f0dcb8;
+  border-radius: 16px;
+  background: #fffaf1;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--fm-text);
+}
+.fm-callout p {
+  margin: 0;
+}
+.fm-callout strong {
+  font-weight: 650;
+}
+.fm-bank {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px 18px 22px;
+  border-radius: 20px;
+  background: var(--fm-panel);
+  text-align: center;
+  animation: fm-rise 300ms var(--fm-ease) both;
+}
+.fm-bank-icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: white;
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 18px -10px rgba(12, 22, 48, 0.4);
+  animation: fm-pop 360ms var(--fm-spring) 80ms both;
+}
+.fm-bank h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.014em;
+}
+.fm-bank p {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--fm-text);
+}
+.fm-bank .fm-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+.fm-bank h3:focus,
+.fm-id-head h3:focus,
+.fm-id-center h3:focus {
+  outline: none;
+}
+
+/* ------------------------------------------------------------- another plan */
+
+.fm-scan {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px dashed #b9c6e3;
+  border-radius: 18px;
+  background: #f8faff;
+  color: var(--ink);
+  text-align: left;
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease,
+    transform 140ms var(--fm-ease);
+}
+.fm-scan:disabled {
+  opacity: 1;
+}
+.fm-scan:active:not(:disabled) {
+  transform: scale(0.99);
+}
+@media (hover: hover) {
+  .fm-scan:hover:not(:disabled) {
+    border-color: #8fa5d8;
+  }
+}
+.fm-scan-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: white;
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.08);
+}
+.fm-scan-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.fm-scan-copy strong {
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.fm-scan-copy span {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.fm-scan.is-done {
+  border-style: solid;
+  border-color: #c4e5d2;
+  background: #f3faf6;
+}
+.fm-scan.is-done .fm-scan-icon {
+  color: var(--fm-ok);
+  animation: fm-pop 320ms var(--fm-spring) both;
+}
+
+/* ------------------------------------------------------------- photo ID */
+
+/* Steps share one height so the sheet's top edge doesn't jump between them. */
+.fm-idcheck {
+  min-height: min(560px, 68dvh);
+}
+.fm-step {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  animation: fm-rise 300ms var(--fm-ease) both;
+}
+.fm-idcheck .fm-step {
+  flex: 1;
+}
+.fm-step.is-result {
+  grid-template-rows: auto 1fr;
+}
+.fm-step.is-result .fm-id-center {
+  align-content: center;
+  padding-bottom: 28px;
+}
+.fm-id-progress {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+.fm-id-progress i {
+  position: relative;
+  height: 4px;
+  border-radius: 4px;
+  background: #e6eaf2;
+  overflow: hidden;
+}
+.fm-id-progress i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--blue);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 420ms var(--fm-ease);
+}
+.fm-id-progress i.is-filled::after {
+  transform: none;
+}
+.fm-id-intro {
+  display: grid;
+  gap: 16px;
+}
+.fm-id-hero {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: var(--fm-wash);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+}
+.fm-id-head {
+  display: grid;
+  gap: 6px;
+}
+.fm-id-head h3,
+.fm-id-center h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.016em;
+  color: var(--ink);
+}
+.fm-id-head p,
+.fm-id-center p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--fm-soft-text);
+  text-wrap: pretty;
+}
+.fm-id-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--fm-line);
+  border-radius: 18px;
+}
+.fm-id-steps li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.fm-id-steps li + li {
+  border-top: 1px solid var(--fm-rule);
+}
+.fm-id-step-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--fm-wash);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+}
+.fm-id-steps strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.fm-id-steps li > span:last-child > span {
+  display: block;
+  margin-top: 1px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.fm-notice {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--fm-panel);
+}
+.fm-notice > svg {
+  margin-top: 2px;
+  color: var(--blue);
+}
+.fm-notice p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fm-text);
+  text-wrap: pretty;
+}
+.fm-notice .fm-note {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* A simulated viewfinder: the frame shows what to do; no camera is ever opened. */
+.fm-frame {
+  position: relative;
+  aspect-ratio: 1.45;
+  border-radius: 20px;
+  background: radial-gradient(120% 90% at 50% 38%, #f4f7fc 0%, #e7ecf4 100%);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.fm-frame.is-face {
+  aspect-ratio: 1.2;
+}
+/* On a wide dialog the frame stays camera-sized rather than filling the width. */
+.fm-step > .fm-frame {
+  width: 100%;
+  max-width: 440px;
+  justify-self: center;
+}
+.fm-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--blue);
+  transition: border-color 220ms ease;
+}
+.fm-corner.is-tl {
+  top: 14px;
+  left: 14px;
+  border-right: 0;
+  border-bottom: 0;
+  border-top-left-radius: 12px;
+}
+.fm-corner.is-tr {
+  top: 14px;
+  right: 14px;
+  border-left: 0;
+  border-bottom: 0;
+  border-top-right-radius: 12px;
+}
+.fm-corner.is-bl {
+  bottom: 14px;
+  left: 14px;
+  border-right: 0;
+  border-top: 0;
+  border-bottom-left-radius: 12px;
+}
+.fm-corner.is-br {
+  bottom: 14px;
+  right: 14px;
+  border-left: 0;
+  border-top: 0;
+  border-bottom-right-radius: 12px;
+}
+.fm-idcard {
+  width: 64%;
+  aspect-ratio: 1.586;
+  padding: 7%;
+  border-radius: 12px;
+  background: white;
+  box-shadow:
+    0 1px 2px rgba(0, 6, 20, 0.08),
+    0 0 0 1px rgba(0, 6, 20, 0.04),
+    0 18px 30px -22px rgba(12, 22, 48, 0.5);
+  display: grid;
+  grid-template-columns: 30% minmax(0, 1fr);
+  align-items: center;
+  gap: 9%;
+}
+.fm-idcard-photo {
+  aspect-ratio: 3 / 4;
+  border-radius: 6px;
+  background: #dfe5f1;
+}
+.fm-idcard-lines {
+  display: grid;
+  gap: 8px;
+}
+.fm-idcard-lines i {
+  height: 6px;
+  border-radius: 3px;
+  background: #e3e8f2;
+}
+.fm-idcard-lines i:nth-child(1) {
+  width: 92%;
+}
+.fm-idcard-lines i:nth-child(2) {
+  width: 70%;
+}
+.fm-idcard-lines i:nth-child(3) {
+  width: 48%;
+}
+.fm-oval {
+  width: 44%;
+  aspect-ratio: 0.8;
+  border-radius: 50%;
+  border: 3px solid var(--blue);
+  background: rgba(255, 255, 255, 0.6);
+  display: grid;
+  place-items: center;
+  color: #9aa6bd;
+  transition: border-color 220ms ease;
+}
+/* A slow sweep while the frame waits, the way a scanner looks for an edge. */
+.fm-scanline {
+  position: absolute;
+  z-index: 1;
+  top: 9%;
+  left: 9%;
+  right: 9%;
+  height: 82%;
+  pointer-events: none;
+  animation: fm-sweep 2.4s var(--fm-ease) infinite alternate;
+}
+.fm-scanline::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(58, 104, 233, 0), rgba(58, 104, 233, 0.85), rgba(58, 104, 233, 0));
+  box-shadow: 0 0 14px 3px rgba(58, 104, 233, 0.22);
+}
+.fm-frame.is-captured .fm-corner,
+.fm-frame.is-captured .fm-oval {
+  border-color: var(--fm-ok);
+}
+/* A brief shutter flash says the photo was taken. */
+.fm-frame.is-captured::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: white;
+  opacity: 0;
+  animation: fm-flash 380ms ease-out;
+}
+.fm-frame-check {
+  position: absolute;
+  z-index: 2;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fm-ok);
+  color: white;
+  box-shadow: 0 10px 24px -10px rgba(19, 130, 79, 0.7);
+  animation: fm-pop 340ms var(--fm-spring) both;
+}
+.fm-id-center {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 22px 8px 6px;
+  text-align: center;
+}
+.fm-id-center p {
+  max-width: 34ch;
+}
+.fm-id-badge {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fm-wash);
+  color: var(--blue);
+}
+.fm-id-badge.is-done {
+  background: #e8f6ee;
+  color: var(--fm-ok);
+  box-shadow: 0 0 0 10px rgba(19, 130, 79, 0.06);
+  animation: fm-pop 380ms var(--fm-spring) both;
+}
+.fm-id-shimmer {
+  width: 148px;
+  height: 4px;
+  margin-top: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #e6ebf3 0%, #b8c8f5 50%, #e6ebf3 100%);
+  background-size: 200% 100%;
+  animation: fm-shimmer 1.3s linear infinite;
+}
+
+/* ------------------------------------------------------------- motion */
+
+@keyframes fm-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes fm-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+@keyframes fm-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+@keyframes fm-tick {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.86);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes fm-nudge-a {
+  0%,
+  100% {
+    background-color: rgba(238, 243, 255, 0);
+  }
+  28% {
+    background-color: rgba(222, 232, 255, 1);
+  }
+}
+@keyframes fm-nudge-b {
+  0%,
+  100% {
+    background-color: rgba(238, 243, 255, 0);
+  }
+  28% {
+    background-color: rgba(222, 232, 255, 1);
+  }
+}
+@keyframes fm-sweep {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(100% - 2px));
+  }
+}
+@keyframes fm-flash {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes fm-sheen {
+  from {
+    background-position: 140% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@keyframes fm-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+@keyframes fm-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-step,
+  .fm-bank,
+  .fm-bank-icon,
+  .fm-frame-check,
+  .fm-id-badge.is-done,
+  .fm-scan.is-done .fm-scan-icon,
+  .fm-card-brand.is-known {
+    animation: fm-fade 160ms ease both;
+  }
+  .fm-spin,
+  .fm-frame.is-captured::after,
+  .fm-scanline,
+  .fm-id-shimmer,
+  .fm-error,
+  .fm-problem,
+  .fm-nudge,
+  .fm-agree-row.is-nudged[data-nudge],
+  .fm-check-input:checked + .fm-box,
+  .fm-primary[aria-busy="true"]::after,
+  .fm-applepay.is-busy::after {
+    animation: none;
+  }
+  .fm-scanline {
+    display: none;
+  }
+  .fm-box,
+  .fm-box svg,
+  .fm-switch,
+  .fm-switch-thumb,
+  .fm-switch-thumb svg,
+  .fm-seg-thumb,
+  .fm-seg label > span,
+  .fm-tiles label > span,
+  .fm-tile-mark,
+  .fm-id-progress i::after,
+  .fm-primary,
+  .fm-secondary,
+  .fm-applepay,
+  .fm-input,
+  .fm-card,
+  .fm-card-cell,
+  .fm-card-cell::after,
+  .fm-agree-row,
+  .fm-doc-chip,
+  .fm-scan {
+    transition: none;
+  }
+  .fm-box svg {
+    transform: none;
+  }
+  .fm-primary:active:not(:disabled),
+  .fm-secondary:active:not(:disabled),
+  .fm-applepay:active:not(:disabled),
+  .fm-tiles input:active + span,
+  .fm-scan:active:not(:disabled) {
+    transform: none;
+  }
+}

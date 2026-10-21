@@ -46,7 +46,7 @@ button:disabled {
 button:focus-visible,
 a:focus-visible,
 summary:focus-visible {
-  outline: 3px solid #9bb6ff;
+  outline: 2px solid #1f4fd1;
   outline-offset: 3px;
 }
 input:not([type="checkbox"]):focus,
@@ -1301,7 +1301,7 @@ h3 {
   color: var(--blue);
 }
 .condition-option:has(input:focus-visible) {
-  outline: 3px solid #a6baf0;
+  outline: 2px solid #1f4fd1;
   outline-offset: 3px;
 }
 .fit-screen .screen-main,

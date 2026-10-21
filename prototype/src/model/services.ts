@@ -1015,6 +1015,8 @@ export function createMockApi({
           const appointment = currentAppointment();
           if (appointment.status !== "confirmed")
             throw new Error("Only an upcoming visit can be rescheduled.");
+          if (getState().encounter.status !== "not_started")
+            throw new Error("This visit has already started, so it can’t be moved now.");
           const slot = getSlot(slotId);
           if (
             !slots.some((item) => item.id === slotId) ||
