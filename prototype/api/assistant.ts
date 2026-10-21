@@ -4,9 +4,52 @@ import Anthropic from "@anthropic-ai/sdk";
  * Wren's answers to typed questions after onboarding. The app runs its own crisis
  * check before calling this, and shows the crisis lines itself. Without an API key
  * the endpoint answers 503 and the app falls back to Legion's stated policies.
+ *
+ * It spends money on every call, so it only answers this site's own pages, limits
+ * how often one caller can ask, and caps the reply at what a few sentences need.
+ * Production would add Vercel Firewall rate limiting, which holds across instances,
+ * and a spend limit on the API key.
  */
 
 const MODEL = "claude-opus-5-5";
+
+/** One to three sentences of JSON fit well inside this. */
+const MAX_TOKENS = 600;
+
+/** Per caller, per instance: generous for a patient, useless for running up a bill. */
+const RATE_WINDOW_MS = 10 * 60_000;
+const RATE_LIMIT = 20;
+const recentCalls = new Map<string, number[]>();
+
+function withinLimit(caller: string, now = Date.now()): boolean {
+  const calls = (recentCalls.get(caller) ?? []).filter((at) => now - at < RATE_WINDOW_MS);
+  const allowed = calls.length < RATE_LIMIT;
+  if (allowed) calls.push(now);
+  // An instance serves many callers; keep the table from growing without bound.
+  if (recentCalls.size > 5_000) recentCalls.clear();
+  recentCalls.set(caller, calls);
+  return allowed;
+}
+
+/** Browsers send Origin on every POST; only this deployment's own pages get an answer. */
+function fromThisSite(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  try {
+    const host = new URL(origin).host;
+    return [new URL(request.url).host, request.headers.get("x-forwarded-host"), request.headers.get("host")].includes(host);
+  } catch {
+    return false;
+  }
+}
+
+function callerOf(request: Request): string {
+  return (
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
+}
 
 const ACTIONS = ["calendar", "reschedule", "message", "support", "followup", "join"] as const;
 
@@ -62,6 +105,8 @@ function readContext(value: unknown): Record<string, string> {
 export async function POST(request: Request): Promise<Response> {
   if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN)
     return Response.json({ error: "not_configured" }, { status: 503 });
+  if (!fromThisSite(request)) return Response.json({ error: "forbidden" }, { status: 403 });
+  if (!withinLimit(callerOf(request))) return Response.json({ error: "busy" }, { status: 429 });
 
   let body: { question?: unknown; context?: unknown };
   try {
@@ -76,7 +121,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const response = await client.beta.messages.create({
       model: MODEL,
-      max_tokens: 4096,
+      max_tokens: MAX_TOKENS,
       // A safety decline is retried on the model Anthropic recommends for that category.
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",

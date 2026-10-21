@@ -12,7 +12,7 @@ The prototype now opens as **one conversation with Wren, Legion’s virtual assi
 - [Language evals: crisis detection and read-back accuracy](docs/language-evals.md)
 - Run locally from `prototype/` with `npm run dev`, then open `http://127.0.0.1:5174/`.
 - **Preview tools** (top of the rail on desktop, or Help on mobile; hidden with `?preview=0`) jump to any moment, trigger recovery scenarios, and show the simulated inbox, the clinician's view of the intake with the care-team queue, the funnel events as they fire, and the agent-ready question graph.
-- Typed questions after booking are answered by `api/assistant.ts` (Claude Opus 5.5) when `ANTHROPIC_API_KEY` is set in the deployment; locally and without a key, the app answers from Legion's stated policies.
+- Typed questions after booking are answered by `api/assistant.ts` (Claude Opus 5.5) when `ANTHROPIC_API_KEY` is set in the deployment; locally and without a key, the app answers from Legion's stated policies. The endpoint answers only the site's own pages, rate-limits each caller and caps reply length; set a spend limit on the key when you add it.
 - The approved screen-based baseline (`baseline-v1`) remains at `?experience=classic`, and its review mode at `?review=1`.
 - `npm test` runs the baseline suites plus the conversation engine, inventory, reconciliation, background-job, language-eval and synthetic-patient safety suites.
 
