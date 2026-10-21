@@ -52,6 +52,50 @@ export function TypingBubble() {
 }
 
 /** Things the patient can always ask for once they're booked: one tap each. */
+/*
+ * A repeated tap shouldn't land on controls that appeared after the tap before it: the
+ * next question's answers, a sheet, the dock after a change closes. It's dropped when it
+ * comes within 600 ms of that tap (a double tap), or within 400 ms of the controls
+ * appearing while that tap is under 1.2 s old (tapping again because nothing seemed to
+ * happen). Deliberate taps, keyboard presses and controls already on screen go through.
+ */
+const DOUBLE_TAP_MS = 600;
+const JUST_SHOWN_MS = 400;
+const RETAP_MS = 1200;
+let lastTapAt = -Infinity;
+let shieldInstalled = false;
+
+/** Records when a container's controls appeared, for the double-tap shield. */
+export function markShown(el: HTMLElement | null) {
+  if (el) el.dataset.shownAt = String(performance.now());
+}
+
+export function useDoubleTapShield() {
+  useEffect(() => {
+    if (shieldInstalled) return;
+    shieldInstalled = true;
+    window.addEventListener(
+      "click",
+      (event) => {
+        // Keyboard and programmatic clicks carry no tap count.
+        if (event.detail === 0) return;
+        const now = performance.now();
+        const previous = lastTapAt;
+        lastTapAt = now;
+        const shown = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-shown-at]") : null;
+        const shownAt = Number(shown?.dataset.shownAt);
+        if (!shown || shownAt <= previous) return;
+        const doubleTap = now - previous < DOUBLE_TAP_MS;
+        const retap = now - shownAt < JUST_SHOWN_MS && now - previous < RETAP_MS;
+        if (!doubleTap && !retap) return;
+        event.preventDefault();
+        event.stopPropagation();
+      },
+      true,
+    );
+  }, []);
+}
+
 export function QuickActions({
   actions,
   onPick,

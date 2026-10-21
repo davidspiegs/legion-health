@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { formatDate, formatTime } from "../model/fixtures";
 import { joinAvailability } from "../model/journey-state";
-import { clinicianFirst, stamp, type ChatContext } from "./agent";
+import { clinicianFirst, lateFees, stamp, type ChatContext } from "./agent";
 import { FIRST_VISIT_LENGTH, PREVIEW } from "./env";
 import { answerQuestion, type GuideAnswer } from "./guide-ai";
 import { flagRisk } from "./safety";
@@ -104,7 +104,10 @@ export function checkInOpensLine(s: ChatJourney): string {
 }
 
 export function billingLine(s: ChatJourney): string {
-  return `You’ll pay ${priceLine(s)}. You’re charged after each visit, not before. Changing a visit within 48 hours, or missing it, costs $100.`;
+  const fees = lateFees(s);
+  const agreed =
+    fees === 1 ? ", plus the $100 late-change fee you agreed to" : fees > 1 ? `, plus $${fees * 100} in late-change fees you agreed to` : "";
+  return `You’ll pay ${priceLine(s)}${agreed}. You’re charged after each visit, not before. Changing a visit within 48 hours, or missing it, costs $100.`;
 }
 
 /** Adds a question to the thread and returns its id, so a reply can land on it later. */
@@ -150,24 +153,41 @@ function actionsFor(intent: GuideAnswer["intent"]): AskActionId[] {
   return [];
 }
 
-const ASKS_WHEN = /\b(?:when|what time|what day|which day|what date|date|time)\b/;
-const ABOUT_VISIT = /\b(?:visit|appointment|session|follow-?up)\b/;
-const ABOUT_COST = /\b(?:cost|costs|pay|paying|price|charge|charged|copay|co-pay|bill|billed|owe|fee|fees)\b/;
+const ASKS_WHEN = /\b(?:when|what time|what day|which day|what date|date|time|today|tonight|tomorrow|how early|how soon)\b/;
+/** The clinician's own name counts: "when do I see Maya?" is a question about the visit. */
+const aboutVisit = (first: string) =>
+  new RegExp(
+    String.raw`\b(?:visits?|appointments?|appts?|sessions?|follow[\s-]?ups?|(?:see|seeing|meet|meeting)\s+(?:${first.toLowerCase()}|my clinician|the clinician|her|him|them))\b`,
+  );
+const ABOUT_COST = /\b(?:costs?|pay|paying|price|charge|charged|copay|co-pay|bill|billed|owe|fees?)\b|\bhow much\b(?!\s+(?:time|longer))/;
 const ABOUT_CHECKIN = /\bcheck[\s-]?in\b/;
 /** Asking to change the time is a reschedule, not a question about when. */
-const WANTS_CHANGE = /\b(?:change|move|reschedule|cancel|different|another|earlier|later|push)\b/;
+const WANTS_CHANGE =
+  /\b(?:chang\w*|move|moving|moved|reschedul\w*|cancel\w*|swap\w*|switch\w*|push(?:ed|ing)?\s+(?:it|my|the|back)|earlier|(?:a\s+)?(?:different|another|new|later)\s+(?:time|day|date|slot))\b/;
 
 /** Facts about this patient's own booking, answered from the booking as the one-tap answers are. */
-function bookingAnswer(s: ChatJourney, question: string): { answer: string; actions: AskActionId[] } | null {
+export function bookingAnswer(s: ChatJourney, question: string): { answer: string; actions: AskActionId[] } | null {
   if (!booked(s)) return null;
   const q = question.toLowerCase().replace(/’/g, "'");
-  if (WANTS_CHANGE.test(q)) return null;
   const first = clinicianFirst(s.appointment!.providerId);
+  if (WANTS_CHANGE.test(q)) {
+    // Moving or cancelling the visit is a booking action with its own button. Other changes
+    // (a different clinician, a plan) aren't about the booking and go to the model.
+    const aboutTheVisit =
+      /\b(?:reschedul\w*|cancel\w*|time|day|date|slot)\b/.test(q) || aboutVisit(first).test(q);
+    if (!aboutTheVisit || s.encounter.status === "completed") return null;
+    const lead = /\bcancel\w*/.test(q)
+      ? `To cancel, a person on the care team can help: open Help, then Talk to a person. You can also pick a new time with ${first} here.`
+      : `You can pick a new time with ${first} here.`;
+    return { answer: `${lead} Changing a visit within 48 hours, or missing it, costs $100.`, actions: ["reschedule"] };
+  }
+  // "When do I pay?" is about money, so cost is read before time.
+  if (ABOUT_COST.test(q)) return { answer: billingLine(s), actions: ["message"] };
   if (ABOUT_CHECKIN.test(q) && ASKS_WHEN.test(q) && s.encounter.status === "not_started")
     return joinAvailability(s) === "open"
       ? { answer: `Check-in is open now, right here. ${first} will let you in at the start of your visit.`, actions: ["join"] }
       : { answer: checkInOpensLine(s), actions: [] };
-  if (ASKS_WHEN.test(q) && ABOUT_VISIT.test(q)) {
+  if (ASKS_WHEN.test(q) && aboutVisit(first).test(q)) {
     if (s.encounter.status !== "completed") return { answer: visitWhenLine(s), actions: ["calendar"] };
     const next = s.followupAppointment?.status === "confirmed" ? s.followupAppointment : null;
     return next
@@ -177,8 +197,31 @@ function bookingAnswer(s: ChatJourney, question: string): { answer: string; acti
         }
       : { answer: `Your first visit with ${first} is done. Want to book a follow-up?`, actions: ["followup"] };
   }
-  if (ABOUT_COST.test(q)) return { answer: billingLine(s), actions: ["message"] };
   return null;
+}
+
+/** Crisis and emergency words are recognized on the device, from the words alone; no model decides that. */
+export function urgentQuestion(question: string): boolean {
+  const { intent } = answerQuestion(question);
+  return intent === "crisis" || intent === "emergency";
+}
+
+/**
+ * A typed question still being answered when the page closed can't finish now, so it
+ * says so. Crisis words still get the crisis lines: those never wait on anything.
+ */
+export function recoverAsks(asks: Ask[]): Ask[] {
+  return asks.map((ask) =>
+    ask.status !== "thinking"
+      ? ask
+      : urgentQuestion(ask.question)
+        ? { ...ask, status: "done", answer: answerQuestion(ask.question).text, actions: ["support"] }
+        : {
+            ...ask,
+            status: "done",
+            answer: "This question didn’t finish before the page reloaded. Ask it again and I’ll answer.",
+          },
+  );
 }
 
 /** Only what the model needs to answer logistics: no story, notes, or safety answers. */

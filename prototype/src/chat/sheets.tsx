@@ -46,6 +46,7 @@ import {
   type Transcript,
 } from "./engine";
 import { ASSISTANT, PREVIEW } from "./env";
+import { bookingAnswer } from "./assistant";
 import { answerQuestion, type GuideAnswer } from "./guide-ai";
 import { clinicianById, type Clinician } from "./inventory";
 import type { Moment } from "./moments";
@@ -863,7 +864,11 @@ function HelpSheet({ state, ctx, data }: SheetProps) {
   const ask = (raw: string) => {
     const question = raw.trim().slice(0, 300);
     if (!question) return;
-    const reply = answerQuestion(question);
+    const local = answerQuestion(question);
+    // After booking, questions about the booking itself are answered from it, as in the chat.
+    // Crisis help is decided first, from the words alone.
+    const booking = urgency(local) ? null : bookingAnswer(ctx.get(), question);
+    const reply: GuideAnswer = booking ? { ...local, text: booking.answer, forClinician: false } : local;
     setExchanges((items) => [...items, { id: items.length + 1, question, reply }]);
     setDraft("");
     if (reply.forClinician) {

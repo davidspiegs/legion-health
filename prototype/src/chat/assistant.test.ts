@@ -3,11 +3,20 @@ import assert from "node:assert/strict";
 import { applyJourneyPatch } from "../model/journey-state";
 import type { JourneyState } from "../model/types";
 import { setAgentPace, type ChatContext, type ChatPatch } from "./agent";
-import { reminderTimes } from "./agent";
-import { addAsk, answerTyped, billingLine, quickActions, settleAsk, visitWhenLine } from "./assistant";
+import { clinicianFirst, reminderTimes } from "./agent";
+import {
+  addAsk,
+  answerTyped,
+  billingLine,
+  checkInOpensLine,
+  quickActions,
+  recoverAsks,
+  settleAsk,
+  visitWhenLine,
+} from "./assistant";
 import { inventory } from "./inventory";
 import { momentState } from "./moments";
-import type { ChatJourney } from "./state";
+import type { Ask, ChatJourney } from "./state";
 
 setAgentPace(0);
 inventory();
@@ -112,4 +121,81 @@ test("patients are told only about the reminders actually scheduled", () => {
   assert.equal(reminderTimes({ ...s, notifications: [reminder(1440), reminder(60), reminder(15)] }), "the day before and an hour before");
   assert.equal(reminderTimes({ ...s, notifications: [reminder(60), reminder(15)] }), "an hour before", "booked for later today");
   assert.equal(reminderTimes({ ...s, notifications: [reminder(15)] }), "15 minutes before", "booked at the last minute");
+});
+
+test("a crisis question cut off by a reload still gets the crisis lines", () => {
+  const ask = (id: string, question: string, status: Ask["status"] = "thinking"): Ask => ({
+    id,
+    at: "",
+    anchor: "ready",
+    question,
+    answer: status === "done" ? "Answered." : "",
+    status,
+  });
+  const before = [
+    ask("a", "I took too many of my pills"),
+    ask("b", "honestly I don’t want to be alive anymore"),
+    ask("c", "When is my visit?"),
+    ask("d", "What will I pay?", "done"),
+  ];
+  const [overdose, crisis, plain, done] = recoverAsks(before);
+  assert.match(overdose.answer, /911/);
+  assert.match(crisis.answer, /988/);
+  for (const reply of [overdose, crisis]) {
+    assert.equal(reply.status, "done");
+    assert.deepEqual(reply.actions, ["support"]);
+  }
+  assert.match(plain.answer, /didn’t finish/);
+  assert.equal(done, before[3], "answered questions are left alone");
+});
+
+test("visit questions are understood however they're worded", async () => {
+  const ctx = context(momentState("booked"));
+  const first = clinicianFirst(ctx.state().appointment!.providerId);
+  const when = visitWhenLine(ctx.state());
+  for (const question of [
+    `what day am I seeing ${first}`,
+    `When do I see ${first}?`,
+    "What time is my appt?",
+    "Is my appointment today?",
+    "What time is my visit later today?",
+  ])
+    assert.equal((await answerTyped(ctx, question)).answer, when, question);
+  for (const question of ["How much is my visit?", "When do I pay for my visit?", "Is there a fee if I miss it?"])
+    assert.equal((await answerTyped(ctx, question)).answer, billingLine(ctx.state()), question);
+  assert.equal((await answerTyped(ctx, "How early can I check in?")).answer, checkInOpensLine(ctx.state()));
+  for (const question of [
+    "Can my visit time be changed?",
+    "I'm thinking about rescheduling my appointment time",
+    "I need a new time for my visit",
+    "Could I swap my appointment time?",
+    "Can I cancel my visit?",
+  ]) {
+    const reply = await answerTyped(ctx, question);
+    assert.deepEqual(reply.actions, ["reschedule"], question);
+    assert.notEqual(reply.answer, when, question);
+  }
+  assert.notDeepEqual((await answerTyped(ctx, "Can I switch clinicians?")).actions, ["reschedule"]);
+});
+
+test("cost answers include a late-change fee the patient agreed to", () => {
+  const s = momentState("booked");
+  const moved = {
+    ...s,
+    chat: {
+      ...s.chat,
+      receipts: [
+        ...s.chat.receipts,
+        {
+          id: "moved",
+          at: "",
+          actor: "Legion AI" as const,
+          action: "Moved your visit to Thu, Oct 22, 6:30 PM, with the $100 late-change fee you agreed to",
+          source: "Legion scheduling",
+        },
+      ],
+    },
+  };
+  assert.match(billingLine(moved), /plus the \$100 late-change fee you agreed to/);
+  assert.doesNotMatch(billingLine(s), /fee you agreed to/);
 });

@@ -29,6 +29,8 @@ import {
   PatientBubble,
   QuickActions,
   TypingBubble,
+  markShown,
+  useDoubleTapShield,
 } from "./parts";
 import { registerCards, renderCard } from "./cards";
 import { SCRIPT } from "./script";
@@ -51,7 +53,9 @@ import {
   billingLine,
   checkInOpensLine,
   quickActions,
+  recoverAsks,
   settleAsk,
+  urgentQuestion,
   visitWhenLine,
   type QuickId,
 } from "./assistant";
@@ -108,15 +112,7 @@ function restore(): ChatJourney {
             ),
           ),
           // A typed question still being answered when the page closed can't finish now.
-          asks: ((saved.chat.asks || []) as Ask[]).map((ask) =>
-            ask.status === "thinking"
-              ? {
-                  ...ask,
-                  status: "done" as const,
-                  answer: "This question didn’t finish before the page reloaded. Ask it again and I’ll answer.",
-                }
-              : ask,
-          ),
+          asks: recoverAsks((saved.chat.asks || []) as Ask[]),
         },
       };
       return withKnownSlots(restored);
@@ -399,6 +395,7 @@ function ChatApp() {
       }
       if (changed) track(ctx, wasEditing ? "answer_changed" : "step_answered", { node: node.id });
       if (!wasEditing) return;
+      pinned.current = true;
       setEditing(null);
       // Choosing the same answer again just closes the change; nothing is marked as edited.
       if (!changed) return;
@@ -416,8 +413,13 @@ function ChatApp() {
     pinned.current = true;
   }, [activeId]);
 
-  // Asks and care-team replies grow the thread outside the script, so they count toward "something new".
-  const threadTail = `${state.chat.asks.length}:${state.chat.asks.filter((ask) => ask.status === "done").length}:${(state.careMessages ?? []).length}`;
+  // Asks and care-team replies grow the thread outside the script, so they count toward "something new",
+  // including an answer rewritten in place, such as a move being confirmed.
+  const askSize = state.chat.asks.reduce(
+    (size, ask) => size + (ask.status === "done" ? 1 + ask.answer.length + (ask.actions?.length ?? 0) : 0),
+    0,
+  );
+  const threadTail = `${state.chat.asks.length}:${askSize}:${(state.careMessages ?? []).length}`;
 
   // Keep the newest message in view unless the patient has scrolled up to reread.
   useEffect(() => {
@@ -462,40 +464,45 @@ function ChatApp() {
     return () => observer.disconnect();
   }, [dockNode?.id, editing, homeOpen]);
 
-  // Turning the phone, or the keyboard opening, resizes the thread: the newest line stays in view.
+  // Turning the phone reflows the thread; the current question stays in view.
   useEffect(() => {
     const follow = () => {
       const el = thread.current;
       if (!el || !pinned.current || editing) return;
-      // The current question stays in view: all of it when it fits, otherwise from its first line.
+      const items = [...el.querySelectorAll<HTMLElement>(".thread-item")];
       const active = transcriptRef.current.active?.node.id;
-      const start = active ? el.querySelector<HTMLElement>(`.thread-item[data-node="${active}"]`) : null;
       const bottom = Math.min(tailTop(el), el.scrollHeight - el.clientHeight);
       autoScrollUntil.current = Date.now() + 300;
-      el.scrollTo({ top: start ? Math.min(bottom, start.offsetTop - 12) : bottom });
+      // Anything newer than the question, like a typed question and its answer, keeps the bottom in view.
+      if (!active || items[items.length - 1]?.dataset.node !== active) return el.scrollTo({ top: bottom });
+      // Otherwise all of the question when it fits, or from its own text, since a card can come before it.
+      const own = items.filter((item) => item.dataset.node === active);
+      const question = [...own].reverse().find((item) => item.querySelector(".msg.from-agent:not(.is-card)")) ?? own[0];
+      el.scrollTo({ top: Math.min(bottom, question.offsetTop - 12) });
     };
-    // The shell takes its new height a frame later (useMobileViewport), so follow once it has settled.
-    // Text reflows as the width changes, which moves the scroll position; that isn't the reader
-    // scrolling away, so whether the thread was following is read before the layout moves.
+    // Only a change of width moves the view; the keyboard changes only the height. The shell takes
+    // its new size a frame later (useMobileViewport), and the reflow moves the scroll position, which
+    // isn't the reader scrolling away, so whether the thread was following is read first.
+    let width = window.innerWidth;
     let timer = 0;
     let wasPinned = false;
     const onResize = () => {
+      if (window.innerWidth === width) return;
       if (!timer) wasPinned = pinned.current;
       autoScrollUntil.current = Date.now() + 600;
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         timer = 0;
+        width = window.innerWidth;
         if (!wasPinned) return;
         pinned.current = true;
         follow();
       }, 180);
     };
     window.addEventListener("resize", onResize);
-    window.visualViewport?.addEventListener("resize", onResize);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("resize", onResize);
-      window.visualViewport?.removeEventListener("resize", onResize);
     };
   }, [editing]);
 
@@ -571,6 +578,7 @@ function ChatApp() {
   const homeActions = quickActions(state);
   // Keeping an answer drops the error its change raised, so it doesn't sit under the next question.
   const keepAnswer = () => {
+    pinned.current = true;
     setEditing(null);
     setError("");
   };
@@ -625,8 +633,7 @@ function ChatApp() {
         scrollToNode("plan");
         break;
       case "followup":
-        setHomeOpen(false);
-        ctx.edit("followup");
+        openFollowup();
         break;
       case "preview-day":
         setSheet({ name: "skip" });
@@ -637,14 +644,25 @@ function ChatApp() {
     }
   };
 
-  const runAskAction = (action: AskActionId) => {
+  // The follow-up question is shown while it's still open; once answered, it opens to change.
+  const openFollowup = () => {
+    setHomeOpen(false);
+    if (transcriptRef.current.active?.node.id !== "followup") ctx.edit("followup");
+  };
+
+  const runAskAction = (action: AskActionId, askId?: string) => {
     const s = stateRef.current;
     if (action === "calendar" && s.appointment) downloadCalendar(s.appointment.start);
-    if (action === "reschedule") setSheet({ name: "reschedule" });
+    if (action === "reschedule") {
+      // The exchange that offered the move waits for it, so the conversation can confirm it.
+      if (askId)
+        ctx.update({ chat: { asks: s.chat.asks.map((ask) => (ask.id === askId ? { ...ask, awaiting: "move" } : ask)) } });
+      setSheet({ name: "reschedule" });
+    }
     if (action === "message") setSheet({ name: "message" });
     if (action === "support") setSheet({ name: "help" });
     if (action === "checkin-skip") skipToVisitDay(ctx);
-    if (action === "followup") ctx.edit("followup");
+    if (action === "followup") openFollowup();
     if (action === "join") setHomeOpen(false);
   };
 
@@ -652,8 +670,10 @@ function ChatApp() {
     pinned.current = true;
     setAskBusy(true);
     const id = addAsk(ctx, anchorNow(), { question: text, status: "thinking" });
-    // A reply shouldn't land before the question has settled on screen.
-    const [reply] = await Promise.all([answerTyped(ctx, text), new Promise((resolve) => setTimeout(resolve, 650))]);
+    // Crisis lines show at once. Other replies wait a beat, so the question settles on screen first.
+    const reply = urgentQuestion(text)
+      ? await answerTyped(ctx, text)
+      : (await Promise.all([answerTyped(ctx, text), new Promise((resolve) => setTimeout(resolve, 650))]))[0];
     settleAsk(ctx, id, { answer: reply.answer, actions: reply.actions, status: "done" });
     setAskBusy(false);
   };
@@ -684,6 +704,16 @@ function ChatApp() {
   const showHome = booked && settled && !editingNode && homeActions.length > 0 && (!dockInput || homeOpen);
   // While a sheet or the visit room is up, the conversation behind it is out of reach, for screen readers too.
   const covered = visitOpen || !!(sheet && sheetEntry);
+  const dockKey = showHome
+    ? "home"
+    : showDock && dockNode && dockInput
+      ? dockInput.kind === "text"
+        ? "composer"
+        : `${dockNode.id}:${editing ? "edit" : "ask"}`
+      : "";
+  // Answers that just appeared under a finger don't take the second tap of a double tap.
+  useDoubleTapShield();
+  useLayoutEffect(() => markShown(dock.current), [dockKey]);
 
   return (
     <div className={`chat-app ${typing ? "is-typing" : ""}`} ref={app}>
@@ -776,7 +806,7 @@ function ChatApp() {
             <div
               ref={dock}
               className="chat-dock enter"
-              key={dockInput.kind === "text" ? "composer" : `${dockNode.id}:${editing ? "edit" : "ask"}`}
+              key={dockKey}
             >
               {editingNode ? (
                 <p className="dock-context">
@@ -952,7 +982,7 @@ function AskRow({
 }: {
   ask: Ask;
   state: ChatJourney;
-  onAction: (action: AskActionId) => void;
+  onAction: (action: AskActionId, askId: string) => void;
 }) {
   const reply = ask.messageId
     ? (state.careMessages ?? []).find((message) => message.replyTo === ask.messageId)
@@ -973,7 +1003,7 @@ function AskRow({
           {ask.actions?.length ? (
             <div className="ask-actions">
               {ask.actions.map((action) => (
-                <button type="button" key={action} className="ask-action" onClick={() => onAction(action)}>
+                <button type="button" key={action} className="ask-action" onClick={() => onAction(action, ask.id)}>
                   {ASK_ACTION_LABEL[action]}
                 </button>
               ))}
@@ -1034,6 +1064,7 @@ function SheetDialog({ title, onClose, children }: { title: string; onClose: () 
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const titleId = useId();
+  useLayoutEffect(() => markShown(dialog.current), []);
   // Read while the sheet first renders: once it's up, the conversation behind it is inert and has lost focus.
   const [opener] = useState(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null));
   useEffect(() => {

@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -43,7 +44,7 @@ import { STAGES } from "./engine";
 import { ASSISTANT, PREVIEW } from "./env";
 import { mentionsCrisis } from "./guide-ai";
 import { clinicianById } from "./inventory";
-import { AssistantAvatar, LegionMark } from "./parts";
+import { AssistantAvatar, LegionMark, markShown } from "./parts";
 import { SUPPORT_LINES, flagRisk, screenPatientLines } from "./safety";
 import type {
   CardMap,
@@ -1226,6 +1227,8 @@ export function VisitRoom({ state, ctx, close }: OverlayProps) {
   // Back in the chat, focus returns to whatever opened the room. It's read while the room
   // first renders, before the conversation behind it goes inert.
   const [opener] = useState(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null));
+  // The room opens under the finger that checked in; a double tap shouldn't land inside it.
+  useLayoutEffect(() => markShown(room.current), []);
   useEffect(() => {
     room.current?.focus({ preventScroll: true });
     return () => {

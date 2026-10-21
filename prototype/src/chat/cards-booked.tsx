@@ -1,7 +1,6 @@
 import { CalendarPlus, CalendarX2, Check, CreditCard, RefreshCw, Video } from "lucide-react";
 import { formatDate, formatTime } from "../model/fixtures";
-import { reminderTimes } from "./agent";
-import { lateFees } from "./clinicians";
+import { lateFees, reminderTimes } from "./agent";
 import { FIRST_VISIT_LENGTH } from "./env";
 import { clinicianById } from "./inventory";
 import { priceLine } from "./script";

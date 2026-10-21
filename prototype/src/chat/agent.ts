@@ -188,6 +188,14 @@ export function releaseNotice(s: ChatJourney): string {
   return `${held} doesn’t fit ${fit}, so I let it go. Pick a time that works.`;
 }
 
+/** The Terms: a change within 48 hours of a visit, or after its time has passed, costs $100. */
+export const LATE_FEE = "$100 late-change fee";
+
+/** Late-change fees the patient agreed to, counted from the receipts that record each one. */
+export function lateFees(s: ChatJourney): number {
+  return s.chat.receipts.filter((item) => item.action.includes(LATE_FEE)).length;
+}
+
 /**
  * The reminders a patient is told about are the ones actually scheduled: a visit
  * booked for later today gets no day-before reminder. Before any are scheduled,

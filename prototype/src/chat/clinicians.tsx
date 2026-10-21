@@ -3,7 +3,16 @@ import { Check, CircleAlert, Clock3, Info, LoaderCircle } from "lucide-react";
 import type { Slot } from "../model/types";
 import { formatDate, formatTime } from "../model/fixtures";
 import { journeyNow } from "../model/journey-state";
-import { clinicianFirst, clinicianName, payerFor, receipt, releaseNotice, slotLabel, type ChatContext } from "./agent";
+import {
+  LATE_FEE,
+  clinicianFirst,
+  clinicianName,
+  payerFor,
+  receipt,
+  releaseNotice,
+  slotLabel,
+  type ChatContext,
+} from "./agent";
 import {
   CLINICIANS,
   clinicianById,
@@ -51,7 +60,6 @@ const NOTICE = 2 * HOUR;
 const HORIZON = 9 * DAY;
 /** The Terms: a change within 48 hours of a visit, or after its time has passed, costs $100. */
 const FEE_WINDOW = 48 * HOUR;
-const LATE_FEE = "$100 late-change fee";
 
 const PREF_WORD: Record<string, string> = {
   mornings: "mornings",
@@ -146,11 +154,6 @@ function takenSlots(s: ChatJourney): Set<string> {
   return ids;
 }
 
-/** How many late-change fees the patient agreed to, from the receipts that record each one. */
-export function lateFees(s: ChatJourney): number {
-  return s.chat.receipts.filter((item) => item.action.includes(LATE_FEE)).length;
-}
-
 /**
  * A moved visit starts its countdown again: the preview clock returns to real time,
  * reminders follow the new time, and the visit-day steps wait for the new day.
@@ -171,20 +174,24 @@ export async function settleMove(ctx: ChatContext, slotId: string, fee: boolean)
   });
   const appointment = ctx.get().appointment;
   if (!appointment) return;
-  // A move asked for in the conversation is confirmed there too.
+  // A move asked for in the conversation is confirmed there, once: on the newest request.
+  // Older requests the patient walked away from stop waiting and keep what they said.
   const asks = ctx.get().chat.asks;
-  if (asks.some((ask) => ask.awaiting === "move"))
+  const newest = asks.map((ask) => ask.awaiting).lastIndexOf("move");
+  if (newest >= 0)
     ctx.update({
       chat: {
-        asks: asks.map((ask) =>
-          ask.awaiting === "move"
-            ? {
+        asks: asks.map((ask, index) =>
+          ask.awaiting !== "move"
+            ? ask
+            : index !== newest
+              ? { ...ask, awaiting: undefined }
+              : {
                 ...ask,
                 awaiting: undefined,
                 answer: `Done. Your visit with ${clinicianFirst(appointment.providerId)} is now ${slotLabel(slotId)} Central.`,
                 actions: ["calendar"],
-              }
-            : ask,
+              },
         ),
       },
     });
