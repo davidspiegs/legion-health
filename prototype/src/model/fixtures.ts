@@ -1,4 +1,32 @@
-import type { JourneyState, Profile, Provider, Slot } from "./types";
+import type { JourneyState, Profile, Provider, Slot, Step } from "./types";
+
+const reviewFitAnswers: readonly [Step, string][] = [
+  ["fit-state", "yes"],
+  ["fit-age", "yes"],
+  ["fit-coverage", "no"],
+  ["fit-safety", "no"],
+  ["fit-history", "no"],
+  ["fit-virtual", "yes"],
+];
+
+/** Seed completed prerequisites for a review jump, never the question being reviewed. */
+export function reviewIntakeAnswers(
+  step: Step,
+): Pick<JourneyState, "fit" | "conditions" | "goal"> {
+  if (step === "welcome" || step === "fit-exit") {
+    return { fit: {}, conditions: [], goal: "" };
+  }
+  const fitIndex = reviewFitAnswers.findIndex(([id]) => id === step);
+  const completedFit = fitIndex >= 0 ? fitIndex : reviewFitAnswers.length;
+  return {
+    fit: Object.fromEntries(reviewFitAnswers.slice(0, completedFit)),
+    conditions: fitIndex >= 0 || step === "needs" ? [] : ["ADHD"],
+    goal:
+      fitIndex >= 0 || step === "needs" || step === "goal"
+        ? ""
+        : "Understand what’s going on",
+  };
+}
 
 // Exact choices observed in Legion's current intake, including its two open-ended routes.
 export const CONDITION_OPTIONS = [

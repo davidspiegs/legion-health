@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   HeartHandshake,
   MapPin,
@@ -118,16 +118,46 @@ const fitQuestions: {
 export function IntakeScreens(p: ScreenProps) {
   const { state, update, go, api, act, busy, setError, openHelp } = p;
   const choicePending = useRef(false);
-  const advance = async (next: Step, stage: string = state.step) => {
+  const active = useRef(true);
+  const [answersReady, setAnswersReady] = useState(false);
+  useEffect(() => {
+    active.current = true;
+    // A second tap from the previous question must not answer the incoming one.
+    // Keep this aligned with the screen-enter duration; reduced motion has no gate.
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const timer = window.setTimeout(
+      () => setAnswersReady(true),
+      reduced ? 0 : 320,
+    );
+    return () => {
+      active.current = false;
+      window.clearTimeout(timer);
+    };
+  }, []);
+  const advance = async (
+    next: Step,
+    stage: string = state.step,
+    acknowledge = false,
+  ) => {
     const ok = await act(async () => {
-      await api.saveDraft(stage);
+      const reduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      await Promise.all([
+        api.saveDraft(stage),
+        acknowledge && !reduced
+          ? new Promise<void>((resolve) => window.setTimeout(resolve, 200))
+          : Promise.resolve(),
+      ]);
       return true;
     });
-    if (ok) go(next);
+    if (ok && active.current) go(next);
   };
   const chooseAndAdvance = async (patch: Partial<JourneyState>, next: Step) => {
     // Lock before updating state so rapid taps cannot overwrite an answer in flight.
-    if (busy || choicePending.current) return;
+    if (busy || !answersReady || choicePending.current) return;
     choicePending.current = true;
     setError("");
     update(patch);
@@ -140,7 +170,7 @@ export function IntakeScreens(p: ScreenProps) {
         });
         return;
       }
-      await advance(next);
+      await advance(next, state.step, true);
     } finally {
       choicePending.current = false;
     }
@@ -204,7 +234,8 @@ export function IntakeScreens(p: ScreenProps) {
               type="button"
               key={option.value}
               className={`fit-answer ${selected === option.value ? "selected" : ""}`}
-              disabled={busy}
+              disabled={busy || !answersReady}
+              aria-pressed={selected === option.value}
               aria-busy={busy && selected === option.value}
               onClick={() => {
                 const eligible = option.value === fit.positive;
@@ -391,7 +422,8 @@ export function IntakeScreens(p: ScreenProps) {
               type="button"
               key={item.label}
               className={`fit-answer ${state.goal === item.label ? "selected" : ""}`}
-              disabled={busy}
+              disabled={busy || !answersReady}
+              aria-pressed={state.goal === item.label}
               aria-busy={busy && state.goal === item.label}
               onClick={() =>
                 void chooseAndAdvance({ goal: item.label }, "coverage")

@@ -29,6 +29,7 @@ import {
   sampleProfile,
   slots,
   normalizeConditions,
+  reviewIntakeAnswers,
 } from "./model/fixtures";
 import { createMockApi } from "./model/services";
 import { applyJourneyPatch } from "./model/journey-state";
@@ -161,19 +162,10 @@ function reviewFixture(step: Step, scenario: Scenario): JourneyState {
     ...fresh,
     step,
     scenario,
-    conditions: ["ADHD"],
-    goal: "Understand what’s going on",
+    ...reviewIntakeAnswers(step),
     profile: { ...sampleProfile, sms: false },
     providerId: "maya",
     slotId: slots[0].id,
-    fit: {
-      "fit-state": "yes",
-      "fit-age": "yes",
-      "fit-coverage": "no",
-      "fit-safety": "no",
-      "fit-history": "no",
-      "fit-virtual": "yes",
-    },
     payer: "Aetna",
     memberId: "DEMO12345",
   };

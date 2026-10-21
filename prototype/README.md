@@ -11,14 +11,14 @@ npm ci
 npm run dev
 ```
 
-Open [the patient experience](http://127.0.0.1:5174/). Build with `npm run build`; run the 33 state, integration, and viewport regression tests with `npm test`.
+Open [the patient experience](http://127.0.0.1:5174/). Build with `npm run build`; run the 37 state, integration, fixture, and viewport regression tests with `npm test`.
 
 ## Review
 
-- **Patient experience `/`:** the default flow, without review rails. Fit and goal choices advance directly; conditions support multiple native-checkbox selections. Personal details come before email and phone.
+- **Patient experience `/`:** the default flow, without review rails. Fit and goal choices briefly acknowledge the selected answer, then advance; conditions support multiple native-checkbox selections. Personal details come before email and phone.
 - **Preview controls:** the footer outside the patient surface opens a simulation dialog. After booking, advance to appointment day; during the visit, advance the conversation, then send the simulated clinician completion signal. The full journey is accessible in patient mode.
 - **Full review `/?review=1`:** [open the reviewer view](http://127.0.0.1:5174/?review=1) for chapter navigation and the following tools. Switching modes preserves the current local journey.
-- **The flow:** jump to any screen with explicit fictional fixtures. Jumping replaces the review path; it does not complete skipped steps.
+- **The flow:** jump to any screen with explicit fictional fixtures. Jumping replaces the review path; it does not complete skipped steps. Intake shortcuts seed only earlier prerequisites, leaving the current and later questions unanswered.
 - **Recovery:** slot contention, pending or unmatched coverage, unavailable records, payment retry, interrupted visit, and failed save.
 - **Mock activity:** inspect the sanitized local service ledger.
 - **Use sample details:** fills fictional personal details without accepting agreements or records consent.

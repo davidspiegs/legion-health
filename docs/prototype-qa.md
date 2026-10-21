@@ -5,7 +5,7 @@ Verified October 20, 2026 after the insurance, mobile viewport, conditions, test
 ## Build and regression checks
 
 - TypeScript/Vite production build passes.
-- All **33 tests pass**: 24 model/service contracts and 9 viewport sequence regressions. Run `npm test` from `prototype/`.
+- All **37 tests pass**: 24 model/service contracts, 4 review-fixture regressions, and 9 viewport sequence regressions. Run `npm test` from `prototype/`.
 - Insurance tests cover arbitrary nonempty numeric/alphanumeric IDs, a visible checking contract, pending/unmatched responses without invented costs, concurrent request deduplication, stale responses, and invalidation after previously successful verification. Name, birth date, address, payer, member ID, clinician, appointment slot/date, coverage path, and scenario changes require a new check. Email, phone, and navigation changes preserve a current result.
 - Pending/unmatched insurance cannot confirm an insured booking; switching to self-pay requires an explicit choice. Tests retain the existing account/reservation/confirmation, records consent, encounter completion, follow-up, and event-value exclusion contracts.
 - Viewport sequence tests cover retained focus after Safari Done, delayed stale offsets, blur while geometry is still reduced, subsequent field focus, later keyboard-height changes, toolbar changes, hardware keyboards, rotation, pinch zoom, and transient invalid dimensions.
@@ -27,10 +27,16 @@ Browser: Codex in-app Chromium through CUA. The target path was insurance entry 
 | Keyboard-size restoration | Restoring height to 667 while phone remained focused removed typing mode, reset top to 0px, and restored the full screen. This is browser emulation, not iOS proof |
 | Conditions | At 390 × 844, ADHD and Anxiety remained selected with distinct icons and native checkboxes. The longest captured quote, all options, and Continue fit; content scroll height equalled client height (602px) |
 | Testimonials | Three distinct captured patient quotes, honest attribution, discreet selection dots, no pause control. Manual selection stops rotation. Source also retains reduced-motion/hover/focus/hidden-tab handling |
-| Screen transitions | Forward and Back navigation set the appropriate direction and use a 200ms content entrance. The app shell and footer action are outside that animation |
+| Screen transitions | Forward and Back navigation set the appropriate direction and use a 320ms content entrance, following a 200ms answer acknowledgment for fit/goal choices. The app shell and footer action are outside that animation |
 | Desktop | Inspected the fit screen at 1440 × 1000; no horizontal overflow or clipping, and direct-answer navigation and Back remained functional |
 
-Screenshots were saved outside the repository in `/tmp/legion-refinement-qa/` and inspected. Relevant captures: `conditions-390.png`, `insurance-result-390.png`, `insurance-pending-375.png`, `phone-restored-375.png`, and `hosted-coverage-390.png`. Vercel's floating preview toolbar may appear on hosted captures; it is not a patient UI component.
+Screenshots were saved outside the repository in `/tmp/legion-refinement-qa/` and inspected. Relevant captures: `conditions-390.png`, `insurance-result-390.png`, `insurance-pending-375.png`, `phone-restored-375.png`, and `hosted-coverage-390.png`. The answer-state follow-up adds `hosted-fit-unanswered-390.png`. Vercel's floating preview toolbar may appear on hosted captures; it is not a patient UI component.
+
+## Answer-state follow-up
+
+A subsequent review found two separate causes of apparent preselection: touch-compatible blue hover styling and review fixtures that filled all six fit answers. Hover no longer fills or colors the answer card; review fixtures now seed only earlier prerequisites. Back/resume preserves choices that were actually made.
+
+The fresh local flow was exercised from welcome through state, age, coverage, and safety. Every new question had zero selected/pressed answers. The outgoing state visibly retained the chosen answer during acknowledgment; the next state had no selected answer. Back returned to the intentionally chosen “No” on coverage. Jumping directly to safety through review controls also produced two white, unselected cards. Incoming answer controls were observed disabled during the 320ms entrance and enabled afterward; the forced-click automation could not establish a physical rapid-tap timing claim. The 200ms presentation pause is distinct from simulated network latency, and urgent-resource routing bypasses that pause. Reduced-motion behavior is retained in code; a physical iPhone tap/hover test remains outstanding.
 
 ## Keyboard issue and remaining validation
 
@@ -42,10 +48,10 @@ The replacement hook infers keyboard occlusion from actual geometry, restores ze
 
 ## Hosted preview
 
-- [Updated protected preview](https://legion-health-assignment-6wgqwyi43-davidspiegs-projects.vercel.app)
-- [Full journey review](https://legion-health-assignment-6wgqwyi43-davidspiegs-projects.vercel.app/?review=1)
-- Deployment `dpl_8weB9qw7Jg9uar64pYjLZd4EVuU8`: READY, preview (`target: null`, `productionUrl: null`), Vercel authentication protection enabled.
-- Hosted build assets: `index-C6C8aqNq.css`, `index-C_VJjXkY.js`.
-- Opened the deployed patient surface and exercised member ID `1` through checking and the estimated-coverage result; inspected the hosted screenshot and console.
+- [Updated protected preview](https://legion-health-assignment-f6bnnvot0-davidspiegs-projects.vercel.app)
+- [Full journey review](https://legion-health-assignment-f6bnnvot0-davidspiegs-projects.vercel.app/?review=1)
+- Deployment `dpl_D2CDKMyt4TBXoPcSPkJmuQKBLe9y`: READY, preview (`target: null`, `productionUrl: null`), Vercel authentication protection enabled.
+- Hosted build assets: `index-DbV1dscg.css`, `index-DdNGMAEw.js`.
+- On this deployment, walked the fresh fit flow through state, age, coverage, and safety. Each new question had zero selected answers; both safety cards remained white with neutral borders and enabled after entry. Inspected the mobile screenshot and found no console warnings/errors. The preceding deployment also verified member ID `1` through checking and the coverage result; that insurance code is unchanged in this follow-up.
 
 The real Legion patient tab was not interacted with, submitted, or closed during this refinement. No real appointments, payments, messages, or vendor verification requests were created by the prototype.

@@ -375,7 +375,7 @@ textarea {
   scrollbar-width: thin;
   scrollbar-color: #d9e1ec transparent;
   scroll-padding: 18px;
-  animation: screen-enter 200ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: screen-enter 320ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 .patient-app[data-navigation="backward"] {
   --screen-entry-x: -10px;
@@ -1221,9 +1221,10 @@ h3 {
   color: var(--ink);
   background: white;
 }
-.fit-answer:hover:not(:disabled) {
-  border-color: var(--blue);
-  background: #f6f8fd;
+@media (hover: hover) and (pointer: fine) {
+  .fit-answer:hover:not(:disabled):not(.selected) > svg {
+    color: var(--ink);
+  }
 }
 .fit-answer.selected {
   border-color: var(--blue);
