@@ -1,0 +1,281 @@
+export type Step =
+  | "welcome"
+  | "fit-state"
+  | "fit-age"
+  | "fit-coverage"
+  | "fit-safety"
+  | "fit-history"
+  | "fit-virtual"
+  | "fit-exit"
+  | "needs"
+  | "goal"
+  | "coverage"
+  | "match"
+  | "slots"
+  | "name"
+  | "birth"
+  | "address"
+  | "insurance"
+  | "email"
+  | "phone"
+  | "review"
+  | "confirmed"
+  | "records"
+  | "brief"
+  | "visit-home"
+  | "reminders"
+  | "device"
+  | "waiting"
+  | "visit"
+  | "complete"
+  | "followup"
+  | "feedback"
+  | "portal-visits"
+  | "portal-messages"
+  | "portal-account"
+  | "portal-signin"
+  | "health-details";
+export type Scenario =
+  | "standard"
+  | "slot-taken"
+  | "coverage-pending"
+  | "coverage-unmatched"
+  | "records-unavailable"
+  | "payment-retry"
+  | "connection-lost"
+  | "save-retry"
+  | "payment-authentication"
+  | "clinician-late"
+  | "care-plan-delayed"
+  | "signin-expired"
+  | "reminder-failed";
+export type Coverage = "selfpay" | "insurance";
+export type ServiceName =
+  | "Profile"
+  | "Scheduling"
+  | "Sohar"
+  | "Payment"
+  | "Auth"
+  | "Metriport"
+  | "AI care brief"
+  | "Reminders"
+  | "Video"
+  | "Encounter"
+  | "Care team";
+export interface Profile {
+  firstName: string;
+  lastName: string;
+  month: string;
+  day: string;
+  year: string;
+  address: string;
+  city: string;
+  zip: string;
+  email: string;
+  phone: string;
+  sms: boolean;
+}
+export interface Provider {
+  id: string;
+  name: string;
+  firstName: string;
+  initials: string;
+  title: string;
+  photo?: string;
+  focuses: string[];
+  description: string;
+}
+export interface Slot {
+  id: string;
+  start: string;
+  providerId: string;
+}
+export interface Reservation {
+  id: string;
+  slotId: string;
+  providerId: string;
+  expiresAt: number;
+}
+export interface Appointment {
+  id: string;
+  providerId: string;
+  slotId: string;
+  start: string;
+  status: "confirmed" | "joined" | "interrupted" | "completed" | "cancelled";
+  followup?: boolean;
+}
+export interface Eligibility {
+  status: "unverified" | "checking" | "pending" | "unmatched" | "verified";
+  estimate: number | null;
+  checkedAt?: string;
+  activeCoverage?: boolean;
+  networkStatus?: "in-network" | "unknown";
+}
+export interface ServiceEvent {
+  id: string;
+  at: string;
+  service: ServiceName;
+  operation: string;
+  outcome: "pending" | "success" | "error";
+  detail: string;
+}
+export interface PaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+}
+/** Only tokenized synthetic metadata enters the adapter, never a PAN or CVC. */
+export interface PaymentMethodInput {
+  token: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  billingZip: string;
+}
+export interface PaymentSetup {
+  id: string | null;
+  status: "empty" | "processing" | "requires_action" | "succeeded" | "failed";
+  method: PaymentMethod | null;
+  previousMethod?: PaymentMethod | null;
+  error?: string;
+}
+export interface Notification {
+  id: string;
+  appointmentId: string;
+  channel: "email" | "sms";
+  kind: "confirmation" | "reminder" | "rescheduled" | "cancelled" | "care-plan";
+  scheduledAt: string;
+  status: "queued" | "delivered" | "failed" | "cancelled";
+}
+export interface CareMessage {
+  id: string;
+  body: string;
+  at: string;
+  sender: "patient" | "care-team";
+  status: "sending" | "delivered" | "failed";
+  replyTo?: string;
+}
+export interface JourneyState {
+  version: 1;
+  step: Step;
+  history: Step[];
+  scenario: Scenario;
+  fit: Record<string, string>;
+  exitReason: string;
+  conditions: string[];
+  /** Retained only to read saved drafts from the earlier single-topic design. */
+  topic: string;
+  goal: string;
+  coverage: Coverage;
+  payer: string;
+  memberId: string;
+  profile: Profile;
+  providerId: string;
+  slotId: string;
+  eligibility: Eligibility;
+  reservation: Reservation | null;
+  paymentReady: boolean;
+  paymentSetup: PaymentSetup;
+  financialConsent: boolean;
+  portalAuth: {
+    status: "signed_in" | "signed_out" | "code_sent" | "expired";
+    codeExpiresAt: number | null;
+  };
+  notifications: Notification[];
+  clock: { virtualStart: number; realStart: number; rate: number } | null;
+  healthReviewed: boolean;
+  medications: string;
+  allergies: string;
+  currentLocation: string;
+  callbackConfirmed: boolean;
+  encounter: {
+    status: "not_started" | "waiting" | "in_progress" | "completed";
+    connection: "disconnected" | "connected" | "interrupted";
+    clinicianStatus: "not_present" | "running_late" | "ready";
+    checkedInAt?: string;
+    joinedAt?: string;
+    pausedAt?: string;
+    pausedDurationMs?: number;
+    completedAt?: string;
+  };
+  carePlan: {
+    status: "unavailable" | "pending" | "published";
+    publishedAt?: string;
+    followupWeeks: number;
+  };
+  appointment: Appointment | null;
+  followupAppointment: Appointment | null;
+  bookingMode: "first" | "reschedule" | "followup";
+  agreements: boolean;
+  recordsPermission: boolean;
+  recordsStatus: "idle" | "ready" | "unavailable" | "declined";
+  recordsReviewed: boolean;
+  briefGoal: string;
+  briefNote: string;
+  outdatedRecord: boolean;
+  briefApproved: boolean;
+  deviceReady: boolean;
+  emailReminder: boolean;
+  reminderScheduled: boolean;
+  followupReminderScheduled?: boolean;
+  visitDay: boolean;
+  micOn: boolean;
+  cameraOn: boolean;
+  visitPhase: number;
+  rating: number;
+  feedback: string;
+  feedbackSaved: boolean;
+  careMessage: string;
+  careMessages?: CareMessage[];
+  events: ServiceEvent[];
+  faultsUsed: string[];
+}
+export interface MockApi {
+  saveDraft(stage: string): Promise<void>;
+  getProviders(): Promise<Provider[]>;
+  checkEligibility(): Promise<Eligibility>;
+  createAccount(): Promise<void>;
+  reserve(providerId: string, slotId: string): Promise<Reservation>;
+  setupPayment(input: PaymentMethodInput): Promise<PaymentSetup>;
+  completePaymentAuthentication(approved: boolean): Promise<PaymentSetup>;
+  confirm(): Promise<Appointment>;
+  requestRecords(
+    allowed: boolean,
+  ): Promise<"ready" | "unavailable" | "declined">;
+  generateBrief(): Promise<void>;
+  scheduleReminders(appointmentId?: string): Promise<void>;
+  saveHealthDetails(): Promise<void>;
+  checkIn(): Promise<void>;
+  admitToVisit(): Promise<void>;
+  setClinicianReady(actor: "clinician"): Promise<void>;
+  joinVisit(): Promise<void>;
+  leaveVisit(): Promise<void>;
+  publishCarePlan(actor: "clinician"): Promise<void>;
+  cancelAppointment(appointmentId?: string): Promise<void>;
+  deliverNotifications(): Promise<void>;
+  requestSignIn(email: string): Promise<void>;
+  verifySignIn(code: string): Promise<void>;
+  signOut(): void;
+  reconnect(): Promise<void>;
+  completeVisit(actor: "clinician"): Promise<void>;
+  bookFollowup(slotId: string): Promise<Appointment>;
+  reschedule(slotId: string): Promise<void>;
+  sendCareMessage(): Promise<void>;
+  replyToCareMessage(): Promise<void>;
+}
+export interface ScreenProps {
+  state: JourneyState;
+  update: (patch: Partial<JourneyState>) => void;
+  updateProfile: (patch: Partial<Profile>) => void;
+  go: (step: Step) => void;
+  back: () => void;
+  api: MockApi;
+  busy: boolean;
+  error: string;
+  setError: (message: string) => void;
+  act: <T>(fn: () => Promise<T>) => Promise<T | undefined>;
+  openHelp: () => void;
+}

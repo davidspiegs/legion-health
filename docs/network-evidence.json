@@ -1,0 +1,437 @@
+{
+  "title": "Sanitized Legion onboarding request evidence",
+  "auditDate": "2026-10-20",
+  "sources": {
+    "A": {
+      "kind": "user-saved HAR, analyzed locally",
+      "entryCount": 298,
+      "entryIndexing": "zero-based",
+      "firstRequestAt": "2026-10-20T21:42:54.138Z",
+      "lastRequestAt": "2026-10-20T21:50:12.664Z",
+      "scope": "Fresh private entry through blank Basic Info after David clicked Book appointment. No account-creation requests in this export."
+    },
+    "B": {
+      "kind": "native Chrome DevTools/UI observation",
+      "scope": "David personally completed signup; selected requests and payment UI inspected. Not part of source A; no payloads retained."
+    }
+  },
+  "sanitization": "Allowlisted metadata and structural field names only. Query strings, headers, cookies, bodies, credentials, user identifiers, provider/slot values, and personal values are omitted. Raw HAR is not in the repository.",
+  "sessionConditions": {
+    "browser": "Chrome Incognito",
+    "thirdPartyCookies": "blocked",
+    "cacheDisabled": false,
+    "networkPreserveLog": true,
+    "freshUserEvidence": "Initial user.me: no user; createAnonymousUser: isExisting false."
+  },
+  "sourceAHostCounts": {
+    "api.perfalytics.com": 47,
+    "app.legionhealth.com": 234,
+    "fonts.googleapis.com": 2,
+    "fonts.gstatic.com": 2,
+    "freshpaint-cdn.com": 2,
+    "perfalytics.com": 6,
+    "s3.amazonaws.com": 3,
+    "www.googletagmanager.com": 2
+  },
+  "selectedRequests": [
+    {
+      "source": "A",
+      "entryIndex": 38,
+      "method": "GET",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/user.me",
+      "status": 200,
+      "elapsedMs": 132.3,
+      "responseMimeType": "application/json"
+    },
+    {
+      "source": "A",
+      "entryIndex": 97,
+      "method": "GET",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/user.me",
+      "status": 200,
+      "elapsedMs": 159.4,
+      "responseMimeType": "application/json"
+    },
+    {
+      "source": "A",
+      "entryIndex": 98,
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/onboarding.createAnonymousUser",
+      "status": 200,
+      "elapsedMs": 329.4,
+      "responseMimeType": "application/json",
+      "structure": {
+        "request": "empty object",
+        "responseFields": [
+          "success",
+          "userId",
+          "profileId",
+          "isExisting",
+          "onboardingVersion"
+        ],
+        "safeObservedFlags": {
+          "success": true,
+          "isExisting": false
+        }
+      }
+    },
+    {
+      "source": "A",
+      "entryIndex": 137,
+      "method": "GET",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/user.me",
+      "status": 200,
+      "elapsedMs": 225.8,
+      "responseMimeType": "application/json",
+      "structure": {
+        "responseFields": [
+          "user.id",
+          "user.isAnonymous",
+          "user.onboardingComplete",
+          "user.onboardingStep",
+          "user.profileId",
+          "isAuthenticated"
+        ],
+        "safeObservedFlags": {
+          "isAuthenticated": true,
+          "user.isAnonymous": true,
+          "user.onboardingComplete": false
+        }
+      }
+    },
+    {
+      "source": "A",
+      "entryIndex": 175,
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/onboarding.updateMetadata",
+      "status": 200,
+      "elapsedMs": 268.4,
+      "responseMimeType": "application/json",
+      "structure": {
+        "requestFields": [
+          "topics[]",
+          "adhd.intakeSignals.hospitalizedForMentalHealthPastYear"
+        ],
+        "requestEnvelope": "Business fields shown within tRPC 0.json envelope."
+      }
+    },
+    {
+      "source": "A",
+      "entryIndex": 177,
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/onboarding.updateStep",
+      "status": 200,
+      "elapsedMs": 174.0,
+      "responseMimeType": "application/json"
+    },
+    {
+      "source": "A",
+      "entryIndex": 193,
+      "method": "GET",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/insurance.getInsuranceProviders",
+      "status": 200,
+      "elapsedMs": 164.2,
+      "responseMimeType": "application/json",
+      "structure": {
+        "response": "payer array, 36 records",
+        "itemFields": [
+          "id",
+          "payerUuid",
+          "payerId",
+          "payerName",
+          "availityPayerName",
+          "availityClaimsPayerId",
+          "availityEligibilityId",
+          "availityRemittancePayerId",
+          "streetAddress",
+          "createdAt",
+          "updatedAt",
+          "lastSyncedAt",
+          "aliases[]"
+        ]
+      }
+    },
+    {
+      "source": "A",
+      "entryIndex": 204,
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/onboarding.updateMetadata",
+      "status": 200,
+      "elapsedMs": 374.7,
+      "responseMimeType": "application/json",
+      "structure": {
+        "requestFields": [
+          "insurance.payerId",
+          "insurance.payerName"
+        ],
+        "requestEnvelope": "Business fields shown within tRPC 0.json envelope."
+      }
+    },
+    {
+      "source": "A",
+      "entryIndex": 205,
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/onboarding.updateStep",
+      "status": 200,
+      "elapsedMs": 160.5,
+      "responseMimeType": "application/json"
+    },
+    {
+      "source": "A",
+      "entryIndex": 224,
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/onboarding.updateMetadata",
+      "status": 200,
+      "elapsedMs": 275.7,
+      "responseMimeType": "application/json",
+      "structure": {
+        "requestFields": [
+          "needs"
+        ],
+        "requestEnvelope": "Business fields shown within tRPC 0.json envelope."
+      }
+    },
+    {
+      "source": "A",
+      "entryIndex": 225,
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/onboarding.updateStep",
+      "status": 200,
+      "elapsedMs": 167.4,
+      "responseMimeType": "application/json"
+    },
+    {
+      "source": "A",
+      "entryIndex": 226,
+      "method": "GET",
+      "host": "app.legionhealth.com",
+      "path": "/portal/join/match",
+      "status": 200,
+      "elapsedMs": 5907.1,
+      "responseMimeType": "text/x-component",
+      "structure": {
+        "response": "React Server Component stream; matching props",
+        "propFields": [
+          "insuranceName",
+          "isAdhd",
+          "isUsingCredentialedProviders",
+          "loadResult",
+          "providers[]",
+          "totalProviderCount"
+        ],
+        "providerFields": [
+          "id",
+          "fullName",
+          "avatarUrl",
+          "gender",
+          "bio",
+          "rating",
+          "reviewCount",
+          "specialties[]",
+          "adhdComplexityLevel",
+          "availableSlots[]",
+          "appointmentTypes[].id",
+          "isBookable",
+          "isCallToBook",
+          "callToBookMessage",
+          "priorityType (optional)"
+        ],
+        "loadResultFields": [
+          "requestId",
+          "status",
+          "reason",
+          "eligibleProviderCount",
+          "failedProviderCount",
+          "serverLoadDurationMs"
+        ],
+        "safeObservedCounts": {
+          "providers": 40,
+          "providerSlotEntries": 598,
+          "bookableProviders": 39,
+          "callToBookProviders": 1,
+          "zeroSlotProviders": 3,
+          "totalProviderCount": 106,
+          "eligibleProviderCount": 40,
+          "failedProviderCount": 0,
+          "serverLoadDurationMs": 4636
+        },
+        "caveat": "Provider-slot entries are not unique appointment times. Counts and duration describe one response, not general supply or performance."
+      }
+    },
+    {
+      "source": "A",
+      "entryIndex": 242,
+      "method": "GET",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/onboarding.getRedirectUrlAfterAppointmentBooked",
+      "status": 200,
+      "elapsedMs": 235.6,
+      "responseMimeType": "application/json"
+    },
+    {
+      "source": "A",
+      "entryIndex": 269,
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/appointments/reserve",
+      "status": 200,
+      "elapsedMs": 825.3,
+      "responseMimeType": "application/json",
+      "structure": {
+        "requestFields": [
+          "datetime",
+          "providerId",
+          "providerName"
+        ],
+        "responseFields": [
+          "success",
+          "reservation.datetime",
+          "reservation.providerId",
+          "reservation.providerName",
+          "reservation.reservedAt",
+          "message"
+        ],
+        "safeObservedFlags": {
+          "success": true
+        },
+        "responseMeaning": "Reservation created; add payment method to confirm."
+      }
+    },
+    {
+      "source": "A",
+      "entryIndex": 272,
+      "method": "GET",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/user.me",
+      "status": 200,
+      "elapsedMs": 202.3,
+      "responseMimeType": "application/json",
+      "structure": {
+        "responseMetadataFields": [
+          "adhd",
+          "needs",
+          "topics",
+          "insurance",
+          "onboardingStep",
+          "onboardingComplete",
+          "appointmentReservation"
+        ],
+        "safeObservedFlags": {
+          "user.isAnonymous": true,
+          "user.onboardingComplete": false
+        },
+        "identityComparison": "Same anonymous user/profile as before reservation; identifier values omitted."
+      }
+    },
+    {
+      "source": "A",
+      "entryIndex": 273,
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/onboarding.updateStep",
+      "status": 200,
+      "elapsedMs": 227.9,
+      "responseMimeType": "application/json"
+    },
+    {
+      "source": "A",
+      "entryIndex": 275,
+      "method": "GET",
+      "host": "app.legionhealth.com",
+      "path": "/portal/join/patient",
+      "status": 200,
+      "elapsedMs": 295.5,
+      "responseMimeType": "text/x-component"
+    }
+  ],
+  "sourceAAggregatedTelemetry": {
+    "freshpaintTrack": {
+      "method": "POST",
+      "host": "api.perfalytics.com",
+      "path": "/track",
+      "requestCount": 47,
+      "statuses": {
+        "200": 47
+      },
+      "pageViewRequestsWithFacebookConversionsApiRouting": 9,
+      "meaning": "Freshpaint request acceptance and destination routing intent; downstream delivery and campaign use not proven."
+    },
+    "postHog": {
+      "host": "app.legionhealth.com",
+      "pathPrefix": "/ph-proxy/",
+      "distinctFitQuestionKeys": 6,
+      "eventsForEachFitQuestion": [
+        "portal.onboarding.question.shown",
+        "portal.onboarding.question.interacted",
+        "portal.onboarding.question.submitted",
+        "portal.onboarding.question.advanced"
+      ],
+      "detailSource": "runtime-telemetry.md"
+    }
+  },
+  "sourceBSupplementalRequests": [
+    {
+      "method": "PUT",
+      "host": "api.legion.health",
+      "path": "/auth/v1/user",
+      "status": 200,
+      "elapsedMs": 147,
+      "meaning": "Auth user update; loaded client configuration identifies Supabase Auth implementation."
+    },
+    {
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/user.onboardUser",
+      "status": 200,
+      "elapsedMs": 1770
+    },
+    {
+      "method": "GET",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/user.me",
+      "status": 200,
+      "elapsedMs": 232
+    },
+    {
+      "method": "POST",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/onboarding.updateStep",
+      "status": 200,
+      "elapsedMs": 253
+    },
+    {
+      "method": "GET",
+      "host": "app.legionhealth.com",
+      "path": "/api/trpc/payment.getCardDetails,appointments.list",
+      "status": 200,
+      "elapsedMs": 380
+    }
+  ],
+  "sourceBAdditionalObservedHosts": [
+    "js.stripe.com",
+    "r.stripe.com",
+    "merchant-ui-api.stripe.com",
+    "b.stripecdn.com",
+    "hcaptcha.com",
+    "newassets.hcaptcha.com",
+    "api.hcaptcha.com"
+  ],
+  "limits": [
+    "Selected request inventory, not a raw or exhaustive traffic export.",
+    "Backend-to-vendor calls are not visible.",
+    "One successful eligible path does not test disqualification or error branches.",
+    "Source B has no retained request/response payload evidence.",
+    "No payment was submitted by the agent; payment-page reach is not completed booking."
+  ]
+}

@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+.env
+.env.*
+!.env.example
+.vercel/
+dist/
+.cache/
+*.har
+
+# TypeScript incremental build cache
+*.tsbuildinfo
