@@ -723,7 +723,7 @@ export default function App() {
         <aside className="review-rail">
           <a
             className="project-link"
-            href="https://github.com/davidspiegs/legion-health-assignment/blob/assignment/journey-audit/docs/redesigned-journey.md"
+            href="https://github.com/davidspiegs/legion-health/blob/main/docs/redesigned-journey.md"
             target="_blank"
             rel="noreferrer"
           >

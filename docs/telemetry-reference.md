@@ -1,6 +1,6 @@
 # Telemetry reference
 
-Source: section 2 of the [assignment brief](../Founding%20Product%20Take-Home%20b4381b607554839287ad8137811d7133.md). This is the brief's historical telemetry reference, not a live instrumentation audit.
+Source: section 2 of the assignment brief, which is kept out of this repository. This is the brief's historical telemetry reference, not a live instrumentation audit.
 
 ## Scope and method
 

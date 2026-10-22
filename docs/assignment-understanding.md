@@ -1,6 +1,6 @@
 # Assignment understanding
 
-Source: [Founding Product Take-Home](../Founding%20Product%20Take-Home%20b4381b607554839287ad8137811d7133.md). This document separates the brief's requirements from interpretation and recommendations. It contains no live UX observations.
+Source: Legion's Founding Product take-home brief, kept out of this repository. This document separates the brief's requirements from interpretation and recommendations. It contains no live UX observations.
 
 ## Explicit requirements
 
@@ -21,7 +21,7 @@ David reports that Yash confirmed by email that mocked or simulated external ser
 
 The first deliverable is an inspectable HTML canvas of the existing journey, with desktop and mobile views, screen URLs, relevant documented events, and correctly attributed funnel metrics. Explore as far as practical, identify any account or contact-information blocker, and distinguish observed screens from unobserved downstream stages.
 
-Create a private GitHub repository named `legion-health-assignment`, with a basic README on `main` and assignment work on a separate branch. Pause for David's feedback after the canvas before building the redesigned prototype. Vercel is intended for the later prototype phase.
+Create a private GitHub repository named `legion-health-assignment` (since renamed `legion-health`), with a basic README on `main` and assignment work on a separate branch. Pause for David's feedback after the canvas before building the redesigned prototype. Vercel is intended for the later prototype phase.
 
 ## Why this fits the role — interpretation
 
