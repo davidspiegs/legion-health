@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { initialState, reviewIntakeAnswers } from "./fixtures";
+import { REGIMENS, REGIMEN_FALLBACK, initialState, regimenFor, regimenLine, reviewIntakeAnswers } from "./fixtures";
 import { FLOW } from "./flow";
 import type { Step } from "./types";
 
@@ -91,4 +91,39 @@ test("welcome and generic fit exits remain empty, and review fixtures share no m
   assert.deepEqual(fresh.fit, {});
   assert.deepEqual(fresh.conditions, []);
   assert.equal(fresh.goal, "");
+});
+
+const FIVE = ["ADHD", "Depression", "Anxiety", "Bipolar Disorder", "PTSD"];
+const subsets = (items: string[]): string[][] =>
+  items.reduce<string[][]>((all, item) => [...all, ...all.map((set) => [...set, item])], [[]]).filter((set) => set.length);
+
+test("every combination of the five conditions has its own regimen, whatever the order", () => {
+  const combinations = subsets(FIVE);
+  assert.equal(combinations.length, 31);
+  assert.equal(Object.keys(REGIMENS).length, 31);
+  for (const conditions of combinations) {
+    const regimen = regimenFor(conditions);
+    assert.ok(regimen.length > 0, conditions.join("+"));
+    assert.notEqual(regimen, REGIMEN_FALLBACK, conditions.join("+"));
+    assert.deepEqual(regimenFor([...conditions].reverse()), regimen, "order doesn't matter");
+    for (const med of regimen) assert.ok(med.name && med.dose && med.schedule && med.for, conditions.join("+"));
+  }
+});
+
+test("only \"I'm not sure\" or \"Other\" gets the fallback; next to a condition they're ignored", () => {
+  for (const conditions of [[], ["I'm not sure"], ["Other"], ["Other", "I'm not sure"]])
+    assert.deepEqual(regimenFor(conditions), REGIMEN_FALLBACK, JSON.stringify(conditions));
+  assert.equal(regimenLine(REGIMEN_FALLBACK), "Sertraline (Zoloft) 50 mg once every morning");
+  assert.deepEqual(regimenFor(["Other", "Anxiety", "I'm not sure"]), regimenFor(["Anxiety"]));
+});
+
+test("the regimen reads as one line, medication by medication", () => {
+  assert.equal(
+    regimenLine(regimenFor(["Anxiety", "ADHD"])),
+    "Adderall 20 mg once every morning; Escitalopram (Lexapro) 10 mg once a day",
+  );
+  assert.equal(
+    regimenLine(regimenFor(["PTSD"])),
+    "Sertraline (Zoloft) 100 mg once every morning; Prazosin (Minipress) 2 mg once at bedtime",
+  );
 });

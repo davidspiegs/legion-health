@@ -19,6 +19,7 @@ import { clinicianFirst, lateFees, stamp, type ChatContext } from "./agent";
 import { FIRST_VISIT_LENGTH, PREVIEW } from "./env";
 import { answerQuestion, type GuideAnswer } from "./guide-ai";
 import { CLINICIANS } from "./inventory";
+import { callModel, modelContext } from "./model";
 import { flagRisk } from "./safety";
 import { booked, priceLine } from "./script";
 import type { Ask, AskActionId, ChatJourney } from "./state";
@@ -237,52 +238,17 @@ export function recoverAsks(asks: Ask[]): Ask[] {
   );
 }
 
-/** Only what the model needs to answer logistics: no story, notes, or safety answers. */
-function modelContext(s: ChatJourney) {
-  const appointment = booked(s) ? s.appointment : null;
-  return {
-    stage: !appointment
-      ? "before booking"
-      : s.encounter.status === "completed"
-        ? "after the first visit"
-        : s.visitDay
-          ? "visit day"
-          : "booked",
-    clinician: appointment ? clinicianFirst(appointment.providerId) : null,
-    visit: appointment ? `${formatDate(appointment.start)} at ${formatTime(appointment.start)} Central` : null,
-    cost: priceLine(s),
-    coverage: s.coverage,
-  };
-}
-
-const viteEnv = (import.meta as ImportMeta & { env?: { DEV?: boolean; VITE_ASSISTANT_API?: string } }).env;
-/** Vite's dev server has no /api; `vercel dev` or a deploy does. VITE_ASSISTANT_API can point elsewhere. */
-const MODEL_ENDPOINT = viteEnv?.VITE_ASSISTANT_API ?? (viteEnv?.DEV ? "" : "/api/assistant");
-
 async function askModel(s: ChatJourney, question: string): Promise<{ answer: string; actions: AskActionId[] } | null> {
-  if (typeof fetch === "undefined" || typeof window === "undefined" || !MODEL_ENDPOINT) return null;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15_000);
-  try {
-    const response = await fetch(MODEL_ENDPOINT, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ question, context: modelContext(s) }),
-      signal: controller.signal,
-    });
-    if (!response.ok) return null;
-    const data = (await response.json()) as { reply?: unknown; actions?: unknown };
-    if (typeof data.reply !== "string" || !data.reply.trim()) return null;
-    return {
-      answer: data.reply.trim(),
-      actions: Array.isArray(data.actions) ? data.actions.filter(isAction).slice(0, 2) : [],
-    };
-  } catch {
-    // No model in this deployment, or it timed out: the local answers take over.
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  const data = await callModel<{ reply?: unknown; actions?: unknown }>(
+    "question",
+    { question, context: modelContext(s) },
+    15_000,
+  );
+  if (!data || typeof data.reply !== "string" || !data.reply.trim()) return null;
+  return {
+    answer: data.reply.trim(),
+    actions: Array.isArray(data.actions) ? data.actions.filter(isAction).slice(0, 2) : [],
+  };
 }
 
 /**

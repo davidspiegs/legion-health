@@ -387,3 +387,119 @@ export const MYCHART_CHART = {
   labResults: 6,
   visitNotes: 3,
 };
+
+/** One medication in a patient's regimen, as the pharmacy's fill history shows it. */
+export interface RegimenMed {
+  /** Display name: the brand alone for Adderall, otherwise "Generic (Brand)". */
+  name: string;
+  dose: string;
+  schedule: string;
+  /** What it treats, in the chart's words. */
+  for: string;
+}
+
+const adderall = (treats = "ADHD"): RegimenMed => ({ name: "Adderall", dose: "20 mg", schedule: "once every morning", for: treats });
+const escitalopram = (treats: string): RegimenMed => ({
+  name: "Escitalopram (Lexapro)",
+  dose: "10 mg",
+  schedule: "once a day",
+  for: treats,
+});
+const sertraline = (treats: string): RegimenMed => ({
+  name: "Sertraline (Zoloft)",
+  dose: "100 mg",
+  schedule: "once every morning",
+  for: treats,
+});
+const prazosin = (): RegimenMed => ({
+  name: "Prazosin (Minipress)",
+  dose: "2 mg",
+  schedule: "once at bedtime",
+  for: "PTSD (nightmares)",
+});
+const lamotrigine = (treats: string): RegimenMed => ({
+  name: "Lamotrigine (Lamictal)",
+  dose: "200 mg",
+  schedule: "once a day",
+  for: treats,
+});
+const hydroxyzine = (treats: string): RegimenMed => ({
+  name: "Hydroxyzine (Vistaril)",
+  dose: "25 mg",
+  schedule: "as needed, up to three times a day",
+  for: treats,
+});
+
+/** The five conditions a regimen is chosen from; "I'm not sure" and "Other" never pick one. */
+const REGIMEN_CONDITIONS = ["ADHD", "Anxiety", "Bipolar Disorder", "Depression", "PTSD"];
+
+/** The lookup key for a set of conditions: the known labels, sorted, joined with "+". */
+export function regimenKey(conditions: readonly string[]): string {
+  return REGIMEN_CONDITIONS.filter((condition) => conditions.includes(condition)).join("+");
+}
+
+/**
+ * The fictional medications each demo patient already takes, by the conditions they
+ * chose: every combination of the five, so the records, the chart, the plan and the
+ * prescriptions all name the same ones.
+ */
+export const REGIMENS: Record<string, readonly RegimenMed[]> = {
+  ADHD: [adderall()],
+  Anxiety: [escitalopram("Anxiety")],
+  Depression: [sertraline("Depression")],
+  PTSD: [sertraline("PTSD"), prazosin()],
+  "Bipolar Disorder": [lamotrigine("Bipolar Disorder")],
+  "ADHD+Anxiety": [adderall(), escitalopram("Anxiety")],
+  "ADHD+Depression": [adderall(), sertraline("Depression")],
+  "ADHD+PTSD": [adderall(), sertraline("PTSD"), prazosin()],
+  "ADHD+Bipolar Disorder": [adderall(), lamotrigine("Bipolar Disorder")],
+  "Anxiety+Depression": [sertraline("Anxiety and Depression")],
+  "Anxiety+PTSD": [sertraline("Anxiety and PTSD"), prazosin()],
+  "Anxiety+Bipolar Disorder": [lamotrigine("Bipolar Disorder"), hydroxyzine("Anxiety")],
+  "Depression+PTSD": [sertraline("Depression and PTSD"), prazosin()],
+  "Bipolar Disorder+Depression": [lamotrigine("Bipolar Disorder and Depression")],
+  "Bipolar Disorder+PTSD": [lamotrigine("Bipolar Disorder"), prazosin()],
+  "ADHD+Anxiety+Depression": [adderall(), sertraline("Anxiety and Depression")],
+  "ADHD+Anxiety+PTSD": [adderall(), sertraline("Anxiety and PTSD"), prazosin()],
+  "ADHD+Anxiety+Bipolar Disorder": [adderall(), lamotrigine("Bipolar Disorder"), hydroxyzine("Anxiety")],
+  "ADHD+Depression+PTSD": [adderall(), sertraline("Depression and PTSD"), prazosin()],
+  "ADHD+Bipolar Disorder+Depression": [adderall(), lamotrigine("Bipolar Disorder and Depression")],
+  "ADHD+Bipolar Disorder+PTSD": [adderall(), lamotrigine("Bipolar Disorder"), prazosin()],
+  "Anxiety+Depression+PTSD": [sertraline("Anxiety, Depression and PTSD"), prazosin()],
+  "Anxiety+Bipolar Disorder+Depression": [lamotrigine("Bipolar Disorder and Depression"), hydroxyzine("Anxiety")],
+  "Anxiety+Bipolar Disorder+PTSD": [lamotrigine("Bipolar Disorder"), hydroxyzine("Anxiety"), prazosin()],
+  "Bipolar Disorder+Depression+PTSD": [lamotrigine("Bipolar Disorder and Depression"), prazosin()],
+  "ADHD+Anxiety+Depression+PTSD": [adderall(), sertraline("Anxiety, Depression and PTSD"), prazosin()],
+  "ADHD+Anxiety+Bipolar Disorder+Depression": [
+    adderall(),
+    lamotrigine("Bipolar Disorder and Depression"),
+    hydroxyzine("Anxiety"),
+  ],
+  "ADHD+Anxiety+Bipolar Disorder+PTSD": [adderall(), lamotrigine("Bipolar Disorder"), hydroxyzine("Anxiety and PTSD")],
+  "ADHD+Bipolar Disorder+Depression+PTSD": [adderall(), lamotrigine("Bipolar Disorder and Depression"), prazosin()],
+  "Anxiety+Bipolar Disorder+Depression+PTSD": [
+    lamotrigine("Bipolar Disorder and Depression"),
+    hydroxyzine("Anxiety"),
+    prazosin(),
+  ],
+  "ADHD+Anxiety+Bipolar Disorder+Depression+PTSD": [
+    adderall(),
+    lamotrigine("Bipolar Disorder and Depression"),
+    hydroxyzine("Anxiety and PTSD"),
+  ],
+};
+
+/** For patients who chose only "I'm not sure" or "Other": a common starting SSRI from a previous prescriber. */
+export const REGIMEN_FALLBACK: readonly RegimenMed[] = [
+  { name: "Sertraline (Zoloft)", dose: "50 mg", schedule: "once every morning", for: "Mood and anxiety" },
+];
+
+/** The medications a patient with these conditions takes. Order and "I'm not sure" or "Other" don't matter. */
+export function regimenFor(conditions: readonly string[]): readonly RegimenMed[] {
+  return REGIMENS[regimenKey(conditions)] ?? REGIMEN_FALLBACK;
+}
+
+/** "Adderall 20 mg once every morning; Escitalopram (Lexapro) 10 mg once a day". */
+export function regimenLine(meds: readonly RegimenMed[]): string {
+  return meds.map((med) => `${med.name} ${med.dose} ${med.schedule}`).join("; ");
+}
