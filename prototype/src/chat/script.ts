@@ -5,6 +5,7 @@ import { mentionsCrisis, readStory } from "./guide-ai";
 import {
   VERIFIED_RECORD,
   addTask,
+  briefKey,
   clinicianFirst,
   clinicianName,
   connectChart,
@@ -1451,8 +1452,12 @@ const brief: Node = {
   applies: (s) => prepping(s) && s.chat.noteDone,
   skip: prepPassed,
   enter: (ctx) => void runBrief(ctx),
-  // A change to what the brief is built from clears it, and the new draft is asked about again.
-  enterKey: (s) => `brief:${s.chat.jobs.brief ? "drafted" : "none"}`,
+  // After approval, a change to what the brief is built from clears it, and the new draft is
+  // asked about again. Before approval, the change redrafts it in place.
+  enterKey: (s) => {
+    const job = s.chat.jobs.brief;
+    return `brief:${!job ? "none" : job.status === "running" ? "drafting" : `drafted:${briefKey(s)}`}`;
+  },
   say: (s) =>
     s.chat.jobs.brief?.status === "done"
       ? [

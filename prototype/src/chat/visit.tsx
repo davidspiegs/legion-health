@@ -1866,6 +1866,19 @@ function storyReason(s: ChatJourney): string {
   return named.length ? `Help with ${joinList(named)}` : "Not sure yet what to call it";
 }
 
+/**
+ * The reason for the visit as the brief states it, and whose words it is: the patient's own
+ * edit first, then Wren's draft (Claude, when there's a model), then what they said or chose.
+ * The clinician view shows the same reason.
+ */
+export function briefReason(s: ChatJourney): { text: string; by: "edit" | "draft" | "patient" } {
+  const edited = editedReason(s);
+  if (edited) return { text: edited, by: "edit" };
+  const drafted = s.chat.briefDraft?.reason.trim();
+  if (drafted) return { text: drafted, by: "draft" };
+  return { text: storyReason(s), by: "patient" };
+}
+
 interface BriefRow {
   label: string;
   value: ReactNode;
@@ -1930,18 +1943,20 @@ function chartRow(s: ChatJourney): BriefRow | null {
 }
 
 function briefRows(s: ChatJourney, who: Who): BriefRow[] {
-  const edited = editedReason(s);
-  const story = storyReason(s);
+  const reason = briefReason(s);
+  const focus = s.chat.briefDraft?.focus.trim();
+  const drafted = `Drafted by ${ASSISTANT.name}`;
   const note = (s.chat.note || s.briefNote).trim();
   const rows: (BriefRow | null)[] = [
     {
       label: "Reason for visit",
-      value: edited || (s.chat.storyMode === "words" ? `“${story}”` : story),
-      source: edited ? "Edited by you" : "You said",
+      value: reason.by === "patient" && s.chat.storyMode === "words" ? `“${reason.text}”` : reason.text,
+      source: reason.by === "edit" ? "Edited by you" : reason.by === "draft" ? drafted : "You said",
     },
     s.goal
       ? { label: "What you want from the visit", value: GOAL_LABEL[s.goal] ?? s.goal, source: "You said" }
       : null,
+    focus ? { label: "What to cover", value: focus, source: drafted } : null,
     medicationRow(s, who),
     allergyRow(s, who),
     chartRow(s),
@@ -2016,7 +2031,7 @@ function Brief({ state }: CardProps) {
 
 function BriefSheet({ state, ctx, close }: SheetProps) {
   const who = clinicianFor(state);
-  const [initialReason] = useState(() => editedReason(state) || storyReason(state));
+  const [initialReason] = useState(() => briefReason(state).text);
   const [initialNote] = useState(() => (state.chat.note || state.briefNote).trim());
   const [reason, setReason] = useState(initialReason);
   const [note, setNote] = useState(initialNote);

@@ -12,6 +12,7 @@ import {
 } from "../model/fixtures";
 import { eligibilityInputKey, journeyNow } from "../model/journey-state";
 import { anonymousId, capture, forward, type EventProps, type PostHogEvent } from "./analytics";
+import { draftBrief } from "./brief";
 import { readStory } from "./guide-ai";
 import { clinicianById, fitsPreference, formalName, inventory } from "./inventory";
 import { readStoryLive } from "./story";
@@ -736,18 +737,50 @@ export async function runStory(ctx: ChatContext, text: string) {
   setJob(ctx, "story", { status: "done", finishedAt: Date.now() });
 }
 
-const BRIEF_DRAFTED = "Drafted a visit brief for your clinician to review";
+/** What the visit brief is built from. A change after approval means approving it again; any change redrafts it. */
+export function briefInputs(s: ChatJourney): string {
+  const { note, medication, medicationNote, allergy, allergyNote, pharmacy, baseline, pcp } = s.chat;
+  return JSON.stringify([note, medication, medicationNote, allergy, allergyNote, pharmacy, baseline, pcp, s.briefNote, s.briefGoal]);
+}
 
+/** The brief's inputs as a fingerprint, so the draft's record never holds the patient's words. */
+export const briefKey = (s: ChatJourney) => fingerprint(briefInputs(s));
+
+const BRIEF_DRAFTED = "Drafted a visit brief for your clinician to review";
+const BRIEF_REDRAFTED = "Redrafted your visit brief with your changes";
+
+/**
+ * Drafts the visit brief, once per set of inputs: Claude writes the reason and focus when there's
+ * a model. A first draft, or one redone after an approval was undone, shows Wren at work. A change
+ * while the patient is reading the brief redrafts it in place, so the brief and its choices stay.
+ * With no answer, the last draft stays, or the brief uses the patient's own words.
+ */
 export async function runBrief(ctx: ChatContext) {
-  const status = ctx.get().chat.jobs.brief?.status;
-  if (status === "running" || status === "done") return;
-  const current = begin(ctx, "brief");
-  await ctx.api.generateBrief().catch(() => undefined);
+  const s = ctx.get();
+  const job = s.chat.jobs.brief;
+  if (job?.status === "running" || (job?.status === "done" && runKey(job) === briefKey(s))) return;
+  const inPlace = job?.status === "done";
+  const current = begin(ctx, "brief", briefKey(s), inPlace ? { status: "done", finishedAt: job?.finishedAt } : {});
+  // The first draft seeds the brief's goal, which is one of its inputs, so the key is read after it.
+  if (!inPlace) await ctx.api.generateBrief().catch(() => undefined);
   if (!current()) return;
+  const drafting = ctx.get();
+  const key = briefKey(drafting);
+  const draft = await draftBrief(drafting);
+  // A restart, a jump, or an undone approval while Claude was drafting makes this draft stale.
+  if (!current()) return;
+  // What the patient approved stays as they saw it.
+  const applied = !!draft && !ctx.get().chat.briefApproved;
+  if (applied) ctx.update({ chat: { briefDraft: { ...draft, key } } });
+  if (inPlace) {
+    setJob(ctx, "brief", applied ? { inputs: key, finishedAt: Date.now() } : { inputs: key });
+    if (applied) receipt(ctx, BRIEF_REDRAFTED, "Legion AI");
+    return;
+  }
   // An answer changed after approval clears the draft, so this is the redraft.
   const redraft = ctx.get().chat.receipts.some((item) => item.action === BRIEF_DRAFTED);
-  setJob(ctx, "brief", { status: "done", finishedAt: Date.now() });
-  receipt(ctx, redraft ? "Redrafted your visit brief with your changes" : BRIEF_DRAFTED, "Legion AI");
+  setJob(ctx, "brief", { status: "done", finishedAt: Date.now(), inputs: key });
+  receipt(ctx, redraft ? BRIEF_REDRAFTED : BRIEF_DRAFTED, "Legion AI");
 }
 
 /**

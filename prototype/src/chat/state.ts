@@ -15,6 +15,7 @@ export type JobId =
   | "payment"
   | "book"
   | "records"
+  /** The visit brief; Claude drafts its reason and focus when there's a model. */
   | "brief"
   | "idcheck"
   | "followup";
@@ -193,6 +194,8 @@ export interface ChatState {
   noteDone: boolean;
   note: string;
   briefApproved: boolean;
+  /** Claude’s draft of the brief’s reason and focus, and the fingerprint of the brief inputs it was drafted from. */
+  briefDraft: { reason: string; focus: string; key: string } | null;
   idCheck: "" | "done" | "later";
   readyAck: boolean;
   reminderReply: "" | "confirm" | "reschedule";
@@ -300,6 +303,7 @@ export function initialChat(): ChatState {
     noteDone: false,
     note: "",
     briefApproved: false,
+    briefDraft: null,
     idCheck: "",
     readyAck: false,
     reminderReply: "",

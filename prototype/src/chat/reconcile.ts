@@ -1,11 +1,6 @@
+import { briefInputs } from "./agent";
 import type { ChatJourney } from "./state";
 import { medicationPath } from "./script";
-
-/** What the visit brief is built from. A change after approval means approving it again. */
-function briefInputs(s: ChatJourney): string {
-  const { note, medication, medicationNote, allergy, allergyNote, pharmacy, baseline, pcp } = s.chat;
-  return JSON.stringify([note, medication, medicationNote, allergy, allergyNote, pharmacy, baseline, pcp, s.briefNote, s.briefGoal]);
-}
 
 /** Rules that keep the conversation honest when something it depends on changes. */
 export function reconcile(previous: ChatJourney, next: ChatJourney): ChatJourney {
