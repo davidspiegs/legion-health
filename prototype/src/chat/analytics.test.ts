@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { applyJourneyPatch } from "../model/journey-state";
 import type { JourneyState } from "../model/types";
 import { track, type ChatContext, type ChatPatch } from "./agent";
-import { answerEvent, milestoneEvents } from "./analytics";
+import { ALLOWED_PROPS, answerEvent, milestoneEvents, streamFor } from "./analytics";
 import { inventory } from "./inventory";
 import { momentState } from "./moments";
 import { SCRIPT } from "./script";
@@ -84,4 +84,25 @@ test("no event carries answers to health questions, free text, or contact detail
 
   const pay = answerEvent(node("pay"), node("pay").input?.(momentState("start")), "insurance", momentState("start"), false);
   assert.deepEqual(pay, ["portal.onboarding.insurance_selected", { step: "pay", choice: "insurance" }], "plain choices still come through");
+});
+
+test("only allowlisted properties reach an event, and crisis events go to the restricted stream", () => {
+  const s = momentState("complete");
+  const keys = new Set<string>();
+  for (const node of SCRIPT) {
+    const [, props] = answerEvent(node, node.input?.(s), "x", s, false);
+    Object.keys(props).forEach((key) => keys.add(key));
+  }
+  for (const [, props] of milestoneEvents(momentState("start"), s)) Object.keys(props).forEach((key) => keys.add(key));
+  for (const key of keys) assert.ok(ALLOWED_PROPS.has(key), `"${key}" isn't on the allowlist`);
+
+  const ctx = context(momentState("booked"));
+  track(ctx, "portal.onboarding.email_added", { step: "email", email: "alex@example.com" } as never);
+  const added = ctx.state().chat.analytics.at(-1)!;
+  assert.equal("email" in added.properties, false, "an unlisted property is dropped");
+  assert.equal(added.properties.analytics_stream, "product");
+  track(ctx, "portal.support.crisis_resources_shown", { source: "help" });
+  assert.equal(ctx.state().chat.analytics.at(-1)!.properties.analytics_stream, "restricted");
+  assert.equal(streamFor("portal.onboarding.fit_exited", { reason: "immediate_support" }), "restricted");
+  assert.equal(streamFor("portal.onboarding.fit_exited", { reason: "age" }), "product");
 });

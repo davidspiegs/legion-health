@@ -51,7 +51,7 @@ export interface Benefits {
 export type ScreenItem = "now";
 
 /** Free text that can carry risk language. */
-export type RiskSource = "story" | "other" | "help" | "note" | "medication" | "allergy" | "brief";
+export type RiskSource = "story" | "other" | "help" | "note" | "medication" | "allergy" | "brief" | "message";
 
 /** A follow-up for a person on the care team (a simulated queue in the preview). */
 export interface CareTask {

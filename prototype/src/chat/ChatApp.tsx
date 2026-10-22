@@ -35,6 +35,8 @@ import {
 } from "./parts";
 import { registerCards, renderCard } from "./cards";
 import { SCRIPT } from "./script";
+import { flagRisk } from "./safety";
+import { answerQuestion } from "./guide-ai";
 import {
   addTask,
   clinicianFirst,
@@ -585,6 +587,12 @@ function ChatApp() {
   }, [state.encounter.status, state.encounter.connection]);
 
   const progress = stageProgress(transcript);
+  // Stage reach, the chat's equivalent of the page reach the brief's August funnel counts. Once per stage.
+  useEffect(() => {
+    const stage = progress.stage;
+    if (stateRef.current.chat.analytics.some((item) => item.event === "portal.onboarding.stage_entered" && item.properties.stage === stage)) return;
+    track(ctx, "portal.onboarding.stage_entered", { stage });
+  }, [progress.stage, epoch, ctx]);
   const stageTitle = STAGES[progress.index]?.title ?? "";
   const remainingLabel = transcript.halted
     ? "Paused"
@@ -961,11 +969,25 @@ function MessageSheet({ state, ctx, close, data }: SheetProps) {
     try {
       ctx.update({ careMessage: body });
       await ctx.api.sendCareMessage();
+      // Crisis words get the crisis lines now, the same as anywhere else; the message still reaches the team.
+      const urgent = urgentQuestion(body);
       const sent = [...(ctx.get().careMessages ?? [])].reverse().find((message) => message.sender === "patient");
+      if (urgent) {
+        flagRisk(ctx, "message", body);
+        track(ctx, "portal.support.crisis_resources_shown", { source: "message" });
+        ctx.update({
+          careMessages: (ctx.get().careMessages ?? []).map((message) =>
+            message.id === sent?.id ? { ...message, urgent: true } : message,
+          ),
+        });
+      }
       const anchor = deriveTranscript(SCRIPT, ctx.get()).active?.node.id ?? "complete";
       addAsk(ctx, anchor, {
         question: body,
-        answer: `Sent to ${first} and the care team. They usually reply within one business day, and their reply shows up here.`,
+        answer: urgent
+          ? `${answerQuestion(body).text} I’ve also sent your message to ${first} and the care team, and someone will check in with you today.`
+          : `Sent to ${first} and the care team. They usually reply within one business day, and their reply shows up here.`,
+        actions: urgent ? ["support"] : undefined,
         messageId: sent?.id,
       });
       close();

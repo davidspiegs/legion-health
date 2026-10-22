@@ -1,5 +1,7 @@
 # Checkout, patient portal, and first-visit architecture
 
+> **Baseline documentation.** This describes the screen-based baseline (`baseline-v1`, now at `?experience=classic`). The chat onboarding in the open PR is described in [chat-onboarding-design.md](chat-onboarding-design.md); its vendors, timing and tracking differ.
+
 Updated October 20, 2026. This describes `prototype/src` and the [patient journey](redesigned-journey.md). The endpoint is a **simulated clinician-completed first visit**, followed by care-plan publication and optional follow-up. The interface is designed as a coherent patient experience; all external connections remain local mocks. It is not a production clinical, authentication, or payment system.
 
 ## Application structure

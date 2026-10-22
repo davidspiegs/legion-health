@@ -2133,6 +2133,7 @@ function ChartSheet({ state, ctx, close, data }: SheetProps) {
     setError("");
     void ctx.api.importChart(organization).then(
       (chart) => {
+        ctx.update({ chartImport: { ...chart, afterApproval: ctx.get().chat.briefApproved } });
         receipt(ctx, `Imported your chart from ${chart.organization}`, "Epic MyChart (simulated)", "You");
         addAsk(ctx, data || "ready", {
           question: "",

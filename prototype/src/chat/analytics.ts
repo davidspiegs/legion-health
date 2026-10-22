@@ -14,9 +14,11 @@ import type { ChatJourney } from "./state";
  * New events cover what the current funnel can't see: a saved payment method, a booked
  * visit, check-in, and the first visit completed.
  *
- * Properties are enums, counts and booleans only. Never answers to health questions,
- * free text, conditions, names, birth dates, phone numbers, emails or member IDs. Events
- * go to PostHog under a BAA, identified by an internal ID, not an email.
+ * Minimum necessary: properties are enums, counts and booleans from an allowlist, never
+ * answers to health questions, free text, conditions, names, birth dates, phone numbers,
+ * emails or member IDs. Events about a patient of a psychiatric practice are still health
+ * information, so PostHog runs under a BAA with an internal ID as the person. Crisis and
+ * support events are marked for a restricted stream with narrower access.
  */
 
 export type EventValue = string | number | boolean | null;
@@ -35,16 +37,88 @@ const randomId = () =>
     ? crypto.randomUUID()
     : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
 
-/** One PostHog session per page load, as posthog-js would keep it. */
-const SESSION_ID = randomId();
+/** Like posthog-js: one session across reloads and tabs until 30 minutes without activity. */
+const SESSION_KEY = "legion-posthog-session";
+const FALLBACK_SESSION = randomId();
+function sessionId(): string {
+  try {
+    const now = Date.now();
+    const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || "null") as {
+      id: string;
+      at: number;
+    } | null;
+    const id = saved && now - saved.at < 30 * 60_000 ? saved.id : randomId();
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ id, at: now }));
+    return id;
+  } catch {
+    return FALLBACK_SESSION;
+  }
+}
+
+/** Every property an event may carry. Anything else is dropped before the event is built. */
+export const ALLOWED_PROPS = new Set([
+  "step",
+  "choice",
+  "mode",
+  "count",
+  "soonest",
+  "windows",
+  "rank",
+  "offers",
+  "ranked",
+  "lead_hours",
+  "result",
+  "via",
+  "member_id_entered",
+  "ai_notes",
+  "method",
+  "coverage",
+  "sources",
+  "days_from_booking",
+  "source",
+  "status",
+  "weeks_out",
+  "action",
+  "actions",
+  "from",
+  "kind",
+  "reason",
+  "reason_changed",
+  "note_changed",
+  "stage",
+  "$pathname",
+  "$anon_distinct_id",
+  "$set",
+]);
+
+/** Crisis and support events go to a restricted stream, kept apart from product analytics. */
+export function streamFor(
+  event: string,
+  props: EventProps,
+): "product" | "restricted" {
+  if (event.startsWith("portal.support.")) return "restricted";
+  if (
+    event === "portal.onboarding.fit_exited" &&
+    props.reason === "immediate_support"
+  )
+    return "restricted";
+  if (
+    event === "portal.assistant.question_answered" &&
+    props.source === "crisis"
+  )
+    return "restricted";
+  return "product";
+}
 
 const currentUrl = () =>
-  typeof window === "undefined" ? "" : `${window.location.origin}${window.location.pathname}`;
+  typeof window === "undefined"
+    ? ""
+    : `${window.location.origin}${window.location.pathname}`;
 
 /** Sent with every event: what posthog-js adds, plus which experience this is. */
 function superProperties(s: ChatJourney): EventProps {
   return {
-    $session_id: SESSION_ID,
+    $session_id: sessionId(),
     $current_url: currentUrl(),
     $lib: "posthog-js",
     experience: "chat",
@@ -56,13 +130,26 @@ function superProperties(s: ChatJourney): EventProps {
 }
 
 /** Builds one event. Super properties come first, so an event's own properties win. */
-export function capture(s: ChatJourney, distinctId: string, event: string, props: EventProps = {}): PostHogEvent {
+export function capture(
+  s: ChatJourney,
+  distinctId: string,
+  event: string,
+  props: EventProps = {},
+): PostHogEvent {
+  const allowed = Object.fromEntries(
+    Object.entries(props).filter(([key]) => ALLOWED_PROPS.has(key)),
+  );
   return {
     uuid: randomId(),
     event,
     timestamp: new Date().toISOString(),
     distinct_id: distinctId,
-    properties: { ...superProperties(s), distinct_id: distinctId, ...props },
+    properties: {
+      ...superProperties(s),
+      distinct_id: distinctId,
+      analytics_stream: streamFor(event, allowed),
+      ...allowed,
+    },
   };
 }
 
@@ -71,9 +158,16 @@ export const anonymousId = () => `anon_${randomId()}`;
 
 /** Hands an event to a real PostHog client when one is on the page. */
 export function forward(event: PostHogEvent) {
-  const client = typeof window === "undefined" ? undefined : (window as Window & { posthog?: PostHogClient }).posthog;
+  const client =
+    typeof window === "undefined"
+      ? undefined
+      : (window as Window & { posthog?: PostHogClient }).posthog;
   if (!client) return;
-  if (event.event === "$identify") client.identify?.(event.distinct_id, JSON.parse(String(event.properties.$set ?? "{}")));
+  if (event.event === "$identify")
+    client.identify?.(
+      event.distinct_id,
+      JSON.parse(String(event.properties.$set ?? "{}")),
+    );
   else client.capture?.(event.event, event.properties);
 }
 
@@ -88,13 +182,14 @@ interface PostHogClient {
 const ANSWER_EVENTS: Record<string, string> = {
   hello: "portal.onboarding.started",
   story: "portal.onboarding.conditions",
-  goal: "portal.onboarding.goal_set",
+  // Legion's needs page asks what the patient wants help with; here that's the goal question.
+  goal: "portal.onboarding.needs",
   quick: "portal.onboarding.fit_checked",
   "screen-now": "portal.onboarding.safety_answered",
   hospital: "portal.onboarding.history_answered",
   pay: "portal.onboarding.insurance_selected",
   payer: "portal.onboarding.payer_selected",
-  when: "portal.onboarding.needs",
+  when: "portal.onboarding.availability_set",
   choose: "portal.provider_selected",
   phone: "portal.onboarding.phone_submitted",
   code: "portal.onboarding.phone_verified",
@@ -141,7 +236,9 @@ export function answerEvent<C>(
     props.count = s.conditions.length;
   } else if (node.id === "when") {
     props.soonest = s.chat.availability.includes("soonest");
-    props.windows = s.chat.availability.filter((item) => item !== "soonest").length;
+    props.windows = s.chat.availability.filter(
+      (item) => item !== "soonest",
+    ).length;
   } else if (node.id === "choose" && s.chat.match) {
     const rank = s.chat.match.offerIds.indexOf(s.providerId);
     props.rank = rank >= 0 ? rank + 1 : null;
@@ -159,10 +256,20 @@ export function answerEvent<C>(
 /* ------------------------------------------------------------- milestones */
 
 const hoursUntil = (iso: string | undefined) =>
-  iso ? Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 3_600_000)) : null;
+  iso
+    ? Math.max(
+        0,
+        Math.round((new Date(iso).getTime() - Date.now()) / 3_600_000),
+      )
+    : null;
 
 const accountCreated = (s: ChatJourney) =>
-  s.events.some((event) => event.service === "Auth" && event.operation === "account.created" && event.outcome === "success");
+  s.events.some(
+    (event) =>
+      event.service === "Auth" &&
+      event.operation === "account.created" &&
+      event.outcome === "success",
+  );
 
 /** Fit-check exits as coarse reason codes, so appropriate exits can be told apart from friction. */
 const EXIT_REASON: Record<string, string> = {
@@ -178,35 +285,57 @@ const EXIT_REASON: Record<string, string> = {
  * What happened between two states of the same conversation, as events. Milestones come
  * from the journey itself (a booking, a visit, a plan), never from the screen alone.
  */
-export function milestoneEvents(prev: ChatJourney, next: ChatJourney): [string, EventProps][] {
+export function milestoneEvents(
+  prev: ChatJourney,
+  next: ChatJourney,
+): [string, EventProps][] {
   const events: [string, EventProps][] = [];
-  const add = (event: string, props: EventProps = {}) => events.push([event, props]);
+  const add = (event: string, props: EventProps = {}) =>
+    events.push([event, props]);
 
   if (next.exitReason && next.exitReason !== prev.exitReason)
-    add("portal.onboarding.fit_exited", { reason: EXIT_REASON[next.exitReason] ?? "other" });
+    add("portal.onboarding.fit_exited", {
+      reason: EXIT_REASON[next.exitReason] ?? "other",
+    });
 
   const match = next.chat.jobs.match;
-  if (match?.status === "done" && match.finishedAt !== prev.chat.jobs.match?.finishedAt && next.chat.match)
+  if (
+    match?.status === "done" &&
+    match.finishedAt !== prev.chat.jobs.match?.finishedAt &&
+    next.chat.match
+  )
     add("portal.provider.match_shown", {
       offers: next.chat.match.offerIds.length,
       ranked: next.chat.match.rankedIds.length,
     });
 
   if (next.reservation && next.reservation.slotId !== prev.reservation?.slotId)
-    add("portal.provider.reservation.created", { lead_hours: hoursUntil(slotStart(next.reservation.slotId)) });
+    add("portal.provider.reservation.created", {
+      lead_hours: hoursUntil(slotStart(next.reservation.slotId)),
+    });
 
-  if (next.chat.identity !== prev.chat.identity && (next.chat.identity === "found" || next.chat.identity === "not-found"))
-    add("portal.onboarding.identity_prefilled", { result: next.chat.identity === "found" ? "found" : "not_found" });
+  if (
+    next.chat.identity !== prev.chat.identity &&
+    (next.chat.identity === "found" || next.chat.identity === "not-found")
+  )
+    add("portal.onboarding.identity_prefilled", {
+      result: next.chat.identity === "found" ? "found" : "not_found",
+    });
 
-  if (accountCreated(next) && !accountCreated(prev)) add("portal.onboarding.userCreated");
+  if (accountCreated(next) && !accountCreated(prev))
+    add("portal.onboarding.userCreated");
 
-  if (next.agreements && !prev.agreements) add("portal.onboarding.agreements_accepted", { ai_notes: next.chat.aiNotes });
+  if (next.agreements && !prev.agreements)
+    add("portal.onboarding.agreements_accepted", {
+      ai_notes: next.chat.aiNotes,
+    });
 
   const benefits = next.chat.jobs.benefits;
   if (
     benefits &&
     ["done", "pending", "failed"].includes(benefits.status) &&
-    (benefits.status !== prev.chat.jobs.benefits?.status || benefits.finishedAt !== prev.chat.jobs.benefits?.finishedAt)
+    (benefits.status !== prev.chat.jobs.benefits?.status ||
+      benefits.finishedAt !== prev.chat.jobs.benefits?.finishedAt)
   )
     add("portal.onboarding.benefits_checked", {
       result:
@@ -222,28 +351,52 @@ export function milestoneEvents(prev: ChatJourney, next: ChatJourney): [string, 
                 ? "not_matched"
                 : "error",
       via: next.chat.benefits?.via ?? (next.payer ? "chosen" : "discovery"),
-      member_id_entered: next.chat.receipts.some((item) => item.action === "Added the member ID from your card"),
+      member_id_entered: next.chat.receipts.some(
+        (item) => item.action === "Added the member ID from your card",
+      ),
     });
 
-  if (next.paymentSetup.status === "succeeded" && prev.paymentSetup.status !== "succeeded")
+  if (
+    next.paymentSetup.status === "succeeded" &&
+    prev.paymentSetup.status !== "succeeded"
+  )
     add("portal.onboarding.payment_method_saved", {
-      method: next.paymentSetup.method?.id === "pm_mock_applepay" ? "apple_pay" : "card",
+      method:
+        next.paymentSetup.method?.id === "pm_mock_applepay"
+          ? "apple_pay"
+          : "card",
     });
 
   const appointment = next.appointment;
   const before = prev.appointment;
-  if (appointment?.status === "confirmed" && (before?.id !== appointment.id || before.status !== "confirmed"))
-    add("portal.appointment.booked", { lead_hours: hoursUntil(appointment.start), coverage: next.coverage });
-  else if (appointment && before && appointment.id === before.id && appointment.slotId !== before.slotId)
-    add("portal.appointment.rescheduled", { lead_hours: hoursUntil(appointment.start) });
+  if (
+    appointment?.status === "confirmed" &&
+    (before?.id !== appointment.id || before.status !== "confirmed")
+  )
+    add("portal.appointment.booked", {
+      lead_hours: hoursUntil(appointment.start),
+      coverage: next.coverage,
+    });
+  else if (
+    appointment &&
+    before &&
+    appointment.id === before.id &&
+    appointment.slotId !== before.slotId
+  )
+    add("portal.appointment.rescheduled", {
+      lead_hours: hoursUntil(appointment.start),
+    });
 
-  if (next.recordsStatus !== prev.recordsStatus && (next.recordsStatus === "ready" || next.recordsStatus === "unavailable"))
+  if (
+    next.recordsStatus !== prev.recordsStatus &&
+    (next.recordsStatus === "ready" || next.recordsStatus === "unavailable")
+  )
     add("portal.records.searched", {
       result: next.recordsStatus === "ready" ? "found" : "none",
       sources: next.chat.recordsFound?.sources.length ?? 0,
     });
 
-  if (next.chartImport && !prev.chartImport) add("portal.chart.imported", { lab_results: next.chartImport.labResults });
+  if (next.chartImport && !prev.chartImport) add("portal.chart.imported");
 
   const status = next.encounter.status;
   if (status !== prev.encounter.status) {
@@ -256,15 +409,27 @@ export function milestoneEvents(prev: ChatJourney, next: ChatJourney): [string, 
       });
   }
 
-  if (next.carePlan.status === "published" && prev.carePlan.status !== "published") add("portal.care_plan.published");
+  if (
+    next.carePlan.status === "published" &&
+    prev.carePlan.status !== "published"
+  )
+    add("portal.care_plan.published");
 
   const rx = next.prescriptions?.[0];
-  if (rx && rx.id !== prev.prescriptions?.[0]?.id) add("portal.prescription.sent", { status: rx.status });
+  if (rx && rx.id !== prev.prescriptions?.[0]?.id)
+    add("portal.prescription.sent", { status: rx.status });
 
-  if (next.followupAppointment && next.followupAppointment.id !== prev.followupAppointment?.id)
-    add("portal.followup.booked", { weeks_out: weeksOut(next.followupAppointment.start) });
+  if (
+    next.followupAppointment &&
+    next.followupAppointment.id !== prev.followupAppointment?.id
+  )
+    add("portal.followup.booked", {
+      weeks_out: weeksOut(next.followupAppointment.start),
+    });
 
-  const sent = (s: ChatJourney) => (s.careMessages ?? []).filter((message) => message.sender === "patient").length;
+  const sent = (s: ChatJourney) =>
+    (s.careMessages ?? []).filter((message) => message.sender === "patient")
+      .length;
   if (sent(next) > sent(prev)) add("portal.care_message.sent");
 
   return events;
@@ -277,9 +442,18 @@ const slotStart = (slotId: string) => {
 };
 
 function daysFromBooking(s: ChatJourney): number | null {
-  const booked = s.chat.receipts.find((item) => item.action.startsWith("Booked "))?.at;
+  const booked = s.chat.receipts.find((item) =>
+    item.action.startsWith("Booked "),
+  )?.at;
   if (!booked) return null;
-  return Math.max(0, Math.round((Date.now() - new Date(booked).getTime()) / 86_400_000));
+  return Math.max(
+    0,
+    Math.round((Date.now() - new Date(booked).getTime()) / 86_400_000),
+  );
 }
 
-const weeksOut = (iso: string) => Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / (7 * 86_400_000)));
+const weeksOut = (iso: string) =>
+  Math.max(
+    0,
+    Math.round((new Date(iso).getTime() - Date.now()) / (7 * 86_400_000)),
+  );

@@ -666,7 +666,7 @@ export async function connectChart(ctx: ChatContext) {
   ctx.update({ chat: { chart: "connecting" } });
   const chart = await ctx.api.importChart(chartOrganization(ctx.get())).catch(() => null);
   if (!chart) return void ctx.update({ chat: { chart: "failed" } });
-  ctx.update({ chat: { chart: "done" } });
+  ctx.update({ chartImport: { ...chart, afterApproval: ctx.get().chat.briefApproved }, chat: { chart: "done" } });
   receipt(ctx, `Imported your chart from ${chart.organization}`, "Epic MyChart (simulated)", "You");
 }
 

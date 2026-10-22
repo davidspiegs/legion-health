@@ -1906,7 +1906,7 @@ const EVENT_CAP = 8;
 
 /** The measurement plan, live: ids and outcomes, newest first. */
 /** What posthog-js adds to every event, left out of the list so each event's own properties stand out. */
-const SUPER_PROPS = new Set(["distinct_id", "experience", "assistant", "booked", "preview", "preview_scenario"]);
+const SUPER_PROPS = new Set(["distinct_id", "experience", "assistant", "booked", "preview", "preview_scenario", "analytics_stream"]);
 const ownProps = (event: ChatState["analytics"][number]) =>
   Object.fromEntries(Object.entries(event.properties).filter(([key]) => !key.startsWith("$") || key === "$anon_distinct_id").filter(([key]) => !SUPER_PROPS.has(key)));
 

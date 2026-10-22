@@ -96,6 +96,7 @@ export const SOURCE_LABEL: Record<RiskSource, string> = {
   medication: "their medication answer",
   allergy: "their allergy answer",
   brief: "an edit to their brief",
+  message: "a message to their care team",
 };
 
 /** What each reason code means, what should happen, and by when. */

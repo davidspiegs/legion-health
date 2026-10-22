@@ -1533,13 +1533,11 @@ function Plan({ state }: CardProps) {
             <span className="vs-fact-label">Prescriptions</span>
             {rx ? (
               <>
-                <span className="vs-fact-value">
-                  {rx.medication}, {rx.supply}
-                </span>
+                <span className="vs-fact-value">Continue {rx.medication.toLowerCase()}</span>
                 <span className="vs-fact-note">
                   {rx.status === "sent"
-                    ? `Sent to ${rx.pharmacy} through DoseSpot, simulated`
-                    : `Didn’t reach ${rx.pharmacy} yet. Your care team is resending it today.`}
+                    ? `${who.first} sent a ${rx.supply} to ${rx.pharmacy} through DoseSpot, simulated`
+                    : `${who.first}’s ${rx.supply} didn’t reach ${rx.pharmacy} yet. Your care team is resending it today.`}
                 </span>
               </>
             ) : (
@@ -1899,7 +1897,8 @@ function chartRow(s: ChatJourney): BriefRow | null {
   return {
     label: "Records from MyChart",
     value: `${chart.organization}: ${chart.conditions.join(", ")}, with ${chart.labResults} lab results and ${chart.visitNotes} visit notes`,
-    source: "You shared",
+    // A chart shared after the brief was approved is marked, so the approval isn't read as covering it.
+    source: chart.afterApproval ? "You shared after approving" : "You shared",
   };
 }
 

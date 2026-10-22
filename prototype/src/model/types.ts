@@ -172,6 +172,8 @@ export interface CareMessage {
   sender: "patient" | "care-team";
   status: "sending" | "delivered" | "failed";
   replyTo?: string;
+  /** Risk language was found, so the care team checks in today instead of sending the routine reply. */
+  urgent?: boolean;
 }
 /** The patient's pharmacy for e-prescribing, saved in DoseSpot (simulated). */
 export interface Pharmacy {
@@ -198,6 +200,8 @@ export interface ChartImport {
   allergies: string[];
   labResults: number;
   visitNotes: number;
+  /** Shared after the patient approved their visit brief, so the brief shows it as added later. */
+  afterApproval?: boolean;
 }
 export interface JourneyState {
   version: 1;

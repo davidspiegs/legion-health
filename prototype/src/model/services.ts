@@ -1243,7 +1243,9 @@ export function createMockApi({
               {
                 id: `reply-${target.id}`,
                 replyTo: target.id,
-                body: "Thanks for reaching out. We’ve received your message. Your care team can help with scheduling and visit questions here; medical questions will be reviewed by your clinician.",
+                body: target.urgent
+                  ? "We’ve read your message, and someone from the care team will reach out to you today. If you’re in danger right now, call or text 988, or call 911."
+                  : "Thanks for reaching out. We’ve received your message. Your care team can help with scheduling and visit questions here; medical questions will be reviewed by your clinician.",
                 at: new Date().toISOString(),
                 sender: "care-team",
                 status: "delivered",
