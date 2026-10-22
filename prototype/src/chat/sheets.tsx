@@ -57,7 +57,7 @@ import {
 import { ASSISTANT, PREVIEW } from "./env";
 import { bookingAnswer } from "./assistant";
 import { answerQuestion, type GuideAnswer } from "./guide-ai";
-import { clinicianById, type Clinician } from "./inventory";
+import { clinicianById, formalName, type Clinician } from "./inventory";
 import { PSYCHIATRIST, storyOtherLabel, waitingForId } from "./model";
 import type { Moment } from "./moments";
 import { SupportLines } from "./cards";
@@ -2939,7 +2939,7 @@ export function ClinicianView({ state, ctx }: { state: ChatJourney; ctx: ChatCon
   const review = reviewFirst(s, gaps);
   const providerId = s.appointment?.providerId || (s.chat.slotChosen ? s.providerId : "");
   const clinician = providerId ? clinicianById(providerId) : undefined;
-  const reviewer = clinician?.name ?? "The clinician";
+  const reviewer = clinician ? formalName(clinician) : "The clinician";
   const last = lastReview(s);
   const flagged = !!openTask(s, "care-team", FLAG_TASK);
 
