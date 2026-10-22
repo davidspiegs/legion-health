@@ -238,6 +238,6 @@ test("after the visit the clinician view says the brief was reviewed and the pla
   assert.match(before, /Accept brief/);
   const done = momentState("complete");
   const html = renderToStaticMarkup(createElement(ClinicianView, { state: done, ctx: p.ctx }));
-  assert.match(html, /Maya Chen reviewed this brief and signed the care plan\./);
+  assert.match(html, /Dr\.\s+Chen reviewed this brief and signed the care plan\./);
   assert.doesNotMatch(html, /AI draft\. Clinician review required\.|Accept brief|Flag for review/);
 });
