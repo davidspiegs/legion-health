@@ -379,15 +379,6 @@ export const DISCOVERED_PLAN = { payer: "Blue Cross Blue Shield of Texas", membe
 /** The pharmacy's NCPDP ID in DoseSpot (fictional). */
 export const PHARMACY_NCPDP_ID = "4512783";
 
-/** The fictional chart Epic MyChart shares for the preview persona. */
-export const MYCHART_CHART = {
-  conditions: ["Generalized anxiety disorder", "Seasonal allergies"],
-  medications: ["Sertraline 50 mg daily", "Cetirizine 10 mg as needed"],
-  allergies: ["Penicillin (rash)"],
-  labResults: 6,
-  visitNotes: 3,
-};
-
 /** One medication in a patient's regimen, as the pharmacy's fill history shows it. */
 export interface RegimenMed {
   /** Display name: the brand alone for Adderall, otherwise "Generic (Brand)". */
@@ -502,4 +493,38 @@ export function regimenFor(conditions: readonly string[]): readonly RegimenMed[]
 /** "Adderall 20 mg once every morning; Escitalopram (Lexapro) 10 mg once a day". */
 export function regimenLine(meds: readonly RegimenMed[]): string {
   return meds.map((med) => `${med.name} ${med.dose} ${med.schedule}`).join("; ");
+}
+
+/** A medication mid-sentence: "escitalopram (Lexapro) 10 mg". A brand on its own, like Adderall, keeps its capital. */
+export const medInSentence = (text: string) => (/^[A-Z][a-z]+ \(/.test(text) ? text[0].toLowerCase() + text.slice(1) : text);
+
+/** "Adderall 20 mg and escitalopram (Lexapro) 10 mg", as a sentence names them; without doses when none are given. */
+export function medsInSentence(meds: readonly { name: string; dose?: string }[]): string {
+  const named = meds.map((med) => medInSentence(med.dose ? `${med.name} ${med.dose}` : med.name));
+  return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
+}
+
+/** How the family clinic's chart names each intake choice. */
+const DIAGNOSES: Record<string, string> = {
+  ADHD: "ADHD, combined type",
+  Anxiety: "Generalized anxiety disorder",
+  Depression: "Major depressive disorder",
+  PTSD: "Post-traumatic stress disorder",
+  "Bipolar Disorder": "Bipolar II disorder",
+};
+
+/**
+ * The fictional chart Epic MyChart shares: the family clinic's diagnoses for the conditions the
+ * patient chose, and the same regimen the pharmacy fills, so the chart never disagrees with the records.
+ */
+export function mychartChart(conditions: readonly string[]) {
+  const diagnoses = REGIMEN_CONDITIONS.filter((condition) => conditions.includes(condition)).map((c) => DIAGNOSES[c]);
+  return {
+    // The starting SSRI's reason, for a patient who chose none of the five.
+    conditions: [...(diagnoses.length ? diagnoses : ["Anxiety with depressed mood"]), "Seasonal allergies"],
+    medications: [...regimenFor(conditions).map((med) => `${med.name} ${med.dose} ${med.schedule}`), "Cetirizine 10 mg as needed"],
+    allergies: ["Penicillin (rash)"],
+    labResults: 6,
+    visitNotes: 3,
+  };
 }

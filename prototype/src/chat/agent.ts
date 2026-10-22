@@ -1,5 +1,15 @@
 import type { Appointment, MockApi, Slot } from "../model/types";
-import { followupSlots, formatDate, formatTime, slots, validateBirth } from "../model/fixtures";
+import {
+  followupSlots,
+  formatDate,
+  formatTime,
+  medInSentence,
+  medsInSentence,
+  regimenFor,
+  slots,
+  validateBirth,
+  type RegimenMed,
+} from "../model/fixtures";
 import { eligibilityInputKey, journeyNow } from "../model/journey-state";
 import { anonymousId, capture, forward, type EventProps, type PostHogEvent } from "./analytics";
 import { readStory } from "./guide-ai";
@@ -13,6 +23,7 @@ import {
   type ChatState,
   type JobId,
   type Receipt,
+  type RecordsFound,
 } from "./state";
 
 export type ChatPatch = Partial<Omit<ChatJourney, "chat">> & {
@@ -644,20 +655,25 @@ export async function runBooking(ctx: ChatContext) {
   }
 }
 
-export const RECORDS_FIXTURE = {
-  sources: [
-    { name: "Austin Family Medicine", kind: "clinic" as const, date: "Jun 2025" },
-    { name: "CVS Pharmacy, South Congress", kind: "pharmacy" as const, date: "Sep 2026" },
-  ],
-  medication: {
-    name: "Sertraline",
-    dose: "50 mg daily",
-    lastFilled: "Sep 28",
-    pharmacy: "CVS Pharmacy, South Congress",
-  },
-  allergy: "Penicillin (rash)",
-  pharmacy: { name: "CVS Pharmacy", address: "2508 S Congress Ave, Austin" },
-};
+/** The pharmacy that fills the patient's regimen, in their records and in DoseSpot. */
+export const RECORDS_PHARMACY = { name: "CVS Pharmacy", address: "2508 S Congress Ave, Austin" };
+
+/**
+ * What the health network finds for this patient: the family clinic, and the pharmacy's fill
+ * history of the regimen that goes with the conditions they chose (fixtures.ts), so the
+ * reconciliation, the brief, the chart and the plan all name the same medications.
+ */
+export function recordsFor(s: Pick<ChatJourney, "conditions">): RecordsFound {
+  return {
+    sources: [
+      { name: "Austin Family Medicine", kind: "clinic", date: "Jun 2025" },
+      { name: "CVS Pharmacy, South Congress", kind: "pharmacy", date: "Sep 2026" },
+    ],
+    medications: regimenFor(s.conditions).map(({ name, dose, schedule }) => ({ name, dose, schedule, lastFilled: "Sep 28" })),
+    allergy: "Penicillin (rash)",
+    pharmacy: { ...RECORDS_PHARMACY },
+  };
+}
 
 /** The clinic in the patient's records, or the one in the fictional chart. */
 export const chartOrganization = (s: ChatJourney) =>
@@ -682,7 +698,7 @@ export async function runRecords(ctx: ChatContext) {
   // A restart, a changed answer or a newer search while waiting makes this result stale.
   if (!current() || ctx.get().chat.records !== "yes") return drop(ctx, "records", current);
   if (result === "ready") {
-    ctx.update({ chat: { recordsFound: RECORDS_FIXTURE } });
+    ctx.update({ chat: { recordsFound: recordsFor(ctx.get()) } });
     setJob(ctx, "records", { status: "done", finishedAt: Date.now() });
     receipt(ctx, "Requested your records and found 2 sources", "Metriport health network (simulated)");
   } else {
@@ -732,6 +748,69 @@ export async function runBrief(ctx: ChatContext) {
   const redraft = ctx.get().chat.receipts.some((item) => item.action === BRIEF_DRAFTED);
   setJob(ctx, "brief", { status: "done", finishedAt: Date.now() });
   receipt(ctx, redraft ? "Redrafted your visit brief with your changes" : BRIEF_DRAFTED, "Legion AI");
+}
+
+/**
+ * What the clinician continues once the plan is signed: the patient's regimen, unless they said
+ * they stopped it or take nothing. A list the patient typed in place of a pharmacy record is
+ * theirs to go over in the visit, so nothing is continued from it.
+ */
+function continuedRegimen(s: ChatJourney): readonly RegimenMed[] {
+  const c = s.chat;
+  if (!s.conditions.length || c.medication === "stopped" || c.medication === "none") return [];
+  if (c.medication === "other" && c.medicationNote.trim()) return [];
+  return regimenFor(s.conditions);
+}
+
+/** The prescription DoseSpot sends for one medication: "Adderall 20 mg once every morning". */
+export const prescriptionFor = (med: RegimenMed) => `${med.name} ${med.dose} ${med.schedule}`;
+
+const PLAN_SUPPLY = "30-day supply";
+
+let continuing: Promise<void> | null = null;
+
+/**
+ * Once the plan is signed, the simulated clinician continues the regimen: one prescription per
+ * medication through DoseSpot. A patient who skipped prep has no pharmacy saved yet, so the one
+ * on record is saved first, unless they asked for a different one. Safe to call again.
+ */
+export function sendPlanPrescriptions(ctx: ChatContext): Promise<void> {
+  continuing ??= continueRegimen(ctx).finally(() => (continuing = null));
+  return continuing;
+}
+
+async function continueRegimen(ctx: ChatContext) {
+  const s = ctx.get();
+  const meds = continuedRegimen(s);
+  if (s.carePlan.status !== "published" || s.prescriptions?.length || !s.appointment || !meds.length) return;
+  const first = clinicianFirst(s.appointment.providerId);
+  if (!s.pharmacy) {
+    if (s.chat.pharmacy === "other") return;
+    const saved = await ctx.api.savePharmacy(RECORDS_PHARMACY).catch(() => null);
+    if (!saved) return;
+    receipt(ctx, `${first} saved ${saved.name}, ${saved.address.split(",")[0]} as your pharmacy`, "DoseSpot (simulated)", "Your clinician");
+  }
+  // Sent together, so the plan lists them together.
+  const results = await Promise.all(
+    meds.map((med) => ctx.api.sendPrescription({ medication: prescriptionFor(med), supply: PLAN_SUPPLY }).catch(() => null)),
+  );
+  const sent = meds.filter((_, index) => results[index]?.status === "sent");
+  const pharmacy = results.find(Boolean)?.pharmacy ?? "";
+  if (sent.length)
+    receipt(
+      ctx,
+      `${first} sent your ${medsInSentence(sent.map(({ name }) => ({ name })))} ${sent.length === 1 ? "prescription" : "prescriptions"} to ${pharmacy}`,
+      "DoseSpot (simulated)",
+      "Your clinician",
+    );
+  meds.forEach((med, index) => {
+    if (results[index]?.status !== "failed") return;
+    addTask(
+      ctx,
+      { kind: "care-team", title: `Resend the ${medInSentence(med.name)} prescription to ${pharmacy}`, due: "Today" },
+      "Asked the care team to resend your prescription",
+    );
+  });
 }
 
 /** Preview only: moves the clock to just before the visit so joining opens. */

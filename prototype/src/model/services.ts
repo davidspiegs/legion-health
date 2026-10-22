@@ -6,8 +6,8 @@ import {
   followupSlots,
   validateBirth,
   DISCOVERED_PLAN,
-  MYCHART_CHART,
   PHARMACY_NCPDP_ID,
+  mychartChart,
   PREVIEW_CODE,
   VERIFIED_RECORD,
 } from "./fixtures";
@@ -1387,16 +1387,17 @@ export function createMockApi({
         () => {
           const { pharmacy } = getState();
           if (!pharmacy) throw new Error("Choose a pharmacy before a prescription can be sent.");
+          // A resend replaces the copy the pharmacy didn't confirm.
+          const others = (getState().prescriptions ?? []).filter((item) => item.medication !== medication);
           const prescription: Prescription = {
-            id: `rx-${Date.now()}`,
+            // A plan sends several at once, so the time alone isn't unique.
+            id: `rx-${Date.now()}-${others.length}`,
             medication,
             supply,
             pharmacy: `${pharmacy.name}, ${pharmacy.address.split(",")[0]}`,
             status: consumeFault("prescription-failed") ? "failed" : "sent",
             at: new Date().toISOString(),
           };
-          // A resend replaces the copy the pharmacy didn't confirm.
-          const others = (getState().prescriptions ?? []).filter((item) => item.medication !== medication);
           update({ prescriptions: [...others, prescription] });
           return prescription;
         },
@@ -1415,7 +1416,7 @@ export function createMockApi({
         "Fictional chart shared with the patient’s permission",
         () => {
           if (consumeFault("mychart-unavailable")) throw new Error("MyChart didn’t connect. Try again in a moment.");
-          const chartImport: ChartImport = { organization, importedAt: new Date().toISOString(), ...MYCHART_CHART };
+          const chartImport: ChartImport = { organization, importedAt: new Date().toISOString(), ...mychartChart(getState().conditions) };
           update({ chartImport });
           return chartImport;
         },

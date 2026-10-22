@@ -78,6 +78,9 @@ export type AskActionId =
   | "followup"
   | "join";
 
+/** Where a typed answer came from: the crisis lines, the booking, a model, or Legion's stated policies. */
+export type AnswerSource = "crisis" | "booking" | "model" | "policies";
+
 /** A question asked once the onboarding questions are done, and the assistant's reply. */
 export interface Ask {
   id: string;
@@ -92,11 +95,22 @@ export interface Ask {
   messageId?: string;
   /** Answered again when the visit actually moves, so the conversation confirms it. */
   awaiting?: "move";
+  /** Where the answer came from; a model's answer is captioned as one. */
+  source?: AnswerSource;
+}
+
+/** One medication in the pharmacy's fill history. */
+export interface FilledMed {
+  name: string;
+  dose: string;
+  schedule: string;
+  lastFilled: string;
 }
 
 export interface RecordsFound {
   sources: { name: string; kind: "clinic" | "pharmacy" | "lab"; date: string }[];
-  medication: { name: string; dose: string; lastFilled: string; pharmacy: string } | null;
+  /** The patient's regimen, as the pharmacy fills it; empty when no pharmacy record came back. */
+  medications: FilledMed[];
   allergy: string | null;
   pharmacy: { name: string; address: string } | null;
 }

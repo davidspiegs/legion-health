@@ -733,6 +733,10 @@
   font-weight: 600;
   color: var(--ink);
 }
+/* A plan that continues several medications lists one per line. */
+.vs-fact-value + .vs-fact-value {
+  margin-top: 3px;
+}
 .vs-fact-note {
   margin-top: 1px;
   font-size: 13px;

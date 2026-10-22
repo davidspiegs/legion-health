@@ -415,9 +415,11 @@ export function milestoneEvents(
   )
     add("portal.care_plan.published");
 
-  const rx = next.prescriptions?.[0];
-  if (rx && rx.id !== prev.prescriptions?.[0]?.id)
-    add("portal.prescription.sent", { status: rx.status });
+  // One event per prescription DoseSpot sends, or resends.
+  const sentBefore = new Set((prev.prescriptions ?? []).map((rx) => rx.id));
+  for (const rx of next.prescriptions ?? [])
+    if (!sentBefore.has(rx.id))
+      add("portal.prescription.sent", { status: rx.status });
 
   if (
     next.followupAppointment &&

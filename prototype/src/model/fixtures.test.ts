@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { REGIMENS, REGIMEN_FALLBACK, initialState, regimenFor, regimenLine, reviewIntakeAnswers } from "./fixtures";
+import {
+  REGIMENS,
+  REGIMEN_FALLBACK,
+  initialState,
+  medsInSentence,
+  mychartChart,
+  regimenFor,
+  regimenLine,
+  reviewIntakeAnswers,
+} from "./fixtures";
 import { FLOW } from "./flow";
 import type { Step } from "./types";
 
@@ -126,4 +135,26 @@ test("the regimen reads as one line, medication by medication", () => {
     regimenLine(regimenFor(["PTSD"])),
     "Sertraline (Zoloft) 100 mg once every morning; Prazosin (Minipress) 2 mg once at bedtime",
   );
+});
+
+test("mid-sentence, generic names drop their capital and brands keep theirs", () => {
+  assert.equal(medsInSentence(regimenFor(["ADHD", "Anxiety"])), "Adderall 20 mg and escitalopram (Lexapro) 10 mg");
+  assert.equal(
+    medsInSentence(regimenFor(["ADHD", "Anxiety", "Bipolar Disorder"]).map(({ name }) => ({ name }))),
+    "Adderall, lamotrigine (Lamictal) and hydroxyzine (Vistaril)",
+  );
+});
+
+test("the MyChart chart names the chosen conditions and the same regimen the pharmacy fills", () => {
+  const chart = mychartChart(["PTSD", "ADHD"]);
+  assert.deepEqual(chart.conditions, ["ADHD, combined type", "Post-traumatic stress disorder", "Seasonal allergies"]);
+  assert.deepEqual(chart.medications, [
+    "Adderall 20 mg once every morning",
+    "Sertraline (Zoloft) 100 mg once every morning",
+    "Prazosin (Minipress) 2 mg once at bedtime",
+    "Cetirizine 10 mg as needed",
+  ]);
+  const unsure = mychartChart(["I'm not sure"]);
+  assert.deepEqual(unsure.medications, ["Sertraline (Zoloft) 50 mg once every morning", "Cetirizine 10 mg as needed"]);
+  assert.equal(unsure.conditions.at(-1), "Seasonal allergies");
 });

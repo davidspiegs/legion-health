@@ -45,6 +45,18 @@ test("the funnel runs through the first completed visit, from the journey itself
   assert.deepEqual(milestoneEvents(done, { ...done }), [], "nothing fires again for an unchanged state");
 });
 
+test("each prescription the plan sends is one event, with its status and never the medication", () => {
+  const done = momentState("complete");
+  const at = new Date().toISOString();
+  const rx = (id: string, medication: string, status: "sent" | "failed") => ({ id, medication, supply: "30-day supply", pharmacy: "CVS Pharmacy, 2508 S Congress Ave", status, at });
+  const sent = { ...done, prescriptions: [rx("rx-1-0", "Adderall 20 mg once every morning", "failed"), rx("rx-1-1", "Escitalopram (Lexapro) 10 mg once a day", "sent")] };
+  const events = milestoneEvents(done, sent).filter(([event]) => event === "portal.prescription.sent");
+  assert.deepEqual(events.map(([, props]) => props), [{ status: "failed" }, { status: "sent" }]);
+  // The resend replaces the copy the pharmacy didn't confirm.
+  const resent = { ...sent, prescriptions: [sent.prescriptions[1], rx("rx-2-1", "Adderall 20 mg once every morning", "sent")] };
+  assert.deepEqual(milestoneEvents(sent, resent).filter(([event]) => event === "portal.prescription.sent").map(([, props]) => props), [{ status: "sent" }]);
+});
+
 test("events are in PostHog's format, and creating the account identifies the patient", () => {
   const ctx = context(momentState("booking"));
   track(ctx, "portal.onboarding.phone_verified", { step: "code" });
@@ -79,7 +91,7 @@ test("no event carries answers to health questions, free text, or contact detail
   const props = Object.entries(sample).map(([id, value]) => answerEvent(node(id), node(id).input?.(s), value, s, false)[1]);
   const milestones = milestoneEvents(momentState("start"), s).map(([, p]) => p);
   const everything = JSON.stringify([...props, ...milestones]);
-  for (const phi of ["Anxiety", "ADHD", "worrying", "5125550148", "alex@", "1993", "unsafe", "W2N48217", "Lee", "Alex", "Rivera", "Sertraline"])
+  for (const phi of ["Anxiety", "ADHD", "worrying", "5125550148", "alex@", "1993", "unsafe", "W2N48217", "Lee", "Alex", "Rivera", "Adderall", "Lexapro", "scitalopram"])
     assert.ok(!everything.includes(phi), `"${phi}" reached an event`);
 
   const pay = answerEvent(node("pay"), node("pay").input?.(momentState("start")), "insurance", momentState("start"), false);

@@ -22,15 +22,16 @@ import { CLINICIANS } from "./inventory";
 import { callModel, modelContext } from "./model";
 import { flagRisk } from "./safety";
 import { booked, priceLine } from "./script";
-import type { Ask, AskActionId, ChatJourney } from "./state";
+import type { AnswerSource, Ask, AskActionId, ChatJourney } from "./state";
 
 /*
  * Once the onboarding questions are done, the conversation stays open: the patient
  * can ask for common things in one tap, or type anything. One-tap requests, and
  * typed questions about the booking's own facts (when it is, what it costs, when
- * check-in opens), are answered from the booking itself. Other typed questions go
- * to a language model behind /api/assistant when the deployment has one, after the
- * local crisis check, with Legion's stated policies as the fallback.
+ * check-in opens), are answered from the booking itself. Other typed questions,
+ * and every question about medications, go to a language model behind
+ * /api/assistant when the deployment has one, with the patient's regimen in its
+ * context, after the local crisis check. Legion's stated policies are the fallback.
  */
 
 export type QuickId =
@@ -253,11 +254,9 @@ async function askModel(s: ChatJourney, question: string): Promise<{ answer: str
 
 /**
  * A typed question. Crisis language is caught locally before anything else and
- * always gets the crisis lines; a model never decides that.
+ * always gets the crisis lines; a model never decides that. A medication question
+ * goes to the model even when it sounds like the booking ("how much sertraline…").
  */
-/** Where a typed answer came from, for measurement: never the question itself. */
-export type AnswerSource = "crisis" | "booking" | "model" | "policies";
-
 export async function answerTyped(
   ctx: ChatContext,
   question: string,
@@ -267,7 +266,7 @@ export async function answerTyped(
     flagRisk(ctx, "help", question);
     return { answer: local.text, actions: ["support"], source: "crisis" };
   }
-  const fromBooking = bookingAnswer(ctx.get(), question);
+  const fromBooking = local.intent === "medication" ? null : bookingAnswer(ctx.get(), question);
   if (fromBooking) return { ...fromBooking, source: "booking" };
   const live = await askModel(ctx.get(), question);
   if (live) return { ...live, source: "model" };

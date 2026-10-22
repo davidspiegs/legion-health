@@ -12,6 +12,7 @@ import {
   appointmentLabel,
   followupOptions,
   matchInputs,
+  prescriptionFor,
   runBenefits,
   runBooking,
   runHold,
@@ -19,6 +20,7 @@ import {
   runMatch,
   runRecords,
   sendCode,
+  sendPlanPrescriptions,
   slotLabel,
   verifyCode,
   type ChatContext,
@@ -28,7 +30,8 @@ import { fitsPreference, inventory } from "./inventory";
 import { momentState } from "./moments";
 import { reconcile } from "./reconcile";
 import { SCRIPT } from "./script";
-import { DISCOVERED_PLAN } from "../model/fixtures";
+import { DISCOVERED_PLAN, medsInSentence, regimenFor, regimenLine } from "../model/fixtures";
+import { modelContext } from "./model";
 import { PREVIEW_CODE, initialChatJourney, type ChatJourney, type ChatState } from "./state";
 
 inventory();
@@ -514,17 +517,119 @@ test("a missed plan asks for the member ID right away, and checking with it conf
   );
 });
 
-test("DoseSpot saves the pharmacy and sends a refill, and a refill the pharmacy didn't confirm is resent", async () => {
+test("DoseSpot saves the pharmacy and sends a prescription, and one the pharmacy didn't confirm is resent", async () => {
   const p = patient({ scenario: "prescription-failed" });
-  await assert.rejects(p.ctx.api.sendPrescription({ medication: "Sertraline 50 mg daily", supply: "30-day refill" }), /pharmacy/);
+  const rx = { medication: "Adderall 20 mg once every morning", supply: "30-day supply" };
+  await assert.rejects(p.ctx.api.sendPrescription(rx), /pharmacy/);
   const saved = await p.ctx.api.savePharmacy({ name: "CVS Pharmacy", address: "2508 S Congress Ave, Austin" });
   assert.ok(saved.ncpdpId);
-  const failed = await p.ctx.api.sendPrescription({ medication: "Sertraline 50 mg daily", supply: "30-day refill" });
+  const failed = await p.ctx.api.sendPrescription(rx);
   assert.equal(failed.status, "failed");
-  const resent = await p.ctx.api.sendPrescription({ medication: "Sertraline 50 mg daily", supply: "30-day refill" });
+  const resent = await p.ctx.api.sendPrescription(rx);
   assert.equal(resent.status, "sent");
   assert.equal(p.state.prescriptions?.length, 1, "a resend replaces the copy that didn't arrive");
   assert.equal(p.state.prescriptions?.[0].pharmacy, "CVS Pharmacy, 2508 S Congress Ave");
+});
+
+const node = (id: string) => SCRIPT.find((item) => item.id === id)!;
+const askOf = (id: string, s: ChatJourney) => {
+  const block = node(id).say(s).find((item) => item.id === "ask");
+  return block?.kind === "text" ? block.text : "";
+};
+
+/** A finished first visit with a signed plan, for these conditions, with prep done the way a patient does it or skipped. */
+async function signedPlan(conditions: string[], prep: boolean) {
+  const done = momentState("complete");
+  if (!prep) {
+    const booked = momentState("booked");
+    return patient({
+      ...done,
+      conditions,
+      pharmacy: null,
+      healthReviewed: false,
+      chat: { ...booked.chat, prep: "later", reminderReply: "confirm" },
+    });
+  }
+  const { records: _records, ...jobs } = done.chat.jobs;
+  const p = patient({
+    ...done,
+    conditions,
+    pharmacy: null,
+    chat: { ...done.chat, recordsFound: null, medication: "", pharmacy: "", jobs },
+  });
+  await runRecords(p.ctx);
+  return p;
+}
+
+test("every reader names the same regimen: records, reconciliation, MyChart, the plan's prescriptions and the model", async () => {
+  for (const conditions of [["ADHD"], ["Anxiety", "Depression"], ["Bipolar Disorder", "PTSD"], ["I'm not sure"]]) {
+    const regimen = regimenFor(conditions);
+    const label = conditions.join("+");
+
+    const p = await signedPlan(conditions, true);
+    const found = p.state.chat.recordsFound;
+    assert.deepEqual(
+      found?.medications.map((med) => `${med.name} ${med.dose} ${med.schedule}`),
+      regimen.map(prescriptionFor),
+      `${label}: the pharmacy's fill history`,
+    );
+    const them = regimen.length === 1 ? "it" : "them";
+    assert.equal(
+      askOf("medication", p.state),
+      `Your pharmacy shows ${medsInSentence(regimen)}, last filled Sep 28. Are you still taking ${them}?`,
+      label,
+    );
+    await node("medication").submit!("taking", p.ctx);
+    await node("pharmacy").submit!("suggested", p.ctx);
+    const chart = await p.ctx.api.importChart("Austin Family Medicine");
+    assert.deepEqual(chart.medications, [...regimen.map(prescriptionFor), "Cetirizine 10 mg as needed"], `${label}: MyChart`);
+
+    await sendPlanPrescriptions(p.ctx);
+    assert.deepEqual(p.state.prescriptions?.map((rx) => rx.medication), regimen.map(prescriptionFor), `${label}: the plan`);
+    assert.ok(p.state.prescriptions?.every((rx) => rx.status === "sent" && rx.supply === "30-day supply"));
+    const context = modelContext(p.state);
+    assert.equal(context.medications, regimenLine(regimen), `${label}: the model`);
+    for (const med of regimen) assert.ok(context.plan.includes(`continue ${prescriptionFor(med)} (`), `${label}: ${med.name} in the plan`);
+    assert.equal(p.receipts("sent your").length, 1, "one receipt for the whole plan");
+
+    // Prep skipped: no records and no pharmacy, so the one on record is saved before the plan is sent.
+    const q = await signedPlan(conditions, false);
+    assert.equal(q.state.chat.recordsFound, null);
+    await sendPlanPrescriptions(q.ctx);
+    assert.equal(q.state.pharmacy?.name, "CVS Pharmacy", `${label}: pharmacy saved`);
+    assert.deepEqual(q.state.prescriptions?.map((rx) => rx.medication), regimen.map(prescriptionFor), `${label}: skipped prep`);
+    assert.equal(modelContext(q.state).medications, regimenLine(regimen), `${label}: the model, skipped prep`);
+  }
+});
+
+test("the plan continues nothing the patient stopped, and sends once however often it's asked", async () => {
+  for (const medication of ["stopped", "none"] as const) {
+    const p = await signedPlan(["ADHD", "Anxiety"], true);
+    p.update({ chat: { medication } });
+    await sendPlanPrescriptions(p.ctx);
+    assert.equal(p.state.prescriptions, undefined, medication);
+  }
+  const typed = await signedPlan(["ADHD"], true);
+  typed.update({ chat: { medication: "other", medicationNote: "Wellbutrin 150 mg" } });
+  await sendPlanPrescriptions(typed.ctx);
+  assert.equal(typed.state.prescriptions, undefined, "a list the patient typed is gone over in the visit");
+
+  const twice = await signedPlan(["ADHD", "Anxiety"], false);
+  await Promise.all([sendPlanPrescriptions(twice.ctx), sendPlanPrescriptions(twice.ctx)]);
+  await sendPlanPrescriptions(twice.ctx);
+  assert.equal(twice.state.prescriptions?.length, 2);
+  assert.equal(twice.receipts("sent your").length, 1);
+});
+
+test("a prescription the pharmacy didn't confirm goes to the care team to resend", async () => {
+  const p = await signedPlan(["ADHD", "Anxiety"], true);
+  p.update({ scenario: "prescription-failed" });
+  await node("medication").submit!("taking", p.ctx);
+  await node("pharmacy").submit!("suggested", p.ctx);
+  await sendPlanPrescriptions(p.ctx);
+  assert.deepEqual(p.state.prescriptions?.map((rx) => rx.status), ["failed", "sent"]);
+  assert.match(p.state.chat.tasks.at(-1)?.title ?? "", /^Resend the Adderall prescription to CVS Pharmacy/);
+  assert.equal(p.receipts("sent your escitalopram (Lexapro) prescription").length, 1);
 });
 
 test("a MyChart import can fail once, then brings in the chart", async () => {

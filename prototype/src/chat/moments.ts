@@ -3,7 +3,7 @@ import type { Scenario } from "../model/types";
 import { deriveTranscript } from "./engine";
 import { fitsPreference, inventory, match } from "./inventory";
 import { SCRIPT } from "./script";
-import { RECORDS_FIXTURE, matchInputs } from "./agent";
+import { RECORDS_PHARMACY, matchInputs, recordsFor } from "./agent";
 import { initialChatJourney, type ChatJourney } from "./state";
 
 /**
@@ -150,7 +150,7 @@ function bookedState(s: ChatJourney): ChatJourney {
 function preparedState(s: ChatJourney): ChatJourney {
   return {
     ...s,
-    pharmacy: { ...RECORDS_FIXTURE.pharmacy, ncpdpId: PHARMACY_NCPDP_ID },
+    pharmacy: { ...RECORDS_PHARMACY, ncpdpId: PHARMACY_NCPDP_ID },
     healthReviewed: true,
     recordsPermission: true,
     recordsStatus: "ready",
@@ -159,7 +159,7 @@ function preparedState(s: ChatJourney): ChatJourney {
       ...s.chat,
       prep: "yes",
       records: "yes",
-      recordsFound: RECORDS_FIXTURE,
+      recordsFound: recordsFor(s),
       medication: "taking",
       allergy: "yes",
       pharmacy: "suggested",

@@ -10,7 +10,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Info, LifeBuoy, ListChecks, SlidersHorizontal, X } from "lucide-react";
+import { Info, LifeBuoy, ListChecks, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { createMockApi } from "../model/services";
 import { applyJourneyPatch, joinAvailability, journeyNow, recoverPaymentSetup } from "../model/journey-state";
 import { formatTime } from "../model/fixtures";
@@ -38,13 +38,13 @@ import { SCRIPT, readingStory } from "./script";
 import { flagRisk } from "./safety";
 import { answerQuestion } from "./guide-ai";
 import {
-  addTask,
   clinicianFirst,
   matchInputs,
-  receipt,
+  recordsFor,
   runBenefits,
   runMatch,
   runRecords,
+  sendPlanPrescriptions,
   skipToVisitDay,
   stamp,
   track,
@@ -121,6 +121,11 @@ function restore(): ChatJourney {
           analytics: ((saved.chat.analytics || []) as { uuid?: string }[]).filter((item) => !!item?.uuid) as ChatState["analytics"],
           // A typed question still being answered when the page closed can't finish now.
           asks: recoverAsks((saved.chat.asks || []) as Ask[]),
+          // Records saved when they held a single medication are read again as the regimen.
+          recordsFound:
+            saved.chat.recordsFound && !Array.isArray(saved.chat.recordsFound.medications)
+              ? recordsFor({ conditions: saved.conditions ?? [] })
+              : (saved.chat.recordsFound ?? null),
         },
       };
       return withKnownSlots(restored);
@@ -536,26 +541,10 @@ function ChatApp() {
     return () => cancelAnimationFrame(frame);
   }, [editing, reduced]);
 
-  // Once the plan is signed, the simulated clinician refills a medication the patient said they still
-  // take, through DoseSpot to the pharmacy they saved. Anything new is decided in the visit itself.
+  // Once the plan is signed, the simulated clinician continues the patient's regimen through
+  // DoseSpot, one prescription per medication. Anything new is decided in the visit itself.
   useEffect(() => {
-    const s = stateRef.current;
-    const med = s.chat.recordsFound?.medication;
-    if (s.carePlan.status !== "published" || s.prescriptions?.length || !s.pharmacy) return;
-    if (!med || s.chat.medication !== "taking" || !s.appointment) return;
-    const first = clinicianFirst(s.appointment.providerId);
-    const drug = med.name.toLowerCase();
-    void ctx.api.sendPrescription({ medication: `${med.name} ${med.dose}`, supply: "30-day refill" }).then(
-      (rx) =>
-        rx.status === "sent"
-          ? receipt(ctx, `${first} sent your ${drug} refill to ${rx.pharmacy}`, "DoseSpot (simulated)", "Your clinician")
-          : addTask(
-              ctx,
-              { kind: "care-team", title: `Resend the ${drug} refill to ${rx.pharmacy}`, due: "Today" },
-              "Asked the care team to resend your prescription",
-            ),
-      () => undefined,
-    );
+    if (state.carePlan.status === "published") void sendPlanPrescriptions(ctx);
   }, [state.carePlan.status, ctx]);
 
   // Leaving the visit room: when whatever opened it is gone, focus goes to what's next in the dock.
@@ -721,7 +710,7 @@ function ChatApp() {
     const reply = urgentQuestion(text)
       ? await answerTyped(ctx, text)
       : (await Promise.all([answerTyped(ctx, text), new Promise((resolve) => setTimeout(resolve, 650))]))[0];
-    settleAsk(ctx, id, { answer: reply.answer, actions: reply.actions, status: "done" });
+    settleAsk(ctx, id, { answer: reply.answer, actions: reply.actions, status: "done", source: reply.source });
     track(ctx, "portal.assistant.question_answered", { source: reply.source, actions: reply.actions.length });
     setAskBusy(false);
   };
@@ -1065,6 +1054,12 @@ function AskRow({
             <AgentAvatar />
             <div className="bubble">{ask.answer}</div>
           </div>
+          {ask.source === "model" ? (
+            <p className="ask-ai-note">
+              <Sparkles size={12} aria-hidden="true" />
+              AI answer
+            </p>
+          ) : null}
           {ask.actions?.length ? (
             <div className="ask-actions">
               {ask.actions.map((action) => (

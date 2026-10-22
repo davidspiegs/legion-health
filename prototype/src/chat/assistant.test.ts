@@ -206,3 +206,55 @@ test("cost answers include a late-change fee the patient agreed to", () => {
   assert.match(billingLine(moved), /plus the \$100 late-change fee you agreed to/);
   assert.doesNotMatch(billingLine(s), /fee you agreed to/);
 });
+
+/** A browser with a model behind /api/assistant that answers every call with `reply`, recording each body. */
+function withModel(reply: Record<string, unknown>) {
+  const calls: Record<string, unknown>[] = [];
+  const saved = { window: (globalThis as { window?: unknown }).window, fetch: globalThis.fetch };
+  (globalThis as { window?: unknown }).window = { location: { origin: "http://localhost", pathname: "/", search: "" } };
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    calls.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+    return new Response(JSON.stringify(reply), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  const restore = () => {
+    (globalThis as { window?: unknown }).window = saved.window;
+    globalThis.fetch = saved.fetch;
+  };
+  return { calls, restore };
+}
+
+test("medication questions go to the model even when they sound like the booking", async () => {
+  const ctx = context(momentState("booked"));
+  for (const question of ["How much Adderall should I take before my visit?", "Can I change the time of day I take my Lexapro?"]) {
+    const reply = await answerTyped(ctx, question);
+    assert.notEqual(reply.source, "booking", question);
+    assert.notEqual(reply.answer, billingLine(ctx.state()), question);
+    assert.notDeepEqual(reply.actions, ["reschedule"], question);
+  }
+  assert.equal((await answerTyped(ctx, "How much will I pay for the visit?")).source, "booking", "the booking still answers its own facts");
+});
+
+test("Claude answers a medication question with the patient's regimen in context, and the answer is marked as the model's", async () => {
+  const model = withModel({
+    reply: "Take your Adderall 20 mg in the morning as usual. A missed dose late in the day is best skipped, so it doesn't keep you up.",
+    actions: [],
+  });
+  try {
+    const ctx = context(momentState("booked"));
+    const reply = await answerTyped(ctx, "I forgot my Adderall this morning, should I take it now?");
+    assert.equal(reply.source, "model");
+    assert.match(reply.answer, /^Take your Adderall/);
+    const [call] = model.calls;
+    assert.equal(call.task, "question");
+    assert.equal(
+      (call.context as Record<string, string>).medications,
+      "Adderall 20 mg once every morning; Escitalopram (Lexapro) 10 mg once a day",
+    );
+    const id = addAsk(ctx, "ready", { question: "I forgot my Adderall this morning", status: "thinking" });
+    settleAsk(ctx, id, { answer: reply.answer, actions: reply.actions, status: "done", source: reply.source });
+    const [kept] = recoverAsks(ctx.state().chat.asks.filter((ask) => ask.id === id));
+    assert.equal(kept.source, "model", "the caption survives a reload");
+  } finally {
+    model.restore();
+  }
+});

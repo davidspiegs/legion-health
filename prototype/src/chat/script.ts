@@ -1,4 +1,4 @@
-import { CONDITION_OPTIONS, formatDate, formatTime, validateBirth } from "../model/fixtures";
+import { CONDITION_OPTIONS, formatDate, formatTime, medsInSentence, validateBirth } from "../model/fixtures";
 import { joinAvailability, journeyNow } from "../model/journey-state";
 import type { AgentBlock, ChatNode, ChatOption } from "./engine";
 import { mentionsCrisis, readStory } from "./guide-ai";
@@ -1211,7 +1211,7 @@ const medication: Node = {
   applies: (s) => prepping(s) && recordsSettled(s),
   skip: prepPassed,
   say: (s) => {
-    const med = s.chat.recordsFound?.medication;
+    const meds = s.chat.recordsFound?.medications ?? [];
     return [
       ...(s.chat.recordsFound
         ? [card("records-found")]
@@ -1220,8 +1220,8 @@ const medication: Node = {
           : []),
       say(
         "ask",
-        med
-          ? `Your pharmacy shows ${med.name.toLowerCase()} ${med.dose}, last filled ${med.lastFilled}. Are you still taking it?`
+        meds.length
+          ? `Your pharmacy shows ${medsInSentence(meds)}, last filled ${meds[0].lastFilled}. Are you still taking ${meds.length === 1 ? "it" : "them"}?`
           : "Are you taking any medications right now?",
       ),
     ];
@@ -1236,7 +1236,7 @@ const medication: Node = {
           submit: "Send",
           maxLength: 200,
         }
-      : s.chat.recordsFound?.medication
+      : s.chat.recordsFound?.medications.length
         ? {
             kind: "single",
             options: [

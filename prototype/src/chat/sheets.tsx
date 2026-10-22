@@ -33,7 +33,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { formatPhone } from "../model/fixtures";
+import { formatPhone, medsInSentence } from "../model/fixtures";
 import type { Notification, Profile, Scenario } from "../model/types";
 import { addTask, clinicianName, receipt, reminderTimes, skipToVisitDay, track, type ChatContext } from "./agent";
 import {
@@ -1139,13 +1139,13 @@ function nameAndPlace(s: ChatJourney, text: string): string {
 }
 
 function medicationShown(s: ChatJourney, text: string): string {
-  const med = s.chat.recordsFound?.medication;
+  const meds = s.chat.recordsFound?.medications ?? [];
   if (s.chat.medication === "none") return "None";
-  if (!med) return text;
-  const name = med.name.toLowerCase();
-  if (s.chat.medication === "taking") return `Still taking ${name} ${med.dose}`;
-  if (s.chat.medication === "stopped") return `Stopped ${name}`;
-  if (s.chat.medication === "changed") return `Different dose of ${name}`;
+  if (!meds.length) return text;
+  const names = medsInSentence(meds.map(({ name }) => ({ name })));
+  if (s.chat.medication === "taking") return `Still taking ${medsInSentence(meds)}`;
+  if (s.chat.medication === "stopped") return `Stopped ${names}`;
+  if (s.chat.medication === "changed") return `Different dose of ${names}`;
   return text;
 }
 
@@ -1757,8 +1757,8 @@ const SCENARIOS: { value: Scenario; title: string; where: string; moment?: Momen
   { value: "care-plan-delayed", title: "Plan takes longer", where: "After the visit", moment: "visit-day" },
   {
     value: "prescription-failed",
-    title: "Refill doesn’t reach the pharmacy",
-    where: "When your clinician sends your refill after the visit",
+    title: "Prescription doesn’t reach the pharmacy",
+    where: "When your clinician sends your prescriptions after the visit",
     moment: "visit-day",
   },
   {
@@ -2216,7 +2216,7 @@ function dataGaps(s: ChatJourney): string[] {
   else {
     if (s.chat.records === "no") gaps.push("Patient skipped records");
     else if (s.chat.jobs.records?.status === "failed") gaps.push("No records found (Metriport, simulated)");
-    if (s.chat.medication === "other" && !s.chat.recordsFound?.medication)
+    if (s.chat.medication === "other" && !s.chat.recordsFound?.medications.length)
       gaps.push("Medication list is self-reported only");
     if (s.chat.baselineIntro === "skip") gaps.push("Patient skipped the check-ins");
     if (s.healthReviewed && s.chat.pharmacy !== "suggested") gaps.push("No pharmacy on file");
@@ -2537,7 +2537,8 @@ type Tone = "ok" | "review" | "open";
 
 interface MedFact {
   label: string;
-  value: string;
+  /** One line, or one per medication. */
+  value: string | string[];
   source?: string;
   check?: { text: string; tone: Tone };
 }
@@ -2546,17 +2547,19 @@ const TONE_ICON: Record<Tone, LucideIcon> = { ok: CircleCheck, review: CircleAle
 
 function medFacts(s: ChatJourney): MedFact[] {
   const found = s.chat.recordsFound;
-  const med = found?.medication;
+  const meds = found?.medications ?? [];
+  const filledAt = found?.sources.find((source) => source.kind === "pharmacy")?.name ?? "the pharmacy";
+  const them = meds.length === 1 ? "it" : "them";
   const medicationChecks: Record<string, { text: string; tone: Tone }> = {
-    taking: { text: "Patient confirmed they still take it", tone: "ok" },
+    taking: { text: `Patient confirmed they still take ${them}`, tone: "ok" },
     stopped: { text: "Patient says they stopped", tone: "review" },
     changed: { text: "Patient says the dose is different", tone: "review" },
   };
-  const medication: MedFact = med
+  const medication: MedFact = meds.length
     ? {
-        label: "Medication",
-        value: `${med.name} ${med.dose}`,
-        source: `Filled at ${med.pharmacy}, last on ${med.lastFilled}. Metriport (simulated)`,
+        label: meds.length === 1 ? "Medication" : "Medications",
+        value: meds.map((med) => `${med.name} ${med.dose} ${med.schedule}`),
+        source: `Filled at ${filledAt}, last on ${meds[0].lastFilled}. Metriport (simulated)`,
         check: medicationChecks[s.chat.medication] ?? { text: "Not confirmed by patient yet", tone: "open" },
       }
     : s.chat.medication === "none"
@@ -2616,7 +2619,11 @@ function MedsSection({ s }: { s: ChatJourney }) {
             <div key={fact.label}>
               <dt>{fact.label}</dt>
               <dd>
-                <span className="sh-med-value">{fact.value}</span>
+                {(Array.isArray(fact.value) ? fact.value : [fact.value]).map((line) => (
+                  <span className="sh-med-value" key={line}>
+                    {line}
+                  </span>
+                ))}
                 {fact.source ? <span className="sh-med-source">{fact.source}</span> : null}
                 {fact.check && Icon ? (
                   <span className={`sh-med-check is-${fact.check.tone}`}>
