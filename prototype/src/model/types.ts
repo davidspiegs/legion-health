@@ -174,6 +174,19 @@ export interface CareMessage {
   replyTo?: string;
   /** Risk language was found, so the care team checks in today instead of sending the routine reply. */
   urgent?: boolean;
+  /** Who on the care team wrote a reply, when it's their clinician ("Dr. Chen") rather than the team. */
+  author?: string;
+  /** The model's first pass on a patient's message, for the care team inbox. */
+  triage?: CareTriage;
+}
+export type TriageCategory = "scheduling" | "billing" | "medication" | "clinical" | "records" | "other";
+export interface CareTriage {
+  category: TriageCategory;
+  /** One line for the team. */
+  summary: string;
+  /** A reply the team can edit and send; empty when there's nothing to start from. */
+  draft: string;
+  status: "drafting" | "ready" | "failed";
 }
 /** The patient's pharmacy for e-prescribing, saved in DoseSpot (simulated). */
 export interface Pharmacy {

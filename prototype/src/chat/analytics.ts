@@ -86,6 +86,8 @@ export const ALLOWED_PROPS = new Set([
   "reason_changed",
   "note_changed",
   "stage",
+  "category",
+  "edited",
   "$pathname",
   "$anon_distinct_id",
   "$set",
@@ -106,6 +108,9 @@ export function streamFor(
     event === "portal.assistant.question_answered" &&
     props.source === "crisis"
   )
+    return "restricted";
+  // A reply to a message the crisis check flagged is a crisis event too.
+  if (event === "portal.care_team.reply_sent" && props.category === "urgent")
     return "restricted";
   return "product";
 }

@@ -1,0 +1,363 @@
+/*
+ * The care team view: a staff tool beside the conversation. Quieter and denser than the
+ * patient's side; rules between rows rather than cards. Every class here is prefixed ct-.
+ */
+.ct-panel {
+  --ct-rule: #eef1f6;
+  display: grid;
+  min-width: 0;
+  animation: ct-in 280ms var(--chat-ease) both;
+}
+.ct-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ct-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.016em;
+  outline: none;
+}
+.ct-sub {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.ct-close {
+  width: 36px;
+  height: 36px;
+  margin: -4px -4px 0 0;
+}
+
+/* Two views, underlined like a staff tool's tabs. The bar stays put while the view scrolls. */
+.ct-tabs {
+  position: sticky;
+  top: -18px;
+  z-index: 4;
+  display: flex;
+  gap: 2px;
+  margin: 12px 0 18px;
+  padding-top: 4px;
+  background: white;
+  box-shadow: inset 0 -1px 0 var(--chat-line);
+}
+.ct-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 14.5px;
+  font-weight: 550;
+  transition: color 160ms ease;
+}
+.ct-tab::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--blue);
+  transform: scaleX(0);
+  transition: transform 240ms var(--chat-ease);
+}
+.ct-tab[aria-selected="true"] {
+  color: var(--ink);
+}
+.ct-tab[aria-selected="true"]::after {
+  transform: scaleX(1);
+}
+@media (hover: hover) {
+  .ct-tab[aria-selected="false"]:hover {
+    color: var(--ink);
+  }
+}
+.ct-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--blue);
+  color: white;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.ct-body {
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------- inbox */
+
+.ct-inbox {
+  gap: 24px;
+}
+.ct-inbox > .sh-section {
+  padding-top: 20px;
+  border-top: 1px solid var(--ct-rule);
+}
+.ct-empty {
+  padding: 4px 0;
+}
+.ct-messages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.ct-msg {
+  min-width: 0;
+  padding: 16px 0;
+  animation: ct-in 260ms var(--chat-ease) both;
+}
+.ct-msg:first-child {
+  padding-top: 0;
+}
+.ct-msg:last-child {
+  padding-bottom: 0;
+}
+.ct-msg + .ct-msg {
+  border-top: 1px solid var(--ct-rule);
+}
+.ct-msg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 22px;
+}
+.ct-route {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.3;
+  animation: ct-fade 220ms ease both;
+}
+.ct-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.ct-cat::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a3aec2;
+}
+.ct-cat.is-medication::before,
+.ct-cat.is-clinical::before {
+  background: var(--blue);
+}
+.ct-cat.is-urgent {
+  color: var(--chat-crisis);
+}
+.ct-cat.is-urgent::before {
+  background: var(--chat-crisis);
+}
+.ct-owner {
+  color: var(--muted);
+}
+.ct-route .sh-due {
+  min-height: 20px;
+  padding: 0 7px;
+  font-size: 12px;
+}
+.ct-time {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* While the model reads the message, a soft light passes over the line (as on Wren's work cards). */
+.ct-reading {
+  font-size: 13px;
+  font-weight: 600;
+  background-image: linear-gradient(100deg, var(--muted) 0 38%, #c3cbd9 50%, var(--muted) 62% 100%);
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ct-shimmer 2.3s cubic-bezier(0.45, 0.1, 0.4, 1) infinite;
+}
+.ct-summary {
+  margin: 7px 0 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+  text-wrap: pretty;
+  animation: ct-fade 220ms ease both;
+}
+.ct-quote {
+  margin: 6px 0 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--chat-line);
+  font-size: 14px;
+  line-height: 1.45;
+  color: #3d4757;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ct-meta {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.ct-reply {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.ct-reply-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 20px;
+}
+.ct-reply-head label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ct-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--muted);
+  animation: ct-fade 220ms ease both;
+}
+.ct-source svg {
+  color: var(--blue);
+}
+.ct-reset {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--chat-blue-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.ct-reply textarea {
+  width: 100%;
+  min-height: 104px;
+  padding: 10px 12px;
+  border: 1px solid var(--chat-chip);
+  border-radius: 12px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.45;
+  resize: vertical;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+.ct-reply textarea.is-drafting {
+  background: #fafbfd;
+}
+.ct-reply .ct-send {
+  justify-self: end;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  box-shadow: none;
+}
+.ct-sent {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  animation: ct-in 240ms var(--chat-ease) both;
+}
+.ct-sent-line {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--chat-ok);
+}
+.ct-sent-line time {
+  margin-left: 2px;
+  font-weight: 500;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ct-sent-body {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 2px solid #cfe8da;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #3d4757;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------- clinician */
+
+/* The chart's action bar sits on the rail's own bottom padding instead of a sheet's. */
+.ct-body .sh-chart-actions {
+  --sh-sheet-pad: 28px;
+}
+
+@keyframes ct-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes ct-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ct-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ct-panel,
+  .ct-msg,
+  .ct-route,
+  .ct-summary,
+  .ct-source,
+  .ct-sent,
+  .ct-reading {
+    animation: none;
+  }
+  .ct-tab::after {
+    transition: none;
+  }
+}

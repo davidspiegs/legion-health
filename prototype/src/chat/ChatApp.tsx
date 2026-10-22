@@ -10,13 +10,13 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Info, LifeBuoy, ListChecks, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { Info, LifeBuoy, ListChecks, SlidersHorizontal, Sparkles, UsersRound, X } from "lucide-react";
 import { createMockApi } from "../model/services";
 import { applyJourneyPatch, joinAvailability, journeyNow, recoverPaymentSetup } from "../model/journey-state";
 import { formatTime } from "../model/fixtures";
 import { useMobileViewport } from "../hooks/useMobileViewport";
 import { useCareSimulation } from "../hooks/useCareSimulation";
-import type { JourneyState, Scenario } from "../model/types";
+import type { CareMessage, JourneyState, Scenario } from "../model/types";
 import { answerEvent, milestoneEvents } from "./analytics";
 import { STAGES, deriveTranscript, stageProgress, type TranscriptItem } from "./engine";
 import { useReducedMotion, useReveal } from "./useReveal";
@@ -64,7 +64,7 @@ import {
   visitWhenLine,
   type QuickId,
 } from "./assistant";
-import { inventory } from "./inventory";
+import { clinicianById, inventory } from "./inventory";
 import { momentState, type Moment } from "./moments";
 import { STORAGE_KEY, initialChat, initialChatJourney, type Ask, type AskActionId, type ChatJourney, type ChatState } from "./state";
 import { reconcile } from "./reconcile";
@@ -76,6 +76,8 @@ import { VISIT_CARDS, VISIT_SHEETS, VISIT_WIDGETS, VisitRoom } from "./visit";
 import { INFO_CARDS, INFO_SHEETS } from "./sheets";
 import { BOOKED_CARDS, downloadCalendar } from "./cards-booked";
 import { ChatBoundary } from "./boundary";
+import { CareTeamPanel, type CareTab } from "./careteam";
+import { recoverTriage, triageMessage } from "./triage";
 import "./chat.css";
 import "./cards.css";
 
@@ -103,11 +105,10 @@ function restore(): ChatJourney {
             ? { status: "unverified", estimate: null }
             : saved.eligibility || base.eligibility,
         paymentSetup: saved.paymentSetup ? recoverPaymentSetup(saved.paymentSetup) : base.paymentSetup,
-        careMessages: (saved.careMessages || []).map((message: object) => ({
-          sender: "patient",
-          status: "delivered",
-          ...message,
-        })),
+        careMessages: (saved.careMessages || []).map((message: object) =>
+          // A first pass cut off by the reload shows its fallback rather than drafting forever.
+          recoverTriage({ sender: "patient", status: "delivered", ...message } as CareMessage),
+        ),
         chat: {
           ...initialChat(),
           ...saved.chat,
@@ -162,6 +163,10 @@ function ChatApp() {
   // Restart and jump start a new generation; work from an older one can't write into it.
   const epochRef = useRef(0);
   const [notice, setNotice] = useState("");
+  // The care team view takes the rail's place on wide screens (Preview only).
+  const [careOpen, setCareOpen] = useState(false);
+  const [careTab, setCareTab] = useState<CareTab>("inbox");
+  const careButton = useRef<HTMLButtonElement>(null);
   const app = useRef<HTMLDivElement>(null);
   const thread = useRef<HTMLDivElement>(null);
   const dock = useRef<HTMLDivElement>(null);
@@ -754,7 +759,7 @@ function ChatApp() {
   useLayoutEffect(() => markShown(dock.current), [dockKey]);
 
   return (
-    <div className={`chat-app ${typing ? "is-typing" : ""}`} ref={app}>
+    <div className={`chat-app ${typing ? "is-typing" : ""} ${careOpen ? "is-care-open" : ""}`} ref={app}>
       <header className={`chat-header ${scrolled ? "is-scrolled" : ""}`} inert={covered}>
         <button
           type="button"
@@ -769,6 +774,18 @@ function ChatApp() {
           </span>
         </button>
         <div className="chat-header-actions">
+          {PREVIEW ? (
+            <button
+              type="button"
+              ref={careButton}
+              className="care-view-toggle"
+              aria-pressed={careOpen}
+              onClick={() => setCareOpen((open) => !open)}
+            >
+              <UsersRound size={16} strokeWidth={2} aria-hidden="true" />
+              Care team view
+            </button>
+          ) : null}
           <button
             type="button"
             className="icon-button"
@@ -915,13 +932,28 @@ function ChatApp() {
             <div className="chat-dock is-empty" aria-hidden="true" />
           )}
         </main>
-        <aside className="chat-rail" aria-label="Your first visit">
-          {PREVIEW ? (
-            <button type="button" className="preview-pill in-rail" onClick={() => setSheet({ name: "preview" })}>
-              <SlidersHorizontal size={14} /> Preview tools
-            </button>
-          ) : null}
-          {INFO_SHEETS.journey?.render({ state, ctx, close: () => undefined, data: "rail" })}
+        <aside className="chat-rail" aria-label={careOpen ? "Care team view" : "Your first visit"}>
+          {careOpen ? (
+            <CareTeamPanel
+              state={state}
+              ctx={ctx}
+              tab={careTab}
+              onTab={setCareTab}
+              onClose={() => {
+                setCareOpen(false);
+                careButton.current?.focus({ preventScroll: true });
+              }}
+            />
+          ) : (
+            <>
+              {PREVIEW ? (
+                <button type="button" className="preview-pill in-rail" onClick={() => setSheet({ name: "preview" })}>
+                  <SlidersHorizontal size={14} /> Preview tools
+                </button>
+              ) : null}
+              {INFO_SHEETS.journey?.render({ state, ctx, close: () => undefined, data: "rail" })}
+            </>
+          )}
         </aside>
       </div>
       {sheet && sheetEntry ? (
@@ -971,6 +1003,8 @@ function MessageSheet({ state, ctx, close, data }: SheetProps) {
           ),
         });
       }
+      // The care team inbox gets a first pass in the background; urgent messages skip it.
+      if (sent && !urgent) void triageMessage(ctx, sent.id);
       const anchor = deriveTranscript(SCRIPT, ctx.get()).active?.node.id ?? "complete";
       addAsk(ctx, anchor, {
         question: body,
@@ -1036,9 +1070,9 @@ function AskRow({
   state: ChatJourney;
   onAction: (action: AskActionId, askId: string) => void;
 }) {
-  const reply = ask.messageId
-    ? (state.careMessages ?? []).find((message) => message.replyTo === ask.messageId)
-    : undefined;
+  const replies = ask.messageId
+    ? (state.careMessages ?? []).filter((message) => message.replyTo === ask.messageId)
+    : [];
   return (
     <div className="thread-item ask-item">
       {ask.question ? (
@@ -1071,18 +1105,26 @@ function AskRow({
           ) : null}
         </>
       ) : null}
-      {reply ? (
-        <>
-          <p className="msg-sender">Legion care team</p>
-          <div className="msg from-agent from-care enter">
-            <span className="care-avatar" aria-hidden="true">
-              LC
-            </span>
-            <div className="bubble">{reply.body}</div>
-          </div>
-        </>
-      ) : null}
+      {replies.map((reply) => (
+        <CareReply key={reply.id} reply={reply} state={state} />
+      ))}
     </div>
+  );
+}
+
+/** A reply from the care team, signed by the clinician when they wrote it. */
+function CareReply({ reply, state }: { reply: CareMessage; state: ChatJourney }) {
+  const clinician = reply.author && state.appointment ? clinicianById(state.appointment.providerId) : undefined;
+  return (
+    <>
+      <p className="msg-sender">{reply.author ?? "Legion care team"}</p>
+      <div className="msg from-agent from-care enter">
+        <span className={`care-avatar ${clinician?.photo ? "has-photo" : ""}`} aria-hidden="true">
+          {clinician?.photo ? <img src={clinician.photo} alt="" /> : (clinician?.initials ?? "LC")}
+        </span>
+        <div className="bubble">{reply.body}</div>
+      </div>
+    </>
   );
 }
 

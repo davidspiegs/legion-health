@@ -210,7 +210,7 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-function Section({
+export function Section({
   title,
   lead,
   aside,
@@ -1045,7 +1045,7 @@ function HelpSheet({ state, ctx, data }: SheetProps) {
           </span>
           <span>
             <strong>Preview tools</strong>
-            <span>For reviewers: jump ahead, try what can go wrong, and see what your clinician sees.</span>
+            <span>For reviewers: jump ahead, try what can go wrong, and look behind the scenes.</span>
           </span>
         </button>
       ) : null}
@@ -1865,7 +1865,7 @@ const TASK_KIND: Record<CareTask["kind"], string> = {
 };
 
 /** The care team queue: the people behind Wren, and what each of them owes the patient. */
-function TaskList({ tasks, empty }: { tasks: CareTask[]; empty: string }) {
+export function TaskList({ tasks, empty }: { tasks: CareTask[]; empty: string }) {
   if (!tasks.length) return <p className="sh-empty">{empty}</p>;
   return (
     <ul className="sh-tasks">
@@ -1959,7 +1959,6 @@ function PreviewSheet({ state, ctx, close }: SheetProps) {
     if (confirming) keepGoing.current?.focus();
   }, [confirming]);
 
-  const openCount = state.chat.tasks.filter((task) => task.status === "open").length;
   const eventCount = state.chat.analytics.length;
   const current = SCENARIOS.find((item) => item.value === state.scenario);
   const chosen = picked ? SCENARIOS.find((item) => item.value === picked) : undefined;
@@ -2004,15 +2003,6 @@ function PreviewSheet({ state, ctx, close }: SheetProps) {
 
         <Section title="Look behind the scenes">
           <div className="sh-tools">
-            <button type="button" className="sh-tool" onClick={() => ctx.openSheet("clinician")}>
-              <span className="sh-tool-icon" aria-hidden="true">
-                <Stethoscope size={18} />
-              </span>
-              <span>
-                <strong>Clinician view</strong>
-                <span>The brief {ASSISTANT.name} drafts and a clinician reviews before the visit</span>
-              </span>
-            </button>
             <button type="button" className="sh-tool" onClick={() => ctx.openSheet("graph")}>
               <span className="sh-tool-icon" aria-hidden="true">
                 <Workflow size={18} />
@@ -2023,14 +2013,6 @@ function PreviewSheet({ state, ctx, close }: SheetProps) {
               </span>
             </button>
           </div>
-        </Section>
-
-        <Section
-          title="Care team queue"
-          lead={`Where a person takes over from ${ASSISTANT.name}, soonest due first.`}
-          aside={openCount ? `${openCount} open` : undefined}
-        >
-          <TaskList tasks={state.chat.tasks} empty="Nothing for the care team yet. Asking Help for a call puts a task here." />
         </Section>
 
         <Section
@@ -2899,7 +2881,8 @@ function lastReview(s: ChatJourney): BriefReview | null {
   return null;
 }
 
-function ClinicianSheet({ state, ctx }: SheetProps) {
+/** The brief and chart a clinician reviews before the visit: in the care team view, and as a sheet. */
+export function ClinicianView({ state, ctx }: { state: ChatJourney; ctx: ChatContext }) {
   const s = state;
   const now = useNow();
   const questions = s.chat.questions;
@@ -2910,7 +2893,6 @@ function ClinicianSheet({ state, ctx }: SheetProps) {
   const reviewer = clinician?.name ?? "The clinician";
   const last = lastReview(s);
   const flagged = !!openTask(s, "care-team", FLAG_TASK);
-  const openCount = s.chat.tasks.filter((task) => task.status === "open").length;
 
   const act = (kind: BriefReview) => {
     if (lastReview(ctx.get()) === kind) return;
@@ -3031,14 +3013,6 @@ function ClinicianSheet({ state, ctx }: SheetProps) {
             );
           })}
         </ul>
-      </Section>
-
-      <Section
-        title="Care team queue"
-        lead="Follow-ups a person owns, soonest due first. Simulated in this preview."
-        aside={openCount ? `${openCount} open` : undefined}
-      >
-        <TaskList tasks={s.chat.tasks} empty="Nothing in the queue." />
       </Section>
 
       <Section title="Activity trail" lead="Who did what, in order, and where each detail came from.">
@@ -3252,6 +3226,6 @@ export const INFO_SHEETS: SheetMap = {
   journey: { title: "Your first visit", render: (props) => <JourneySheet {...props} /> },
   skip: { title: "Skip to visit day", render: (props) => <SkipSheet {...props} /> },
   preview: { title: "Preview tools", render: (props) => <PreviewSheet {...props} /> },
-  clinician: { title: "What your clinician sees", render: (props) => <ClinicianSheet {...props} /> },
+  clinician: { title: "What your clinician sees", render: (props) => <ClinicianView {...props} /> },
   graph: { title: "Agent-ready intake", render: (props) => <GraphSheet {...props} /> },
 };

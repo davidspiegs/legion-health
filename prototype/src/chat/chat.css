@@ -571,6 +571,15 @@ button.bubble:active {
   font-size: 11px;
   font-weight: 700;
 }
+.care-avatar.has-photo {
+  overflow: hidden;
+  background: #e6ebf3;
+}
+.care-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .msg-sender {
   margin: 10px 0 4px 36px;
   font-size: 12px;
@@ -1251,6 +1260,69 @@ button.bubble:active {
   }
 }
 
+/*
+ * The care team view (Preview only): a toggle in the header on wide screens. While it's
+ * open the rail widens for it, and the conversation slides over to make room.
+ */
+.care-view-toggle {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .care-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    margin-right: 6px;
+    padding: 0 13px 0 11px;
+    border: 1px solid var(--chat-chip);
+    border-radius: 999px;
+    background: white;
+    color: var(--ink);
+    font-size: 13.5px;
+    font-weight: 550;
+    white-space: nowrap;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      transform 140ms var(--chat-ease);
+  }
+  .care-view-toggle svg {
+    color: #3d4657;
+    transition: color 160ms ease;
+  }
+  .care-view-toggle[aria-pressed="true"] {
+    background: var(--chat-wash);
+    border-color: #c6d4f6;
+    color: var(--chat-blue-text);
+  }
+  .care-view-toggle[aria-pressed="true"] svg {
+    color: var(--chat-blue-text);
+  }
+  .care-view-toggle:active {
+    transform: scale(0.97);
+  }
+  .chat-app.is-care-open {
+    --chat-rail: 460px;
+  }
+  .chat-body {
+    transition: grid-template-columns 360ms var(--chat-ease);
+  }
+  .chat-header {
+    transition:
+      border-color 220ms ease,
+      box-shadow 220ms ease,
+      grid-template-columns 360ms var(--chat-ease);
+  }
+}
+@media (min-width: 1024px) and (hover: hover) {
+  .care-view-toggle:not([aria-pressed="true"]):hover {
+    border-color: #a9b7d3;
+    background: #fbfcfe;
+  }
+}
+
 /* Off the phone, answers sit on the patient's side, where the reply bubble will land. */
 @media (min-width: 761px) {
   .chat-dock .replies,
@@ -1349,6 +1421,8 @@ button.bubble:active {
     animation: none;
   }
   .chat-progress i b,
+  .chat-body,
+  .care-view-toggle,
   .chip,
   .composer,
   .composer-send,
