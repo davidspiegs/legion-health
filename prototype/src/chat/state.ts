@@ -1,4 +1,5 @@
 import type { JourneyState } from "../model/types";
+import type { PostHogEvent } from "./analytics";
 import { initialState } from "../model/fixtures";
 
 /** Work Wren does on the patient’s behalf. Each job renders as a work card with a receipt. */
@@ -197,7 +198,10 @@ export interface ChatState {
   /** Every changed answer, oldest first, for the clinician's view. */
   history: { node: string; from: string; to: string; at: string }[];
   /** Product events, oldest first (the measurement plan in the design doc). */
-  analytics: { event: string; at: string; props?: Record<string, string | number | boolean> }[];
+  /** Tracked events, in PostHog's capture format (see analytics.ts). */
+  analytics: PostHogEvent[];
+  /** PostHog distinct ID: anonymous until the account is created, then an internal patient ID. */
+  distinctId: string;
   /** A birth date showed the patient is under 18, on either details path. */
   ageBlocked: boolean;
   /** The estimate the patient agreed to; consent survives a re-check that returns the same number. */
@@ -291,6 +295,7 @@ export function initialChat(): ChatState {
     tasks: [],
     history: [],
     analytics: [],
+    distinctId: "",
     ageBlocked: false,
     agreedEstimate: null,
     pcpName: "",

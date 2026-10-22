@@ -425,7 +425,6 @@ const safety: Node = {
     });
     addFlags(ctx, screenFlags(screen));
     queueSafetyTasks(ctx, screen);
-    track(ctx, "safety_answered", { level });
   },
 };
 

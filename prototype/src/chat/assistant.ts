@@ -289,19 +289,25 @@ async function askModel(s: ChatJourney, question: string): Promise<{ answer: str
  * A typed question. Crisis language is caught locally before anything else and
  * always gets the crisis lines; a model never decides that.
  */
-export async function answerTyped(ctx: ChatContext, question: string): Promise<{ answer: string; actions: AskActionId[] }> {
+/** Where a typed answer came from, for measurement: never the question itself. */
+export type AnswerSource = "crisis" | "booking" | "model" | "policies";
+
+export async function answerTyped(
+  ctx: ChatContext,
+  question: string,
+): Promise<{ answer: string; actions: AskActionId[]; source: AnswerSource }> {
   const local = answerQuestion(question);
   if (local.intent === "crisis" || local.intent === "emergency") {
     flagRisk(ctx, "help", question);
-    return { answer: local.text, actions: ["support"] };
+    return { answer: local.text, actions: ["support"], source: "crisis" };
   }
   const fromBooking = bookingAnswer(ctx.get(), question);
-  if (fromBooking) return fromBooking;
+  if (fromBooking) return { ...fromBooking, source: "booking" };
   const live = await askModel(ctx.get(), question);
-  if (live) return live;
+  if (live) return { ...live, source: "model" };
   if (local.forClinician) {
     const questions = ctx.get().chat.questions;
     ctx.update({ chat: { questions: [...questions, question] } });
   }
-  return { answer: local.text, actions: actionsFor(local.intent) };
+  return { answer: local.text, actions: actionsFor(local.intent), source: "policies" };
 }

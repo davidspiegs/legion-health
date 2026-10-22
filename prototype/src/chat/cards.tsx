@@ -229,7 +229,7 @@ function confirmAllTrue(ctx: ChatContext) {
       edits: { ...now.chat.edits, quick: (now.chat.edits.quick ?? 0) + 1 },
     },
   });
-  track(ctx, "answer_changed", { node: "quick" });
+  track(ctx, "portal.onboarding.answer_changed", { step: "quick" });
   receipt(ctx, "Changed your answer: all three quick checks are true", "You", "You");
 }
 
@@ -310,7 +310,7 @@ function ReviewExit({ state, ctx }: CardProps) {
       }
     } else {
       addTask(ctx, { ...CALLBACK, contact: digits }, "Asked a care coordinator to call you within 1 business day");
-      track(ctx, "coordinator_call_requested");
+      track(ctx, "portal.support.call_requested");
     }
     setChanging(false);
     setSent(true);

@@ -111,23 +111,25 @@ The patient experience stays the same as autonomy changes: same guide, same rece
 | Sohar | Discovery (name, birth date, state) finds payer and member ID; verification returns network status, copay and deductible. When discovery misses, Wren asks right away for the member ID from the card, with self-pay and care-team help as alternatives | Simulated; in use at Legion |
 | Metriport | Records from health networks, pharmacies and labs, with permission | Simulated; in use at Legion |
 | DoseSpot | Saves the patient's pharmacy before the visit. After the clinician signs the plan, a refill of a medication the patient still takes goes to that pharmacy; one the pharmacy doesn't confirm goes to the care team to resend | Simulated; existing at Legion |
-| Epic MyChart | The patient can bring their chart (conditions, medications, allergies, labs, visit notes) anytime before the visit, from one quick action; it joins the visit brief. Never a required step | Simulated |
+| Epic MyChart (additional) | Patient-mediated records (SMART on FHIR) from any Epic organization the patient has used, including ones Metriport's networks miss: conditions, medications, allergies, labs and visit notes. Wren offers it once after prep, in the chat; it joins the visit brief. Never a required step | Simulated |
 | Persona | Photo ID and selfie, offered only when a controlled medication is discussed | Simulated; optional per brief |
-| Stripe | Card on file (SetupIntent-shaped), bank authentication, nothing charged today | Simulated |
+| Stripe (additional) | Card on file (SetupIntent-shaped) and Apple Pay, with bank authentication; nothing charged today | Simulated |
+| Anthropic Claude (additional) | Answers typed questions after booking within Legion's policies, with the booking's facts as context; the local crisis check always runs first | Real when `ANTHROPIC_API_KEY` is set |
+| PostHog (existing) | Event tracking through the first completed visit, comparable with today's funnel; see [event-tracking.md](event-tracking.md) | Simulated |
 | Healthie | Likely upstream scheduling and records (from the audit) | Behind the scheduling adapter |
 
 ## 10. Measurement
 
 - **North star for onboarding:** first visits completed by the clinician within 30 days, per eligible start, reported on matured cohorts. Completion comes from the encounter system, never a client event.
 - **Funnel:** started → story answered → eligible → offers shown → time held → account → coverage resolved → card saved → booked → prep engaged → checked in → joined → completed → plan published → follow-up booked. Keep the August same-session funnel reproducible beside it.
-- **Events (no answer values or free text):** `chat.node_shown`, `chat.answer_submitted {input_mode}`, `chat.answer_edited {invalidated_count}`, `agent.job {job, status, duration_bucket}`, `fit.outcome {reason_code}` (restricted), `safety.crisis_shown {source}` (restricted), `match.offers_shown`, `slot.held`, `account.created {method}`, `payment.method_saved`, `appointment.confirmed`, `visit.checked_in`, `visit.completed` (server), `care_plan.published`.
+- **Events:** PostHog events, mocked in the prototype, keeping Legion's current names where a step still exists and adding the milestones the August funnel can't see (payment method saved, booked, checked in, joined, **first visit completed**). Properties are enums, counts and booleans only; no answers, free text or contact details. Full plan: [event-tracking.md](event-tracking.md).
 - **Experiment:** randomize new starts between chat and `baseline-v1`, stratified by device and campaign traffic. Guardrails: crisis routing within one turn, exit-reason mix, median time to book, support contacts, no-show rate, and AI quality (read-back corrections, brief edit rate).
 - **Ops cost per visit:** human minutes per onboarded patient, which is where an AI-native front door should show up first. The care-team queue is the unit: every task a person owns, with its due time.
-- **In the preview:** the conversation records `onboarding_started`, `step_answered {node}`, `answer_changed {node}`, `safety_answered {level}` (restricted), `visit_booked`, `checked_in`, `first_visit_completed` and `care_plan_published`, with node ids only, and Preview tools shows them live.
+- **In the preview:** Preview tools → PostHog events shows each event live, in PostHog's capture format, from `$pageview` to `portal.onboarding.first_visit_completed`, with `$identify` when the account is created.
 
 ## 11. What is real and what is simulated
 
-Real in the prototype: the conversation engine, editing and invalidation, eligibility and safety rules, the crisis check, matching over a fictional directory, Central Time inventory, state persistence and resume, the full simulated booking-to-completion lifecycle reused from the baseline's services, and the test suites. Simulated: every vendor (Verified, Sohar, Metriport, Persona, Stripe), the clinician and the video visit, notifications, the care-team queue's people, and the language model (a deterministic interpreter stands in for it).
+Real in the prototype: the conversation engine, editing and invalidation, eligibility and safety rules, the crisis check, matching over a fictional directory, Central Time inventory, state persistence and resume, the full simulated booking-to-completion lifecycle reused from the baseline's services, and the test suites. Simulated, as typed calls on one mock API (`prototype/src/model/services.ts`) with response times, logged requests and failure modes you can switch on in Preview tools: every vendor (Verified, Sohar, Metriport, DoseSpot, Epic MyChart, Persona, Stripe), the clinician and the video visit, notifications, the care-team queue's people, and PostHog. The one real connection is the language model behind `prototype/api/assistant.ts`, live once `ANTHROPIC_API_KEY` is set; without it, typed questions are answered from Legion's stated policies and the booking's own facts.
 
 ## 12. Decisions for David
 

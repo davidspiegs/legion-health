@@ -2038,7 +2038,7 @@ function BriefSheet({ state, ctx, close }: SheetProps) {
           : {}),
       },
     });
-    track(ctx, "brief_edited", { reason: reasonChanged, note: noteChanged });
+    track(ctx, "portal.prep.brief_edited", { reason_changed: reasonChanged, note_changed: noteChanged });
     // Both fields are the patient's own words, so both get the crisis check. A match never halts.
     const risky = [reasonChanged ? nextReason : "", noteChanged ? nextNote : ""].filter(
       (text) => text && mentionsCrisis(text),

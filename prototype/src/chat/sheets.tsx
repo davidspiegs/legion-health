@@ -450,7 +450,7 @@ function SafetyCallback({ state, ctx, from }: { state: ChatJourney; ctx: ChatCon
         onSubmit={(digits) => {
           setAsked(true);
           requestSafetyCallback(ctx, digits);
-          track(ctx, "safety_callback_requested", { from });
+          track(ctx, "portal.support.safety_callback_requested", { from });
         }}
       />
     </div>
@@ -515,7 +515,7 @@ function CareRequest({ kind, state, ctx }: { kind: CareKind; state: ChatJourney;
   const send = (digits: string) => {
     setPressed(true);
     addTask(ctx, { kind: "care-team", title: item.title, due: CARE_DUE, contact: digits }, item.receipt);
-    track(ctx, "care_team_requested", { kind });
+    track(ctx, "portal.support.care_team_requested", { kind });
   };
   if (task) {
     return (
@@ -879,7 +879,7 @@ function HelpSheet({ state, ctx, data }: SheetProps) {
     if (urgent) {
       // The words go to the clinician with a same-day check-in. Help stays open; nothing else stops.
       flagRisk(ctx, "help", question);
-      track(ctx, "safety_crisis_shown", { source: "help", kind: urgent });
+      track(ctx, "portal.support.crisis_resources_shown", { source: "help" });
     }
   };
 
@@ -1905,6 +1905,11 @@ function TaskList({ tasks, empty }: { tasks: CareTask[]; empty: string }) {
 const EVENT_CAP = 8;
 
 /** The measurement plan, live: ids and outcomes, newest first. */
+/** What posthog-js adds to every event, left out of the list so each event's own properties stand out. */
+const SUPER_PROPS = new Set(["distinct_id", "experience", "assistant", "booked", "preview", "preview_scenario"]);
+const ownProps = (event: ChatState["analytics"][number]) =>
+  Object.fromEntries(Object.entries(event.properties).filter(([key]) => !key.startsWith("$") || key === "$anon_distinct_id").filter(([key]) => !SUPER_PROPS.has(key)));
+
 function EventLog({ events }: { events: ChatState["analytics"] }) {
   const [all, setAll] = useState(false);
   const listId = useId();
@@ -1917,12 +1922,12 @@ function EventLog({ events }: { events: ChatState["analytics"] }) {
         {shown.map(({ event, index }) => (
           <li key={index} className="sh-event">
             <span className="sh-event-name">{event.event}</span>
-            <time className="sh-event-time" dateTime={event.at}>
-              {stampLabel(event.at)}
+            <time className="sh-event-time" dateTime={event.timestamp}>
+              {stampLabel(event.timestamp)}
             </time>
-            {event.props && Object.keys(event.props).length ? (
+            {Object.keys(ownProps(event)).length ? (
               <span className="sh-event-props">
-                {Object.entries(event.props)
+                {Object.entries(ownProps(event))
                   .map(([key, value]) => `${key}: ${String(value)}`)
                   .join(", ")}
               </span>
@@ -2084,8 +2089,8 @@ function PreviewSheet({ state, ctx, close }: SheetProps) {
         </Section>
 
         <Section
-          title="Events"
-          lead="What this session logged for the measurement plan, newest first. The plan logs ids and outcomes, never answers, and nothing leaves this device."
+          title="PostHog events (simulated)"
+          lead={`Newest first, in PostHog's capture format${state.chat.distinctId ? `, as ${state.chat.distinctId}` : ""}. Enums, counts and booleans only: never answers, free text or contact details. Nothing leaves this device.`}
           aside={eventCount ? (eventCount === 1 ? "1 event" : `${eventCount} events`) : undefined}
         >
           <EventLog events={state.chat.analytics} />
@@ -2903,7 +2908,7 @@ function ClinicianSheet({ state, ctx }: SheetProps) {
   const act = (kind: BriefReview) => {
     if (lastReview(ctx.get()) === kind) return;
     receipt(ctx, BRIEF_REVIEW[kind], "Clinician view (simulated)", "Your clinician");
-    track(ctx, "brief_reviewed", { action: kind });
+    track(ctx, "portal.clinician.brief_reviewed", { action: kind });
     if (kind === "flag" && !openTask(ctx.get(), "care-team", FLAG_TASK))
       addTask(ctx, { kind: "care-team", title: FLAG_TASK, due: "Before the visit" }, "Put the clinician’s flag in the care team queue");
   };

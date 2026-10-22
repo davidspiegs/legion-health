@@ -1,6 +1,7 @@
 import type { Appointment, MockApi, Slot } from "../model/types";
 import { followupSlots, formatDate, formatTime, slots, validateBirth } from "../model/fixtures";
 import { eligibilityInputKey, journeyNow } from "../model/journey-state";
+import { anonymousId, capture, forward, type EventProps, type PostHogEvent } from "./analytics";
 import { clinicianById, fitsPreference, formalName, inventory } from "./inventory";
 import {
   type Benefits,
@@ -100,9 +101,24 @@ export function addTask(ctx: ChatContext, task: Omit<CareTask, "id" | "at" | "st
 }
 
 /** Records a product event for the measurement plan (shown in Preview tools). */
-export function track(ctx: ChatContext, event: string, props?: Record<string, string | number | boolean>) {
+/** Records an event in PostHog's format (see analytics.ts). Properties are enums, counts and booleans only. */
+export function track(ctx: ChatContext, event: string, props?: EventProps) {
   const s = ctx.get();
-  ctx.update({ chat: { analytics: [...s.chat.analytics, { event, at: stamp(s), ...(props ? { props } : {}) }] } });
+  const anonymous = s.chat.distinctId || anonymousId();
+  const events: PostHogEvent[] = [capture(s, anonymous, event, props)];
+  let distinctId = anonymous;
+  // Account created: posthog-js identify, linking the anonymous history to an internal patient ID.
+  if (event === "portal.onboarding.userCreated" && anonymous.startsWith("anon_")) {
+    distinctId = `patient_${anonymous.slice(5, 17)}`;
+    events.push(
+      capture(s, distinctId, "$identify", {
+        $anon_distinct_id: anonymous,
+        $set: JSON.stringify({ signup_experience: "chat", coverage: s.coverage }),
+      }),
+    );
+  }
+  events.forEach(forward);
+  ctx.update({ chat: { analytics: [...s.chat.analytics, ...events], distinctId } });
 }
 
 export function receipt(

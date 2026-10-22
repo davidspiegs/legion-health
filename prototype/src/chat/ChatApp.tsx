@@ -17,6 +17,7 @@ import { formatTime } from "../model/fixtures";
 import { useMobileViewport } from "../hooks/useMobileViewport";
 import { useCareSimulation } from "../hooks/useCareSimulation";
 import type { JourneyState, Scenario } from "../model/types";
+import { answerEvent, milestoneEvents } from "./analytics";
 import { STAGES, deriveTranscript, stageProgress, type TranscriptItem } from "./engine";
 import { useReducedMotion, useReveal } from "./useReveal";
 import {
@@ -63,7 +64,7 @@ import {
 } from "./assistant";
 import { inventory } from "./inventory";
 import { momentState, type Moment } from "./moments";
-import { STORAGE_KEY, initialChat, initialChatJourney, type Ask, type AskActionId, type ChatJourney } from "./state";
+import { STORAGE_KEY, initialChat, initialChatJourney, type Ask, type AskActionId, type ChatJourney, type ChatState } from "./state";
 import { reconcile } from "./reconcile";
 import type { SheetMap, SheetProps, WidgetMap } from "./registry";
 import { WORK_CARDS } from "./cards-work";
@@ -81,6 +82,8 @@ const SHEETS: SheetMap = { ...INFO_SHEETS, ...CLINICIAN_SHEETS, ...FORM_SHEETS, 
 const WIDGETS: WidgetMap = { ...FORM_WIDGETS, ...VISIT_WIDGETS };
 
 const STORAGE = STORAGE_KEY;
+
+let pageviewSent = false;
 
 function restore(): ChatJourney {
   inventory();
@@ -112,6 +115,8 @@ function restore(): ChatJourney {
               ([, job]) => (job as { status?: string })?.status !== "running",
             ),
           ),
+          // Events from before the PostHog format are dropped rather than shown half-formed.
+          analytics: ((saved.chat.analytics || []) as { uuid?: string }[]).filter((item) => !!item?.uuid) as ChatState["analytics"],
           // A typed question still being answered when the page closed can't finish now.
           asks: recoverAsks((saved.chat.asks || []) as Ask[]),
         },
@@ -342,21 +347,23 @@ function ChatApp() {
     return () => window.clearInterval(timer);
   }, [update, epoch]);
 
-  // Funnel milestones for the measurement plan, recorded once each.
-  const milestones: [string, boolean][] = [
-    ["onboarding_started", state.chat.begun],
-    ["visit_booked", booked],
-    ["checked_in", state.encounter.status !== "not_started"],
-    ["first_visit_completed", state.encounter.status === "completed"],
-    ["care_plan_published", state.carePlan.status === "published"],
-  ];
-  const reachedKey = milestones.map(([, reached]) => (reached ? 1 : 0)).join("");
+  // Journey milestones as PostHog events: what changed since the last state of this same conversation.
+  // A restart or preview jump replaces the conversation, so it starts a fresh baseline instead.
+  const watched = useRef<{ epoch: number; state: ChatJourney } | null>(null);
   useEffect(() => {
-    for (const [event, reached] of milestones)
-      if (reached && !stateRef.current.chat.analytics.some((item) => item.event === event)) track(ctx, event);
-    // The key captures every milestone's state.
+    const last = watched.current;
+    watched.current = { epoch, state };
+    if (!last || last.epoch !== epoch) return;
+    for (const [event, props] of milestoneEvents(last.state, state)) track(ctx, event, props);
+  }, [state, epoch, ctx]);
+
+  // One $pageview per page load, as posthog-js sends (development mode runs this effect twice).
+  useEffect(() => {
+    if (pageviewSent) return;
+    pageviewSent = true;
+    track(ctx, "$pageview", { $pathname: window.location.pathname });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reachedKey, ctx]);
+  }, []);
 
   const answer = useCallback(
     async (value: string | string[], target?: string) => {
@@ -368,6 +375,8 @@ function ChatApp() {
       pinned.current = true;
       const wasEditing = !!editingNode;
       const before = answerText(node, stateRef.current);
+      // The options as they were offered, so the event records only a choice that was one of them.
+      const input = node.input?.(stateRef.current);
       setPending(true);
       let answered = false;
       try {
@@ -394,7 +403,10 @@ function ChatApp() {
           },
         });
       }
-      if (changed) track(ctx, wasEditing ? "answer_changed" : "step_answered", { node: node.id });
+      if (changed) {
+        const [event, props] = answerEvent(node, input, value, stateRef.current, wasEditing);
+        track(ctx, event, props);
+      }
       if (!wasEditing) return;
       pinned.current = true;
       setEditing(null);
@@ -613,6 +625,7 @@ function ChatApp() {
 
   const runQuick = (id: QuickId) => {
     const s = stateRef.current;
+    track(ctx, "portal.assistant.quick_action", { action: id });
     const first = s.appointment ? clinicianFirst(s.appointment.providerId) : "your clinician";
     pinned.current = true;
     switch (id) {
@@ -701,6 +714,7 @@ function ChatApp() {
       ? await answerTyped(ctx, text)
       : (await Promise.all([answerTyped(ctx, text), new Promise((resolve) => setTimeout(resolve, 650))]))[0];
     settleAsk(ctx, id, { answer: reply.answer, actions: reply.actions, status: "done" });
+    track(ctx, "portal.assistant.question_answered", { source: reply.source, actions: reply.actions.length });
     setAskBusy(false);
   };
 
@@ -991,7 +1005,7 @@ function MessageSheet({ state, ctx, close, data }: SheetProps) {
 
 /** "Today 5:14 AM", like the start of a message thread. */
 function startedLabel(state: ChatJourney): string {
-  const at = state.chat.analytics[0]?.at ?? new Date().toISOString();
+  const at = state.chat.analytics[0]?.timestamp ?? new Date().toISOString();
   const day = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date(iso));
   const today = day(new Date().toISOString()) === day(at);
   const date = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "short", month: "short", day: "numeric" }).format(
