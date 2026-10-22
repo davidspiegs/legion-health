@@ -1,5 +1,7 @@
 # Language evals
 
+Claude now reads the patient's own words and answers typed questions on the deployed preview (`prototype/api/assistant.ts`). The keyword reader described here is the offline fallback behind it (Vite dev, or a call that fails or runs long), and its crisis check still runs first. No new evals were run for the take-home: the numbers below are the keyword reader's.
+
 Wren's language work sits behind one contract in `prototype/src/chat/guide-ai.ts`: `mentionsCrisis` (the crisis floor under every free-text answer), `readStory` (the patient's own words read back as intake choices) and `answerQuestion` (Help). A deterministic interpreter stands in for a model. The labeled cases are in `language-eval-data.ts`. To print the table, run `node --import tsx --test src/chat/language-eval.test.ts` from `prototype/`.
 
 ## What the set covers
