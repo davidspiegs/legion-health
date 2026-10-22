@@ -10,7 +10,6 @@ window.JOURNEY = {
   "title": "Legion Health · The journey to a first visit",
   "capturedAt": "Chrome walkthrough · October 20, 2026",
   "telemetryPeriod": "Rolling 30 days ending August 29, 2026",
-  "source": "../Founding%20Product%20Take-Home%20b4381b607554839287ad8137811d7133.md",
   "sourceLabel": "Assignment brief · aggregate production PostHog telemetry",
   "scope": "Production app.legionhealth.com only. Ordered milestones within the same browser session; not verified individual patients.",
   "measurementNotes": [

@@ -10,3 +10,6 @@ dist/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Legion's take-home brief stays local
+/Founding Product Take-Home*.md
