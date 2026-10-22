@@ -13,7 +13,7 @@ import {
   Video,
   type LucideIcon,
 } from "lucide-react";
-import { formatDate, formatTime } from "../model/fixtures";
+import { formatDate, formatTime, REGIMEN_FALLBACK, REGIMENS } from "../model/fixtures";
 import { joinAvailability } from "../model/journey-state";
 import { clinicianFirst, lateFees, stamp, type ChatContext } from "./agent";
 import { FIRST_VISIT_LENGTH, PREVIEW } from "./env";
@@ -215,6 +215,13 @@ export function bookingAnswer(s: ChatJourney, question: string): { answer: strin
   return null;
 }
 
+/** Every drug in the regimens, by generic and brand name ("lamotrigine", "lamictal"), so a question naming one reaches the model. */
+const REGIMEN_DRUGS = new RegExp(
+  String.raw`\b(?:${[
+    ...new Set([...Object.values(REGIMENS).flat(), ...REGIMEN_FALLBACK].flatMap((med) => med.name.toLowerCase().match(/[a-z]+/g) ?? [])),
+  ].join("|")})\b`,
+);
+
 /** Crisis and emergency words are recognized on the device, from the words alone; no model decides that. */
 export function urgentQuestion(question: string): boolean {
   const { intent } = answerQuestion(question);
@@ -266,7 +273,8 @@ export async function answerTyped(
     flagRisk(ctx, "help", question);
     return { answer: local.text, actions: ["support"], source: "crisis" };
   }
-  const fromBooking = local.intent === "medication" ? null : bookingAnswer(ctx.get(), question);
+  const aboutMedication = local.intent === "medication" || REGIMEN_DRUGS.test(question.toLowerCase());
+  const fromBooking = aboutMedication ? null : bookingAnswer(ctx.get(), question);
   if (fromBooking) return { ...fromBooking, source: "booking" };
   const live = await askModel(ctx.get(), question);
   if (live) return { ...live, source: "model" };

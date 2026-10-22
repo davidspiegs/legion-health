@@ -129,6 +129,8 @@ export interface ChatState {
   storySuggested: string[];
   /** The read-back of the patient’s words, from Claude or the local reader. */
   storyReflection: string;
+  /** Claude’s short name for an “Other” concern it read (“trouble sleeping”); "" from the local reader. */
+  storyOther: string;
   /** Risk language in the story, from the local check or added by Claude’s reading. */
   storyCrisis: boolean;
   storyConfirmed: boolean;
@@ -256,6 +258,7 @@ export function initialChat(): ChatState {
     storyText: "",
     storySuggested: [],
     storyReflection: "",
+    storyOther: "",
     storyCrisis: false,
     storyConfirmed: false,
     otherText: "",

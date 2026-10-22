@@ -46,6 +46,8 @@ export function listOf(items: string[]): string {
 }
 
 export const conditionLabel = (c: string) => (c === "Bipolar Disorder" ? "bipolar disorder" : c);
+/** A condition in running text: "anxiety", "bipolar disorder". ADHD and PTSD keep their capitals. */
+const conditionInSentence = (c: string) => (c === "ADHD" || c === "PTSD" ? c : c.toLowerCase());
 export const booked = (s: ChatJourney) => !!s.appointment && s.appointment.status !== "cancelled";
 const preBooking = (s: ChatJourney) => !booked(s);
 /** ADHD care where a controlled medication may come up: starting one, or continuing one. */
@@ -243,7 +245,7 @@ function reflection(s: ChatJourney): AgentBlock[] {
       "noted",
       conditions[0] === "I'm not sure"
         ? "I’ll tell your clinician you’re not sure yet what to call it. Did I get that right?"
-        : `I’ll note ${listOf(conditions.map((c) => (c === "Other" ? "what you described" : conditionLabel(c))))} for your clinician as a starting point, not a diagnosis. Did I get that right?`,
+        : `I’ll note ${listOf(conditions.map((c) => (c === "Other" ? s.chat.storyOther.trim() || "what you described" : conditionInSentence(c))))} for your clinician as a starting point, not a diagnosis. Did I get that right?`,
     ),
   ];
 }

@@ -225,3 +225,19 @@ test("the clinician view renders on its own, without a second care team queue", 
   assert.match(html, /Rule checks/);
   assert.doesNotMatch(html, /Care team queue/);
 });
+
+test("after the visit the clinician view says the brief was reviewed and the plan signed, with nothing left to accept", async () => {
+  register(
+    `data:text/javascript,${encodeURIComponent(
+      'export async function load(url, context, next) { return url.endsWith(".css") ? { format: "module", source: "", shortCircuit: true } : next(url, context); }',
+    )}`,
+  );
+  const { ClinicianView } = await import("./sheets");
+  const p = booked();
+  const before = renderToStaticMarkup(createElement(ClinicianView, { state: p.state, ctx: p.ctx }));
+  assert.match(before, /Accept brief/);
+  const done = momentState("complete");
+  const html = renderToStaticMarkup(createElement(ClinicianView, { state: done, ctx: p.ctx }));
+  assert.match(html, /Maya Chen reviewed this brief and signed the care plan\./);
+  assert.doesNotMatch(html, /AI draft\. Clinician review required\.|Accept brief|Flag for review/);
+});

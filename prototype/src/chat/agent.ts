@@ -3,8 +3,10 @@ import {
   followupSlots,
   formatDate,
   formatTime,
+  isControlled,
   medInSentence,
   medsInSentence,
+  prescriptionFor,
   regimenFor,
   slots,
   validateBirth,
@@ -15,6 +17,7 @@ import { anonymousId, capture, forward, type EventProps, type PostHogEvent } fro
 import { draftBrief } from "./brief";
 import { readStory } from "./guide-ai";
 import { clinicianById, fitsPreference, formalName, inventory } from "./inventory";
+import { continuedRegimen, PSYCHIATRIST } from "./model";
 import { readStoryLive } from "./story";
 import {
   type Benefits,
@@ -722,6 +725,7 @@ export async function runStory(ctx: ChatContext, text: string) {
       storyText: text,
       storySuggested: local.conditions,
       storyReflection: local.reflection,
+      storyOther: "",
       storyCrisis: local.crisis,
       storyConfirmed: false,
     },
@@ -732,7 +736,12 @@ export async function runStory(ctx: ChatContext, text: string) {
   // A restart or a jump while Claude was reading leaves the new conversation alone.
   if (!current()) return;
   ctx.update({
-    chat: { storySuggested: reading.conditions, storyReflection: reading.reflection, storyCrisis: reading.crisis },
+    chat: {
+      storySuggested: reading.conditions,
+      storyReflection: reading.reflection,
+      storyOther: reading.other ?? "",
+      storyCrisis: reading.crisis,
+    },
   });
   setJob(ctx, "story", { status: "done", finishedAt: Date.now() });
 }
@@ -769,8 +778,9 @@ export async function runBrief(ctx: ChatContext) {
   const draft = await draftBrief(drafting);
   // A restart, a jump, or an undone approval while Claude was drafting makes this draft stale.
   if (!current()) return;
-  // What the patient approved stays as they saw it.
-  const applied = !!draft && !ctx.get().chat.briefApproved;
+  // What the patient approved, or chose not to send, stays as they saw it.
+  const settled = ctx.get().chat;
+  const applied = !!draft && !settled.briefApproved && !settled.briefSkipped;
   if (applied) ctx.update({ chat: { briefDraft: { ...draft, key } } });
   if (inPlace) {
     setJob(ctx, "brief", applied ? { inputs: key, finishedAt: Date.now() } : { inputs: key });
@@ -783,39 +793,35 @@ export async function runBrief(ctx: ChatContext) {
   receipt(ctx, redraft ? BRIEF_REDRAFTED : BRIEF_DRAFTED, "Legion AI");
 }
 
-/**
- * What the clinician continues once the plan is signed: the patient's regimen, unless they said
- * they stopped it or take nothing. A list the patient typed in place of a pharmacy record is
- * theirs to go over in the visit, so nothing is continued from it.
- */
-function continuedRegimen(s: ChatJourney): readonly RegimenMed[] {
-  const c = s.chat;
-  if (!s.conditions.length || c.medication === "stopped" || c.medication === "none") return [];
-  if (c.medication === "other" && c.medicationNote.trim()) return [];
-  return regimenFor(s.conditions);
-}
-
-/** The prescription DoseSpot sends for one medication: "Adderall 20 mg once every morning". */
-export const prescriptionFor = (med: RegimenMed) => `${med.name} ${med.dose} ${med.schedule}`;
-
 const PLAN_SUPPLY = "30-day supply";
 
-let continuing: Promise<void> | null = null;
+/** One run per conversation: a restart or jump has a new context, so it never waits on an older one. */
+const continuing = new WeakMap<ChatContext, Promise<void>>();
 
 /**
  * Once the plan is signed, the simulated clinician continues the regimen: one prescription per
- * medication through DoseSpot. A patient who skipped prep has no pharmacy saved yet, so the one
- * on record is saved first, unless they asked for a different one. Safe to call again.
+ * medication through DoseSpot. A controlled medication waits for the photo ID check, and then a
+ * Legion psychiatrist sends it. A patient who skipped prep has no pharmacy saved yet, so the one
+ * on record is saved first, unless they asked for a different one. Each medication is sent once,
+ * however often this is called.
  */
 export function sendPlanPrescriptions(ctx: ChatContext): Promise<void> {
-  continuing ??= continueRegimen(ctx).finally(() => (continuing = null));
-  return continuing;
+  const running = continuing.get(ctx);
+  // An ID verified while a send is running is picked up right after it.
+  if (running) return running.then(() => sendPlanPrescriptions(ctx));
+  const run = continueRegimen(ctx).finally(() => continuing.delete(ctx));
+  continuing.set(ctx, run);
+  return run;
 }
 
 async function continueRegimen(ctx: ChatContext) {
   const s = ctx.get();
-  const meds = continuedRegimen(s);
-  if (s.carePlan.status !== "published" || s.prescriptions?.length || !s.appointment || !meds.length) return;
+  if (s.carePlan.status !== "published" || !s.appointment) return;
+  const sent = (s.prescriptions ?? []).map((rx) => rx.medication);
+  const meds = continuedRegimen(s).filter(
+    (med) => !sent.includes(prescriptionFor(med)) && (!isControlled(med.name) || s.chat.idCheck === "done"),
+  );
+  if (!meds.length) return;
   const first = clinicianFirst(s.appointment.providerId);
   if (!s.pharmacy) {
     if (s.chat.pharmacy === "other") return;
@@ -827,15 +833,22 @@ async function continueRegimen(ctx: ChatContext) {
   const results = await Promise.all(
     meds.map((med) => ctx.api.sendPrescription({ medication: prescriptionFor(med), supply: PLAN_SUPPLY }).catch(() => null)),
   );
-  const sent = meds.filter((_, index) => results[index]?.status === "sent");
   const pharmacy = results.find(Boolean)?.pharmacy ?? "";
-  if (sent.length)
-    receipt(
-      ctx,
-      `${first} sent your ${medsInSentence(sent.map(({ name }) => ({ name })))} ${sent.length === 1 ? "prescription" : "prescriptions"} to ${pharmacy}`,
-      "DoseSpot (simulated)",
-      "Your clinician",
-    );
+  // One receipt per prescriber: the visit clinician, and the psychiatrist for a controlled one.
+  const prescribers: [string, Receipt["actor"], RegimenMed[]][] = [
+    [first, "Your clinician", meds.filter((med) => !isControlled(med.name))],
+    [PSYCHIATRIST.replace(/^a/, "A"), "Care team", meds.filter((med) => isControlled(med.name))],
+  ];
+  for (const [by, actor, group] of prescribers) {
+    const done = group.filter((med) => results[meds.indexOf(med)]?.status === "sent");
+    if (done.length)
+      receipt(
+        ctx,
+        `${by} sent your ${medsInSentence(done.map(({ name }) => ({ name })))} ${done.length === 1 ? "prescription" : "prescriptions"} to ${pharmacy}`,
+        "DoseSpot (simulated)",
+        actor,
+      );
+  }
   meds.forEach((med, index) => {
     if (results[index]?.status !== "failed") return;
     addTask(

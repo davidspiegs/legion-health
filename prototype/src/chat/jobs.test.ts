@@ -5,6 +5,9 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
+import { register } from "node:module";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { createMockApi } from "../model/services";
 import { applyJourneyPatch } from "../model/journey-state";
 import type { Appointment, JourneyState, Profile, Slot } from "../model/types";
@@ -12,7 +15,6 @@ import {
   appointmentLabel,
   followupOptions,
   matchInputs,
-  prescriptionFor,
   runBenefits,
   runBooking,
   runHold,
@@ -30,8 +32,8 @@ import { fitsPreference, inventory } from "./inventory";
 import { momentState } from "./moments";
 import { reconcile } from "./reconcile";
 import { SCRIPT } from "./script";
-import { DISCOVERED_PLAN, medsInSentence, regimenFor, regimenLine } from "../model/fixtures";
-import { modelContext } from "./model";
+import { DISCOVERED_PLAN, isControlled, medsInSentence, prescriptionFor, regimenFor, regimenLine } from "../model/fixtures";
+import { modelContext, waitingForId } from "./model";
 import { PREVIEW_CODE, initialChatJourney, type ChatJourney, type ChatState } from "./state";
 
 inventory();
@@ -584,17 +586,24 @@ test("every reader names the same regimen: records, reconciliation, MyChart, the
     const chart = await p.ctx.api.importChart("Austin Family Medicine");
     assert.deepEqual(chart.medications, [...regimen.map(prescriptionFor), "Cetirizine 10 mg as needed"], `${label}: MyChart`);
 
+    // A controlled medication waits for the photo ID; the rest go when the plan is signed.
+    const now = regimen.filter((med) => !isControlled(med.name));
+    const controlled = regimen.filter((med) => isControlled(med.name));
     await sendPlanPrescriptions(p.ctx);
-    assert.deepEqual(p.state.prescriptions?.map((rx) => rx.medication), regimen.map(prescriptionFor), `${label}: the plan`);
-    assert.ok(p.state.prescriptions?.every((rx) => rx.status === "sent" && rx.supply === "30-day supply"));
+    assert.deepEqual(p.state.prescriptions?.map((rx) => rx.medication) ?? [], now.map(prescriptionFor), `${label}: the plan`);
     const context = modelContext(p.state);
     assert.equal(context.medications, regimenLine(regimen), `${label}: the model`);
     for (const med of regimen) assert.ok(context.plan.includes(`continue ${prescriptionFor(med)} (`), `${label}: ${med.name} in the plan`);
-    assert.equal(p.receipts("sent your").length, 1, "one receipt for the whole plan");
+    p.update({ chat: { idCheck: "done" } });
+    await sendPlanPrescriptions(p.ctx);
+    assert.deepEqual(p.state.prescriptions?.map((rx) => rx.medication), [...now, ...controlled].map(prescriptionFor), `${label}: verified`);
+    assert.ok(p.state.prescriptions?.every((rx) => rx.status === "sent" && rx.supply === "30-day supply"));
+    assert.equal(p.receipts("sent your").length, (now.length ? 1 : 0) + (controlled.length ? 1 : 0), "one receipt per prescriber");
 
     // Prep skipped: no records and no pharmacy, so the one on record is saved before the plan is sent.
     const q = await signedPlan(conditions, false);
     assert.equal(q.state.chat.recordsFound, null);
+    q.update({ chat: { idCheck: "done" } });
     await sendPlanPrescriptions(q.ctx);
     assert.equal(q.state.pharmacy?.name, "CVS Pharmacy", `${label}: pharmacy saved`);
     assert.deepEqual(q.state.prescriptions?.map((rx) => rx.medication), regimen.map(prescriptionFor), `${label}: skipped prep`);
@@ -615,15 +624,90 @@ test("the plan continues nothing the patient stopped, and sends once however oft
   assert.equal(typed.state.prescriptions, undefined, "a list the patient typed is gone over in the visit");
 
   const twice = await signedPlan(["ADHD", "Anxiety"], false);
+  twice.update({ chat: { idCheck: "done" } });
   await Promise.all([sendPlanPrescriptions(twice.ctx), sendPlanPrescriptions(twice.ctx)]);
   await sendPlanPrescriptions(twice.ctx);
   assert.equal(twice.state.prescriptions?.length, 2);
-  assert.equal(twice.receipts("sent your").length, 1);
+  assert.equal(twice.receipts("sent your").length, 2, "one from the clinician, one from the psychiatrist");
+});
+
+test("a restart while DoseSpot is sending doesn't stop the new conversation's plan from being sent", async () => {
+  const p = await signedPlan(["Anxiety"], true);
+  await node("medication").submit!("taking", p.ctx);
+  await node("pharmacy").submit!("suggested", p.ctx);
+  const first = sendPlanPrescriptions(p.ctx);
+  // A jump makes a new context for the new conversation; the old one's writes go nowhere.
+  const fresh = await signedPlan(["Anxiety"], true);
+  await node("medication").submit!("taking", fresh.ctx);
+  await node("pharmacy").submit!("suggested", fresh.ctx);
+  const second = sendPlanPrescriptions(fresh.ctx);
+  assert.notEqual(first, second, "the new conversation doesn't wait on the old one's send");
+  await Promise.all([first, second]);
+  assert.deepEqual(fresh.state.prescriptions?.map((rx) => rx.medication), ["Escitalopram (Lexapro) 10 mg once a day"]);
+});
+
+test("Adderall waits for the photo ID, then a Legion psychiatrist sends it, once", async () => {
+  const p = await signedPlan(["ADHD", "Anxiety", "Bipolar Disorder"], true);
+  await node("medication").submit!("taking", p.ctx);
+  await node("pharmacy").submit!("suggested", p.ctx);
+  assert.equal(p.state.chat.idCheck, "later");
+  await sendPlanPrescriptions(p.ctx);
+  await sendPlanPrescriptions(p.ctx);
+  assert.deepEqual(p.state.prescriptions?.map((rx) => rx.medication), [
+    "Lamotrigine (Lamictal) 200 mg once a day",
+    "Hydroxyzine (Vistaril) 25 mg as needed, up to three times a day",
+  ]);
+  assert.equal(p.receipts("Chen sent your lamotrigine (Lamictal) and hydroxyzine (Vistaril) prescriptions").length, 1);
+  assert.deepEqual(waitingForId(p.state).map((med) => med.name), ["Adderall"]);
+  assert.match(modelContext(p.state).plan, /continue Adderall 20 mg once every morning \(not sent yet: a Legion psychiatrist sends it once the patient verifies their photo ID\)/);
+
+  p.update({ chat: { idCheck: "done" } });
+  await Promise.all([sendPlanPrescriptions(p.ctx), sendPlanPrescriptions(p.ctx)]);
+  await sendPlanPrescriptions(p.ctx);
+  assert.equal(p.state.prescriptions?.filter((rx) => rx.medication === "Adderall 20 mg once every morning").length, 1);
+  assert.equal(p.state.prescriptions?.length, 3);
+  const [sent] = p.receipts("A Legion psychiatrist sent your Adderall prescription to CVS Pharmacy");
+  assert.equal(sent?.actor, "Care team");
+  assert.equal(p.receipts("sent your Adderall").length, 1);
+  assert.deepEqual(waitingForId(p.state), []);
+  assert.match(modelContext(p.state).plan, /continue Adderall 20 mg once every morning \(30-day supply, written by a Legion psychiatrist, sent to/);
+});
+
+test("the plan card and the clinician view show Adderall waiting for the ID, then sent by the psychiatrist", async () => {
+  // Stylesheets are the bundler's job; here they load as nothing.
+  register(
+    `data:text/javascript,${encodeURIComponent(
+      'export async function load(url, context, next) { return url.endsWith(".css") ? { format: "module", source: "", shortCircuit: true } : next(url, context); }',
+    )}`,
+  );
+  const { VISIT_CARDS } = await import("./visit");
+  const { ClinicianView } = await import("./sheets");
+  const p = await signedPlan(["ADHD", "Anxiety"], true);
+  await node("medication").submit!("taking", p.ctx);
+  await node("pharmacy").submit!("suggested", p.ctx);
+  await sendPlanPrescriptions(p.ctx);
+  const card = () => renderToStaticMarkup(createElement(() => VISIT_CARDS.plan({ state: p.state, ctx: p.ctx, active: false })));
+  const chart = () => renderToStaticMarkup(createElement(ClinicianView, { state: p.state, ctx: p.ctx }));
+  assert.match(card(), /Continue escitalopram \(Lexapro\) 10 mg once a day/);
+  assert.match(card(), /Dr\.\u00A0Chen sent a 30-day supply to CVS Pharmacy/);
+  assert.match(card(), /Continue Adderall 20 mg once every morning/);
+  assert.match(card(), /A Legion psychiatrist sends it after you verify your photo ID\./);
+  assert.match(card(), />Verify my ID</);
+  assert.match(chart(), /Adderall 20 mg once every morning, waiting for photo ID/);
+  assert.match(chart(), /Photo ID not verified, so the Adderall prescription waits to be sent/);
+
+  p.update({ chat: { idCheck: "done" } });
+  await sendPlanPrescriptions(p.ctx);
+  assert.match(card(), /A Legion psychiatrist sent your Adderall prescription there too\./);
+  assert.doesNotMatch(card(), /Verify my ID|after you verify/);
+  assert.match(chart(), /Adderall 20 mg once every morning, sent by a Legion psychiatrist/);
+  assert.doesNotMatch(chart(), /waiting for photo ID|Photo ID not verified/);
 });
 
 test("a prescription the pharmacy didn't confirm goes to the care team to resend", async () => {
   const p = await signedPlan(["ADHD", "Anxiety"], true);
-  p.update({ scenario: "prescription-failed" });
+  // With the photo ID verified first, both go together.
+  p.update({ scenario: "prescription-failed", chat: { idCheck: "done" } });
   await node("medication").submit!("taking", p.ctx);
   await node("pharmacy").submit!("suggested", p.ctx);
   await sendPlanPrescriptions(p.ctx);

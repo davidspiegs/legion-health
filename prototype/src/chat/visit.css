@@ -744,6 +744,14 @@
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+/* A controlled medication waiting on the photo ID check starts it from here. */
+.vs-fact-note + .vs-fact-value {
+  margin-top: 10px;
+}
+.vs-fact-action {
+  justify-self: start;
+  min-height: 32px;
+}
 .vs-plan-note {
   margin: 14px 2px 0;
   display: flex;

@@ -485,14 +485,23 @@ export const REGIMEN_FALLBACK: readonly RegimenMed[] = [
   { name: "Sertraline (Zoloft)", dose: "50 mg", schedule: "once every morning", for: "Mood and anxiety" },
 ];
 
+/**
+ * A controlled medication: a stimulant. Legion verifies the patient's photo ID before one is sent,
+ * and in Texas a physician writes it. Takes a name or a prescription line ("Adderall 20 mg …").
+ */
+export const isControlled = (medication: string) => /^Adderall\b/.test(medication);
+
 /** The medications a patient with these conditions takes. Order and "I'm not sure" or "Other" don't matter. */
 export function regimenFor(conditions: readonly string[]): readonly RegimenMed[] {
   return REGIMENS[regimenKey(conditions)] ?? REGIMEN_FALLBACK;
 }
 
+/** The prescription DoseSpot sends for one medication: "Adderall 20 mg once every morning". */
+export const prescriptionFor = (med: RegimenMed) => `${med.name} ${med.dose} ${med.schedule}`;
+
 /** "Adderall 20 mg once every morning; Escitalopram (Lexapro) 10 mg once a day". */
 export function regimenLine(meds: readonly RegimenMed[]): string {
-  return meds.map((med) => `${med.name} ${med.dose} ${med.schedule}`).join("; ");
+  return meds.map(prescriptionFor).join("; ");
 }
 
 /** A medication mid-sentence: "escitalopram (Lexapro) 10 mg". A brand on its own, like Adderall, keeps its capital. */

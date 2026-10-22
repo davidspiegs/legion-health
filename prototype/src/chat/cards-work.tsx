@@ -462,7 +462,7 @@ function MatchWork({ state }: CardProps) {
             ? "Couldn’t reach clinicians’ calendars"
             : "Looking for clinicians who fit"
           : found
-            ? `Found ${found} ${found === 1 ? "clinician" : "clinicians"} who fit`
+            ? `Found ${found} ${found === 1 ? "clinician who fits" : "clinicians who fit"}`
             : searched
               ? `Searched ${searched} Texas clinicians`
               : "How I searched"

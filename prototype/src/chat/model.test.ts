@@ -59,15 +59,24 @@ test("after the visit the signed plan goes too, with each prescription and the f
   assert.equal(modelContext(s).allergies, "Penicillin (rash)");
   assert.equal(modelContext(withChat(s, { allergy: "no" })).allergies, undefined, "a record the patient flagged isn't sent");
   const at = new Date().toISOString();
-  const withRx: ChatJourney = {
-    ...s,
-    prescriptions: [
-      { id: "rx1", medication: "Adderall 20 mg", supply: "30-day supply", pharmacy: "CVS Pharmacy, South Congress", status: "sent", at },
-    ],
-  };
+  const rx = (medication: string) => ({ id: medication, medication, supply: "30-day supply", pharmacy: "CVS Pharmacy, South Congress", status: "sent" as const, at });
+  // Before the photo ID is verified, the controlled medication waits.
+  const withRx: ChatJourney = { ...s, prescriptions: [rx("Escitalopram (Lexapro) 10 mg once a day")] };
   const plan = modelContext(withRx).plan;
-  assert.match(plan, /^Dr\. Chen signed the care plan: continue Adderall 20 mg \(30-day supply, sent to CVS Pharmacy, South Congress through DoseSpot\)/);
+  assert.match(
+    plan,
+    /^Dr\. Chen signed the care plan: continue Escitalopram \(Lexapro\) 10 mg once a day \(30-day supply, sent to CVS Pharmacy, South Congress through DoseSpot\); continue Adderall 20 mg once every morning \(not sent yet: a Legion psychiatrist sends it once the patient verifies their photo ID\)/,
+  );
   assert.match(plan, /Follow-up in about 2 weeks, not booked yet\.$/);
+  const verified: ChatJourney = {
+    ...withChat(withRx, { idCheck: "done" }),
+    prescriptions: [...withRx.prescriptions!, rx("Adderall 20 mg once every morning")],
+  };
+  assert.match(
+    modelContext(verified).plan,
+    /; continue Adderall 20 mg once every morning \(30-day supply, written by a Legion psychiatrist, sent to CVS Pharmacy, South Congress through DoseSpot\)\./,
+  );
+  assert.doesNotMatch(modelContext(verified).plan, /not sent yet/);
 });
 
 test("the brief also gets the patient's story, goal and note", () => {

@@ -33,9 +33,18 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { formatPhone, medsInSentence } from "../model/fixtures";
+import { formatPhone, isControlled, medsInSentence, prescriptionFor } from "../model/fixtures";
 import type { Notification, Profile, Scenario } from "../model/types";
-import { addTask, clinicianName, receipt, reminderTimes, skipToVisitDay, track, type ChatContext } from "./agent";
+import {
+  addTask,
+  clinicianFirst,
+  clinicianName,
+  receipt,
+  reminderTimes,
+  skipToVisitDay,
+  track,
+  type ChatContext,
+} from "./agent";
 import {
   STAGES,
   deriveTranscript,
@@ -49,6 +58,7 @@ import { ASSISTANT, PREVIEW } from "./env";
 import { bookingAnswer } from "./assistant";
 import { answerQuestion, type GuideAnswer } from "./guide-ai";
 import { clinicianById, type Clinician } from "./inventory";
+import { PSYCHIATRIST, storyOtherLabel, waitingForId } from "./model";
 import type { Moment } from "./moments";
 import { SupportLines } from "./cards";
 import { AgentAvatar, AssistantAvatar } from "./parts";
@@ -2204,7 +2214,10 @@ function dataGaps(s: ChatJourney): string[] {
     if (s.chat.baselineIntro === "skip") gaps.push("Patient skipped the check-ins");
     if (s.healthReviewed && s.chat.pharmacy !== "suggested") gaps.push("No pharmacy on file");
   }
-  if (medicationPath(s) && s.chat.idCheck !== "done")
+  const held = waitingForId(s);
+  if (held.length)
+    gaps.push(`Photo ID not verified, so the ${medsInSentence(held.map(({ name }) => ({ name })))} prescription waits to be sent`);
+  else if (medicationPath(s) && s.chat.idCheck !== "done")
     gaps.push("Photo ID not verified, which is needed before any controlled medication");
   return gaps;
 }
@@ -2331,7 +2344,8 @@ const GOAL_LABELS: Record<string, string> = {
 };
 
 function ReasonSection({ s, questions }: { s: ChatJourney; questions: string[] }) {
-  const conditions = s.conditions.map(conditionLabel);
+  const other = storyOtherLabel(s);
+  const conditions = s.conditions.map((c) => (c === "Other" && other ? other : conditionLabel(c)));
   const words = s.chat.storyMode === "words" && s.chat.storyText;
   const reason = briefReason(s);
   return (
@@ -2369,13 +2383,21 @@ const EXPLORE: Record<string, string> = {
 };
 
 function ExploreSection({ s }: { s: ChatJourney }) {
+  const other = storyOtherLabel(s);
   const items = s.conditions.map((condition) => ({
-    name: condition === "I'm not sure" ? "Not sure yet" : conditionLabel(condition),
+    name:
+      condition === "I'm not sure"
+        ? "Not sure yet"
+        : condition === "Other" && other
+          ? other.replace(/^./, (c) => c.toUpperCase())
+          : conditionLabel(condition),
     question:
       condition === "Other"
         ? s.chat.otherText
           ? `What do they mean by “${s.chat.otherText}”?`
-          : "They chose something else. What’s going on?"
+          : other
+            ? "How long has it been going on, and how much is it affecting daily life?"
+            : "They chose something else. What’s going on?"
         : (EXPLORE[condition] ?? "What would they like help with?"),
   }));
   return (
@@ -2591,7 +2613,31 @@ function medFacts(s: ChatJourney): MedFact[] {
         ? { label: "Pharmacy", value: "To choose at the visit", source: "Patient asked for a different one" }
         : { label: "Pharmacy", value: "None on file" };
 
-  return [medication, allergy, pharmacy];
+  // Once the plan is signed: what went to the pharmacy, and a controlled medication waiting on the photo ID.
+  const sent = s.prescriptions ?? [];
+  const held = waitingForId(s);
+  const clinician = clinicianFirst(s.appointment?.providerId ?? s.providerId);
+  const prescriptions: MedFact | null =
+    s.carePlan.status === "published" && (sent.length || held.length)
+      ? {
+          label: "Prescriptions",
+          value: [
+            ...sent.map(
+              (rx) =>
+                `${rx.medication}, ${rx.status === "sent" ? "sent" : "resending"} by ${isControlled(rx.medication) ? PSYCHIATRIST : clinician}`,
+            ),
+            ...held.map((med) => `${prescriptionFor(med)}, waiting for photo ID`),
+          ],
+          source: `${sent[0] ? `${sent[0].supply} to ${sent[0].pharmacy}. ` : ""}DoseSpot (simulated)`,
+          check: held.length
+            ? { text: `Photo ID not verified. ${PSYCHIATRIST.replace(/^a/, "A")} sends ${medsInSentence(held.map(({ name }) => ({ name })))} once it is`, tone: "open" }
+            : sent.some((rx) => rx.status !== "sent")
+              ? { text: "Pharmacy hasn’t confirmed one yet. The care team is resending it", tone: "review" }
+              : { text: "All sent to the pharmacy", tone: "ok" },
+        }
+      : null;
+
+  return [medication, ...(prescriptions ? [prescriptions] : []), allergy, pharmacy];
 }
 
 function MedsSection({ s }: { s: ChatJourney }) {
@@ -2913,28 +2959,40 @@ export function ClinicianView({ state, ctx }: { state: ChatJourney; ctx: ChatCon
           ? "Opened for editing (simulated). Changes are signed by the clinician."
           : "";
 
+  // After the visit, the brief has done its job: the clinician read it and signed the plan.
+  const signed = s.carePlan.status === "published";
+
   return (
     <div className="sh-sheet sh-chart">
-      <p className="sh-banner">
-        <Sparkles size={18} aria-hidden="true" />
-        <span>
-          <strong>AI draft. Clinician review required.</strong>
+      {signed ? (
+        <p className="sh-banner">
+          <CircleCheck size={18} aria-hidden="true" />
           <span>
-            {ASSISTANT.name} drafted this from the patient’s answers and connected sources. It isn’t a
-            diagnosis, and nothing here is final until a clinician reviews it.
+            <strong>{reviewer} reviewed this brief and signed the care plan.</strong>
           </span>
-          <span className="sh-banner-meta">
-            {s.chat.briefApproved
-              ? "The patient reviewed and approved their brief."
-              : s.chat.briefSkipped
-                ? "The patient chose not to send their brief."
-                : s.chat.jobs.brief?.status === "done"
-                  ? "The patient hasn’t reviewed their brief yet."
-                  : "Still filling in as the patient answers."}
-            {last === "accept" ? ` ${reviewer} accepted it (simulated).` : ""}
+        </p>
+      ) : (
+        <p className="sh-banner">
+          <Sparkles size={18} aria-hidden="true" />
+          <span>
+            <strong>AI draft. Clinician review required.</strong>
+            <span>
+              {ASSISTANT.name} drafted this from the patient’s answers and connected sources. It isn’t a
+              diagnosis, and nothing here is final until a clinician reviews it.
+            </span>
+            <span className="sh-banner-meta">
+              {s.chat.briefApproved
+                ? "The patient reviewed and approved their brief."
+                : s.chat.briefSkipped
+                  ? "The patient chose not to send their brief."
+                  : s.chat.jobs.brief?.status === "done"
+                    ? "The patient hasn’t reviewed their brief yet."
+                    : "Still filling in as the patient answers."}
+              {last === "accept" ? ` ${reviewer} accepted it (simulated).` : ""}
+            </span>
           </span>
-        </span>
-      </p>
+        </p>
+      )}
 
       <PatientSection s={s} clinician={clinician} />
 
@@ -3022,27 +3080,29 @@ export function ClinicianView({ state, ctx }: { state: ChatJourney; ctx: ChatCon
         <ReceiptList receipts={s.chat.receipts} now={now} compact named empty="No activity yet." />
       </Section>
 
-      <div className="sh-chart-actions">
-        <p className="sh-meta" role="status">
-          {said}
-        </p>
-        <div className="sh-chart-buttons">
-          <button type="button" className="sh-btn" disabled={flagged} onClick={() => act("flag")}>
-            {flagged ? "Flagged" : "Flag for review"}
-          </button>
-          <button type="button" className="sh-btn" onClick={() => act("edit")}>
-            Edit
-          </button>
-          <button
-            type="button"
-            className="sh-btn is-primary"
-            disabled={last === "accept"}
-            onClick={() => act("accept")}
-          >
-            <Check size={16} aria-hidden="true" /> {last === "accept" ? "Accepted" : "Accept brief"}
-          </button>
+      {signed ? null : (
+        <div className="sh-chart-actions">
+          <p className="sh-meta" role="status">
+            {said}
+          </p>
+          <div className="sh-chart-buttons">
+            <button type="button" className="sh-btn" disabled={flagged} onClick={() => act("flag")}>
+              {flagged ? "Flagged" : "Flag for review"}
+            </button>
+            <button type="button" className="sh-btn" onClick={() => act("edit")}>
+              Edit
+            </button>
+            <button
+              type="button"
+              className="sh-btn is-primary"
+              disabled={last === "accept"}
+              onClick={() => act("accept")}
+            >
+              <Check size={16} aria-hidden="true" /> {last === "accept" ? "Accepted" : "Accept brief"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

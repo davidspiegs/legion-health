@@ -36,14 +36,23 @@ import {
   WifiOff,
   type LucideIcon,
 } from "lucide-react";
-import { formatDate, formatPhone, formatTime, medInSentence, medsInSentence } from "../model/fixtures";
+import {
+  formatDate,
+  formatPhone,
+  formatTime,
+  isControlled,
+  medInSentence,
+  medsInSentence,
+  prescriptionFor,
+} from "../model/fixtures";
 import { journeyNow } from "../model/journey-state";
-import { addTask, receipt, stamp, track, type ChatContext, type ChatPatch } from "./agent";
+import { addTask, briefKey, receipt, stamp, track, type ChatContext, type ChatPatch } from "./agent";
 import { downloadCalendar, saveFile } from "./cards-booked";
 import { STAGES } from "./engine";
 import { ASSISTANT, PREVIEW } from "./env";
 import { mentionsCrisis } from "./guide-ai";
 import { clinicianById, formalName } from "./inventory";
+import { continuedRegimen, PSYCHIATRIST, waitingForId } from "./model";
 import { AssistantAvatar, LegionMark, markShown } from "./parts";
 import { SUPPORT_LINES, flagRisk, screenPatientLines } from "./safety";
 import type {
@@ -55,6 +64,7 @@ import type {
   WidgetMap,
   WidgetProps,
 } from "./registry";
+import type { Prescription } from "../model/types";
 import type { ChatJourney } from "./state";
 import "./visit.css";
 
@@ -1474,28 +1484,49 @@ function planSteps(s: ChatJourney): string[] {
 const followupOf = (s: ChatJourney) =>
   s.followupAppointment && s.followupAppointment.status !== "cancelled" ? s.followupAppointment : null;
 
-/**
- * The plan's prescriptions: each medication the clinician continued, and one line on where
- * DoseSpot sent them. Empty until the clinician sends any.
- */
-function prescriptionLines(s: ChatJourney, who: Who): { lines: string[]; note: string } {
-  const prescriptions = s.prescriptions ?? [];
-  if (!prescriptions.length) return { lines: [], note: "" };
+/** One prescriber's prescriptions: where DoseSpot sent them, or that the care team is resending them. */
+function sentNote(prescriptions: Prescription[], by: string, whose: string): string {
+  if (!prescriptions.length) return "";
   const { pharmacy, supply } = prescriptions[0];
   const many = prescriptions.length > 1;
   const failed = prescriptions.filter((rx) => rx.status !== "sent").length;
-  const sent = `${who.First} sent a ${supply}${many ? " of each" : ""} to ${pharmacy} through DoseSpot, simulated.`;
-  const note =
-    failed === 0
-      ? sent
-      : failed === prescriptions.length
-        ? `${who.first}’s ${many ? "prescriptions" : supply} didn’t reach ${pharmacy} yet. Your care team is resending ${many ? "them" : "it"} today.`
-        : `${sent} The pharmacy hasn’t confirmed ${failed === 1 ? "one of them" : `${failed} of them`} yet, so your care team is resending ${failed === 1 ? "it" : "them"} today.`;
-  return { lines: prescriptions.map((rx) => `Continue ${medInSentence(rx.medication)}`), note };
+  const sent = `${by} sent a ${supply}${many ? " of each" : ""} to ${pharmacy} through DoseSpot, simulated.`;
+  return failed === 0
+    ? sent
+    : failed === prescriptions.length
+      ? `${whose} ${many ? "prescriptions" : supply} didn’t reach ${pharmacy} yet. Your care team is resending ${many ? "them" : "it"} today.`
+      : `${sent} The pharmacy hasn’t confirmed ${failed === 1 ? "one of them" : `${failed} of them`} yet, so your care team is resending ${failed === 1 ? "it" : "them"} today.`;
+}
+
+/**
+ * The plan's prescriptions: each medication the clinician continued, with one line on where
+ * DoseSpot sent them, and any controlled one still waiting for the photo ID check, which a
+ * Legion psychiatrist sends once it's verified. Empty until there's a signed plan to list.
+ */
+function prescriptionLines(s: ChatJourney, who: Who): { lines: string[]; note: string; waiting: string[]; waitNote: string } {
+  const prescriptions = s.prescriptions ?? [];
+  const ours = prescriptions.filter((rx) => !isControlled(rx.medication));
+  const theirs = prescriptions.filter((rx) => isControlled(rx.medication));
+  const psychiatrist = capitalize(PSYCHIATRIST);
+  const named = (rx: Prescription) => ({
+    name: continuedRegimen(s).find((med) => prescriptionFor(med) === rx.medication)?.name ?? rx.medication,
+  });
+  // Sent alongside the clinician's, the psychiatrist's needs only a short line.
+  const theirNote =
+    ours.length && theirs.length && theirs.every((rx) => rx.status === "sent")
+      ? `${psychiatrist} sent your ${medsInSentence(theirs.map(named))} ${theirs.length === 1 ? "prescription" : "prescriptions"} there too.`
+      : sentNote(theirs, psychiatrist, "The psychiatrist’s");
+  const held = waitingForId(s);
+  return {
+    lines: prescriptions.map((rx) => `Continue ${medInSentence(rx.medication)}`),
+    note: [sentNote(ours, who.First, `${who.first}’s`), theirNote].filter(Boolean).join(" "),
+    waiting: held.map((med) => `Continue ${medInSentence(prescriptionFor(med))}`),
+    waitNote: held.length ? `${psychiatrist} sends ${held.length === 1 ? "it" : "them"} after you verify your photo ID.` : "",
+  };
 }
 
 /** The clinician's signed plan, laid out like a short letter: who signed it, what you discussed, what's next. */
-function Plan({ state }: CardProps) {
+function Plan({ state, ctx }: CardProps) {
   const who = clinicianFor(state);
   const signed = onClock(state, state.carePlan.publishedAt) ?? state.appointment?.start ?? null;
   const followup = followupOf(state);
@@ -1560,12 +1591,26 @@ function Plan({ state }: CardProps) {
                 ))}
                 <span className="vs-fact-note">{rx.note}</span>
               </>
-            ) : (
+            ) : null}
+            {rx.waiting.length ? (
+              <>
+                {rx.waiting.map((line) => (
+                  <span className="vs-fact-value" key={line}>
+                    {line}
+                  </span>
+                ))}
+                <span className="vs-fact-note">{rx.waitNote}</span>
+                <button type="button" className="vs-link vs-fact-action" onClick={() => ctx.openSheet("idcheck")}>
+                  Verify my ID
+                </button>
+              </>
+            ) : null}
+            {!rx.lines.length && !rx.waiting.length ? (
               <>
                 <span className="vs-fact-value">None today</span>
                 <span className="vs-fact-note">Any medication decision is made with your clinician.</span>
               </>
-            )}
+            ) : null}
           </span>
         </li>
       </ul>
@@ -1605,9 +1650,15 @@ function shareTarget(s: ChatJourney): { to: string; network: string; fromRecords
 
 /** The summary's prescriptions, as the plan card lists them. */
 function prescriptionSummary(s: ChatJourney, who: Who): string[] {
-  const { lines, note } = prescriptionLines(s, who);
-  if (!lines.length) return ["Prescriptions: none today. Any medication decision is made with your clinician."];
-  return ["", "Prescriptions", ...lines.map((line) => `- ${line}`), note];
+  const { lines, note, waiting, waitNote } = prescriptionLines(s, who);
+  if (!lines.length && !waiting.length)
+    return ["Prescriptions: none today. Any medication decision is made with your clinician."];
+  return [
+    "",
+    "Prescriptions",
+    ...(lines.length ? [...lines.map((line) => `- ${line}`), note] : []),
+    ...(waiting.length ? [...waiting.map((line) => `- ${line}`), waitNote] : []),
+  ];
 }
 
 /** A plain-text copy of the visit summary for the patient to keep. */
@@ -1871,10 +1922,13 @@ function storyReason(s: ChatJourney): string {
  * edit first, then Wren's draft (Claude, when there's a model), then what they said or chose.
  * The clinician view shows the same reason.
  */
+/** Wren's draft, only while it was written from the brief's current inputs; an older one is stale. */
+const currentDraft = (s: ChatJourney) => (s.chat.briefDraft?.key === briefKey(s) ? s.chat.briefDraft : null);
+
 export function briefReason(s: ChatJourney): { text: string; by: "edit" | "draft" | "patient" } {
   const edited = editedReason(s);
   if (edited) return { text: edited, by: "edit" };
-  const drafted = s.chat.briefDraft?.reason.trim();
+  const drafted = currentDraft(s)?.reason.trim();
   if (drafted) return { text: drafted, by: "draft" };
   return { text: storyReason(s), by: "patient" };
 }
@@ -1944,7 +1998,7 @@ function chartRow(s: ChatJourney): BriefRow | null {
 
 function briefRows(s: ChatJourney, who: Who): BriefRow[] {
   const reason = briefReason(s);
-  const focus = s.chat.briefDraft?.focus.trim();
+  const focus = currentDraft(s)?.focus.trim();
   const drafted = `Drafted by ${ASSISTANT.name}`;
   const note = (s.chat.note || s.briefNote).trim();
   const rows: (BriefRow | null)[] = [

@@ -1,4 +1,12 @@
-import { formatDate, formatTime, regimenFor, regimenLine } from "../model/fixtures";
+import {
+  formatDate,
+  formatTime,
+  isControlled,
+  prescriptionFor,
+  regimenFor,
+  regimenLine,
+  type RegimenMed,
+} from "../model/fixtures";
 import { clinicianById, formalName } from "./inventory";
 import type { ChatJourney } from "./state";
 
@@ -69,10 +77,17 @@ function costOf(s: ChatJourney): string {
   return "The plan's share, charged after the visit";
 }
 
-/** The chosen conditions by name, with an "Other" concern in the patient's words. */
+/**
+ * Claude's short name for the patient's "Other" concern ("trouble sleeping"), while the conditions
+ * are the ones it read from their words. Chosen from the list instead, there's none.
+ */
+export const storyOtherLabel = (s: ChatJourney) =>
+  s.chat.storyMode === "words" && s.conditions.includes("Other") ? s.chat.storyOther.trim() : "";
+
+/** The chosen conditions by name, with an "Other" concern in the patient's words, or as Claude named it. */
 function conditionsOf(s: ChatJourney): string {
   const named = s.conditions.filter((c) => c !== "I'm not sure" && c !== "Other");
-  const other = s.conditions.includes("Other") ? s.chat.otherText.trim() : "";
+  const other = s.conditions.includes("Other") ? s.chat.otherText.trim() || storyOtherLabel(s) : "";
   return [...named, ...(other ? [other] : [])].join(", ");
 }
 
@@ -98,20 +113,45 @@ function allergiesOf(s: ChatJourney): string {
   return [onRecord, c.allergyNote.trim()].filter(Boolean).join("; ");
 }
 
+/**
+ * What the clinician continues once the plan is signed: the patient's regimen, unless they said
+ * they stopped it or take nothing. A list the patient typed in place of a pharmacy record is
+ * theirs to go over in the visit, so nothing is continued from it.
+ */
+export function continuedRegimen(s: ChatJourney): readonly RegimenMed[] {
+  const c = s.chat;
+  if (!s.conditions.length || c.medication === "stopped" || c.medication === "none") return [];
+  if (c.medication === "other" && c.medicationNote.trim()) return [];
+  return regimenFor(s.conditions);
+}
+
+/** Who writes a controlled medication. Texas requires a physician, and no one in the directory is an MD or DO. */
+export const PSYCHIATRIST = "a Legion psychiatrist";
+
+/** A controlled medication the signed plan continues, not sent yet because the photo ID isn't verified. */
+export function waitingForId(s: ChatJourney): RegimenMed[] {
+  if (s.carePlan.status !== "published" || s.chat.idCheck === "done") return [];
+  const sent = (s.prescriptions ?? []).map((rx) => rx.medication);
+  return continuedRegimen(s).filter((med) => isControlled(med.name) && !sent.includes(prescriptionFor(med)));
+}
+
 /** Once the clinician signs the plan: what they continued or changed, where it was sent, and what's next. */
 function planOf(s: ChatJourney): string {
   if (s.carePlan.status !== "published") return "";
   const who = clinicianOf(s.appointment?.providerId ?? s.providerId) || "The clinician";
   const prescriptions = s.prescriptions ?? [];
-  const sent = prescriptions.length
-    ? prescriptions
-        .map((rx) =>
-          rx.status === "sent"
-            ? `continue ${rx.medication} (${rx.supply}, sent to ${rx.pharmacy} through DoseSpot)`
-            : `continue ${rx.medication} (${rx.supply}, not confirmed by ${rx.pharmacy} yet; the care team is resending it)`,
-        )
-        .join("; ")
-    : "no prescriptions sent";
+  const lines = [
+    ...prescriptions.map((rx) => {
+      const by = isControlled(rx.medication) ? `written by ${PSYCHIATRIST}, ` : "";
+      return rx.status === "sent"
+        ? `continue ${rx.medication} (${rx.supply}, ${by}sent to ${rx.pharmacy} through DoseSpot)`
+        : `continue ${rx.medication} (${rx.supply}, ${by}not confirmed by ${rx.pharmacy} yet; the care team is resending it)`;
+    }),
+    ...waitingForId(s).map(
+      (med) => `continue ${prescriptionFor(med)} (not sent yet: ${PSYCHIATRIST} sends it once the patient verifies their photo ID)`,
+    ),
+  ];
+  const sent = lines.length ? lines.join("; ") : "no prescriptions sent";
   const followup = s.followupAppointment && s.followupAppointment.status !== "cancelled" ? s.followupAppointment : null;
   return `${who} signed the care plan: ${sent}. Follow-up in about ${s.carePlan.followupWeeks} weeks${
     followup ? `, booked for ${when(followup.start)}` : ", not booked yet"

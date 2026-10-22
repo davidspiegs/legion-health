@@ -1261,13 +1261,14 @@ button.bubble:active {
 }
 
 /*
- * The care team view (Preview only): a toggle in the header on wide screens. While it's
- * open the rail widens for it, and the conversation slides over to make room.
+ * The care team view (Preview only): a toggle in the header from 1200px, where there's room
+ * for it beside the conversation. While it's open the rail widens for it, and the
+ * conversation slides over to make room.
  */
 .care-view-toggle {
   display: none;
 }
-@media (min-width: 1024px) {
+@media (min-width: 1200px) {
   .care-view-toggle {
     display: inline-flex;
     align-items: center;
@@ -1316,7 +1317,7 @@ button.bubble:active {
       grid-template-columns 360ms var(--chat-ease);
   }
 }
-@media (min-width: 1024px) and (hover: hover) {
+@media (min-width: 1200px) and (hover: hover) {
   .care-view-toggle:not([aria-pressed="true"]):hover {
     border-color: #a9b7d3;
     background: #fbfcfe;

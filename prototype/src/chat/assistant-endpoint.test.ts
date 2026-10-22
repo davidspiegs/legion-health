@@ -252,6 +252,8 @@ test(
       assert.equal(sent[0].max_tokens, 700);
       assert.equal(schemaOf(sent[0]).additionalProperties, false);
       assert.match(sent[0].system, /first pass/);
+      assert.match(sent[0].system, /"medication" and "clinical" messages[^\n]*first person as that clinician/);
+      assert.match(sent[0].system, /every other category, write as the Legion care team/);
       assert.match(sent[0].messages[0].content, /The patient's message to the care team:\nCan I get my refill early\?/);
     },
   ),

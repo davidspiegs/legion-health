@@ -13,7 +13,7 @@ import {
 import { Info, LifeBuoy, ListChecks, SlidersHorizontal, Sparkles, UsersRound, X } from "lucide-react";
 import { createMockApi } from "../model/services";
 import { applyJourneyPatch, joinAvailability, journeyNow, recoverPaymentSetup } from "../model/journey-state";
-import { formatTime } from "../model/fixtures";
+import { formatTime, mychartChart } from "../model/fixtures";
 import { useMobileViewport } from "../hooks/useMobileViewport";
 import { useCareSimulation } from "../hooks/useCareSimulation";
 import type { CareMessage, JourneyState, Scenario } from "../model/types";
@@ -105,6 +105,10 @@ function restore(): ChatJourney {
             ? { status: "unverified", estimate: null }
             : saved.eligibility || base.eligibility,
         paymentSetup: saved.paymentSetup ? recoverPaymentSetup(saved.paymentSetup) : base.paymentSetup,
+        // A chart saved before it followed the regimen is read again from the chosen conditions.
+        chartImport: saved.chartImport
+          ? { ...saved.chartImport, ...mychartChart(saved.conditions ?? []) }
+          : saved.chartImport,
         careMessages: (saved.careMessages || []).map((message: object) =>
           // A first pass cut off by the reload shows its fallback rather than drafting forever.
           recoverTriage({ sender: "patient", status: "delivered", ...message } as CareMessage),
@@ -201,6 +205,15 @@ function ChatApp() {
     });
   }, [update, epoch]);
   useCareSimulation(stateRef, api, update);
+  // The care team view needs 1200px beside the conversation; narrower, the rail goes back to the journey.
+  useEffect(() => {
+    const wide = window.matchMedia("(min-width: 1200px)");
+    const fit = () => {
+      if (!wide.matches) setCareOpen(false);
+    };
+    wide.addEventListener("change", fit);
+    return () => wide.removeEventListener("change", fit);
+  }, []);
 
   const act = useCallback(async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
     if (busyRef.current) return undefined;
@@ -547,10 +560,11 @@ function ChatApp() {
   }, [editing, reduced]);
 
   // Once the plan is signed, the simulated clinician continues the patient's regimen through
-  // DoseSpot, one prescription per medication. Anything new is decided in the visit itself.
+  // DoseSpot, one prescription per medication; a controlled one goes once the photo ID is
+  // verified. Anything new is decided in the visit itself.
   useEffect(() => {
     if (state.carePlan.status === "published") void sendPlanPrescriptions(ctx);
-  }, [state.carePlan.status, ctx]);
+  }, [state.carePlan.status, state.chat.idCheck, ctx]);
 
   // Leaving the visit room: when whatever opened it is gone, focus goes to what's next in the dock.
   const roomWasOpen = useRef(false);

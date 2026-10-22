@@ -183,6 +183,8 @@ export async function settleMove(ctx: ChatContext, slotId: string, fee: boolean)
                 awaiting: undefined,
                 answer: `Done. Your visit with ${clinicianFirst(appointment.providerId)} is now ${slotLabel(slotId)} Central.`,
                 actions: ["calendar"],
+                // The confirmation comes from the booking, even when a model answered the question.
+                source: "booking",
               },
         ),
       },

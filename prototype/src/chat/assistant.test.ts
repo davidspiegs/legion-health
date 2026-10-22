@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { register } from "node:module";
 import { applyJourneyPatch } from "../model/journey-state";
 import type { JourneyState } from "../model/types";
 import type { ChatContext, ChatPatch } from "./agent";
@@ -234,6 +235,31 @@ test("medication questions go to the model even when they sound like the booking
   assert.equal((await answerTyped(ctx, "How much will I pay for the visit?")).source, "booking", "the booking still answers its own facts");
 });
 
+test("a question naming any regimen drug, generic or brand, reaches the model instead of the booking", async () => {
+  const model = withModel({ reply: "Take it as you usually do.", actions: [] });
+  try {
+    const ctx = context({ ...momentState("booked"), conditions: ["Anxiety", "Bipolar Disorder"] });
+    for (const question of [
+      "How much hydroxyzine can I take in a day?",
+      "How much Vistaril can I take?",
+      "Can I change the time of day I take my Lamictal?",
+      "How much lamotrigine should I take if I miss a dose?",
+      "How much Lexapro can I take?",
+      "How much escitalopram is too much?",
+      "How much does prazosin usually cost?",
+      "When should I take my Minipress before my visit with Dr. Chen?",
+      "Can I move my sertraline to the evening?",
+    ]) {
+      const reply = await answerTyped(ctx, question);
+      assert.equal(reply.source, "model", question);
+    }
+    assert.ok(model.calls.every((call) => call.task === "question"));
+    assert.equal((await answerTyped(ctx, "How much will I pay for the visit?")).source, "booking");
+  } finally {
+    model.restore();
+  }
+});
+
 test("Claude answers a medication question with the patient's regimen in context, and the answer is marked as the model's", async () => {
   const model = withModel({
     reply: "Take your Adderall 20 mg in the morning as usual. A missed dose late in the day is best skipped, so it doesn't keep you up.",
@@ -257,4 +283,28 @@ test("Claude answers a medication question with the patient's regimen in context
   } finally {
     model.restore();
   }
+});
+
+test("a move picked from a model answer is confirmed by the booking, so it loses the AI caption", async () => {
+  // Stylesheets are the bundler's job; here they load as nothing.
+  register(
+    `data:text/javascript,${encodeURIComponent(
+      'export async function load(url, context, next) { return url.endsWith(".css") ? { format: "module", source: "", shortCircuit: true } : next(url, context); }',
+    )}`,
+  );
+  const { settleMove } = await import("./clinicians");
+  const s = momentState("booked");
+  const ctx = context(s);
+  ctx.api = { scheduleReminders: async () => undefined } as unknown as ChatContext["api"];
+  const id = addAsk(ctx, "ready", {
+    question: "Can I see her later in the day? Mornings are rough on my meds",
+    answer: "Afternoons might suit you better. You can pick a new time here.",
+    actions: ["reschedule"],
+    awaiting: "move",
+  });
+  settleAsk(ctx, id, { source: "model" });
+  await settleMove(ctx, s.appointment!.slotId, false);
+  const ask = ctx.state().chat.asks.find((item) => item.id === id)!;
+  assert.match(ask.answer, /^Done\. Your visit with/);
+  assert.equal(ask.source, "booking");
 });

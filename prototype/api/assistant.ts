@@ -195,7 +195,9 @@ const TRIAGE_SYSTEM = `You're the first pass on a patient's message to the Legio
 
 - category: one of ${JSON.stringify(CATEGORIES)}.
 - summary: one short sentence for the team about what the patient needs.
-- draft: a reply the team can send as is: warm, specific, two to four sentences, no signature. Answer medication and clinical questions helpfully from the patient's context, the way their clinician would, and say their clinician (by the name in the context, such as Dr. Chen) will follow up if anything needs to change. For scheduling, billing and records, answer from the visit, cost and policy facts.
+- draft: a reply that can be sent as is: warm, specific, two to four sentences, no signature.
+  - For "medication" and "clinical" messages, the reply is sent under the name of the clinician in the context (such as Dr. Chen), so write it in the first person as that clinician. Answer helpfully from the patient's context, the way they would. If anything needs to change, say you'll look into it and follow up ("I'll follow up with you"), never naming yourself or speaking of the clinician in the third person.
+  - For every other category, write as the Legion care team ("we"), and answer scheduling, billing and records questions from the visit, cost and policy facts.
 
 ${FACTS}
 

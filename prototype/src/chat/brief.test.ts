@@ -5,6 +5,9 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
+import { register } from "node:module";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { createMockApi } from "../model/services";
 import { applyJourneyPatch } from "../model/journey-state";
 import type { JourneyState } from "../model/types";
@@ -136,6 +139,18 @@ async function toBrief(p: ReturnType<typeof patient>, note = "Mornings are the h
   await p.say("note", note);
 }
 
+/** The brief card and its reason as the patient sees them. Stylesheets are the bundler's job; here they load as nothing. */
+async function shown(p: ReturnType<typeof patient>) {
+  register(
+    `data:text/javascript,${encodeURIComponent(
+      'export async function load(url, context, next) { return url.endsWith(".css") ? { format: "module", source: "", shortCircuit: true } : next(url, context); }',
+    )}`,
+  );
+  const { VISIT_CARDS, briefReason } = await import("./visit");
+  const card = renderToStaticMarkup(createElement(() => VISIT_CARDS.brief({ state: p.state, ctx: p.ctx, active: false })));
+  return { card, reason: briefReason(p.state) };
+}
+
 /** What the patient's Edit sheet saves when they change their note. */
 const editNote = (p: ReturnType<typeof patient>, note: string) =>
   p.update({ briefNote: note, briefApproved: false, chat: { note, briefApproved: false } });
@@ -210,7 +225,8 @@ test("a change before approval redrafts in place, with the brief and its choices
     assert.equal(p.state.chat.jobs.brief?.status, "done");
     assert.deepEqual(p.blocks(), ["work", "text", "brief"]);
     assert.ok(p.active()?.input);
-    assert.equal(p.state.chat.briefDraft, first, "the earlier draft shows meanwhile");
+    assert.equal(p.state.chat.briefDraft, first, "the earlier draft is kept meanwhile");
+    assert.equal((await shown(p)).reason.by, "patient", "but it was written from the old note, so it isn't shown");
     model.calls.length = 0;
     await p.flush();
     assert.equal(model.calls.length, 0, "one redraft per change");
@@ -305,6 +321,7 @@ test("a failed redraft keeps the last draft, and one that lands after approval c
     editNote(p, "Sleep too");
     await p.flush();
     assert.equal(p.state.chat.briefDraft, first);
+    assert.equal((await shown(p)).reason.by, "patient", "a draft of the old note isn't shown");
 
     reply = () => new Promise((resolve) => (release = () => resolve(json({ ...CLAUDE, focus: "Something new" }))));
     editNote(p, "Sleep, and work stress");
@@ -332,4 +349,50 @@ test("a restart while Claude drafts leaves the new conversation alone", async ()
   }
   assert.equal(p.state.chat.briefDraft, null);
   assert.equal(p.state.chat.jobs.brief, undefined);
+});
+
+test("a draft written from older inputs isn't shown: the brief goes back to the patient's own words", async () => {
+  const p = patient();
+  let reply: () => Response | Promise<Response> = () => json(CLAUDE);
+  const model = withModel(() => reply());
+  try {
+    await toBrief(p, "ask about sleep");
+    const drafted = await shown(p);
+    assert.equal(drafted.reason.by, "draft");
+    assert.match(drafted.card, /What to cover/);
+    assert.ok(drafted.card.includes("stimulant could help"));
+    // The patient clears their note, and the redraft gets no answer.
+    reply = () => json({ error: "unavailable" }, 503);
+    editNote(p, "");
+    await p.flush();
+  } finally {
+    model.restore();
+  }
+  assert.notEqual(p.state.chat.briefDraft?.key, briefKey(p.state), "the stored draft is from the old note");
+  const after = await shown(p);
+  assert.equal(after.reason.by, "patient");
+  assert.doesNotMatch(after.card, /What to cover|Source: <\/span>Drafted by Wren/);
+  assert.ok(!after.card.includes("stimulant could help"), "the old focus is gone");
+});
+
+test("a redraft that lands after the patient chose not to send the brief changes nothing", async () => {
+  const p = patient();
+  let reply: () => Response | Promise<Response> = () => json(CLAUDE);
+  let release!: () => void;
+  const model = withModel(() => reply());
+  try {
+    await toBrief(p);
+    const first = p.state.chat.briefDraft;
+    reply = () => new Promise((resolve) => (release = () => resolve(json({ ...CLAUDE, focus: "Something new" }))));
+    editNote(p, "Sleep, and work stress");
+    await p.flush();
+    await p.say("brief", "skip");
+    release();
+    await p.flush();
+    assert.equal(p.state.chat.briefDraft, first, "the late draft is ignored");
+    assert.equal(p.state.chat.briefSkipped, true);
+    assert.equal(p.receipts(REDRAFTED), 0);
+  } finally {
+    model.restore();
+  }
 });

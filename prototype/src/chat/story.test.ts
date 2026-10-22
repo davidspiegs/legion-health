@@ -5,6 +5,9 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
+import { register } from "node:module";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { createMockApi } from "../model/services";
 import { applyJourneyPatch } from "../model/journey-state";
 import type { JourneyState } from "../model/types";
@@ -12,6 +15,7 @@ import type { ChatContext, ChatPatch } from "./agent";
 import { deriveTranscript } from "./engine";
 import { readStory } from "./guide-ai";
 import { inventory } from "./inventory";
+import { modelContext } from "./model";
 import { SCRIPT, readingStory } from "./script";
 import { initialChatJourney, type ChatJourney } from "./state";
 import { readStoryLive, storyFromModel } from "./story";
@@ -177,7 +181,7 @@ test("the read-back waits while Claude reads, then shows Claude's reading to con
   }
   assert.equal(readingStory(p.state), false);
   assert.equal(p.said("story::reflect"), CLAUDE.reflection);
-  assert.match(p.said("story::noted") ?? "", /^I’ll note ADHD and Anxiety for your clinician/);
+  assert.match(p.said("story::noted") ?? "", /^I’ll note ADHD and anxiety for your clinician/);
   assert.ok(p.transcript().active?.input, "the confirm question is asked");
   await p.node("story-confirm").submit!("right", p.ctx);
   assert.deepEqual(p.state.conditions, ["ADHD", "Anxiety"]);
@@ -236,4 +240,46 @@ test("Claude can't clear the local crisis check", async () => {
   }
   assert.equal(p.state.chat.storyCrisis, true);
   assert.ok(p.cards().includes("support-line"));
+});
+
+test("Claude's name for an Other concern is kept for the read-back, the model and the clinician view", async () => {
+  // Stylesheets are the bundler's job; here they load as nothing.
+  register(
+    `data:text/javascript,${encodeURIComponent(
+      'export async function load(url, context, next) { return url.endsWith(".css") ? { format: "module", source: "", shortCircuit: true } : next(url, context); }',
+    )}`,
+  );
+  const { ClinicianView } = await import("./sheets");
+  const p = patient();
+  await atStory(p);
+  const model = withModel(() =>
+    json({ ...CLAUDE, conditions: ["ADHD", "Anxiety", "Other", "Depression"], other: "trouble sleeping" }),
+  );
+  try {
+    await p.node("story").submit!("I can't focus, I worry all the time, I feel low and I barely sleep", p.ctx);
+  } finally {
+    model.restore();
+  }
+  assert.equal(p.state.chat.storyOther, "trouble sleeping");
+  assert.equal(
+    p.said("story::noted"),
+    "I’ll note ADHD, depression, anxiety and trouble sleeping for your clinician as a starting point, not a diagnosis. Did I get that right?",
+  );
+  await p.node("story-confirm").submit!("right", p.ctx);
+  assert.equal(modelContext(p.state).conditions, "ADHD, Depression, Anxiety, trouble sleeping");
+  const html = renderToStaticMarkup(createElement(ClinicianView, { state: p.state, ctx: p.ctx }));
+  assert.match(html, /<dt>Help with<\/dt><dd>ADHD, Depression, Anxiety and trouble sleeping<\/dd>/);
+  assert.match(html, /<strong>Trouble sleeping<\/strong>/);
+  assert.doesNotMatch(html, /They chose something else/);
+
+  // Claude names nothing when it reads no Other concern, and a label without one is dropped.
+  assert.equal(storyFromModel({ ...CLAUDE, other: "sleep" })?.other, undefined);
+});
+
+test("without Claude, an Other concern is still noted as what the patient described", async () => {
+  const p = patient();
+  await atStory(p);
+  await p.node("story").submit!("I can't focus at work and I barely sleep", p.ctx);
+  assert.equal(p.state.chat.storyOther, "");
+  assert.match(p.said("story::noted") ?? "", /what you described/);
 });
