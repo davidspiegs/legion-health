@@ -7,9 +7,10 @@
     "dev": "vite --host 127.0.0.1 --port 5174",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5175",
-    "test": "node --import tsx --test src/model/*.test.ts src/hooks/*.test.ts"
+    "test": "node --import tsx --test src/model/*.test.ts src/hooks/*.test.ts src/chat/*.test.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.137.0",
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

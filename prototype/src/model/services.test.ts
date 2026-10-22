@@ -422,6 +422,26 @@ test("care messages persist separately from analytics and duplicate sends save o
   assert.notEqual(h.state.careMessages?.[0].id, h.state.careMessages?.[1].id);
 });
 
+test("an urgent care message gets a same-day check-in reply instead of the routine one", async () => {
+  const h = harness();
+  await book(h);
+  h.update({ careMessage: "Routine question about parking." });
+  await h.api.sendCareMessage();
+  await h.api.replyToCareMessage();
+  assert.match(h.state.careMessages?.at(-1)?.body ?? "", /scheduling and visit questions/);
+  h.update({ careMessage: "Something urgent." });
+  await h.api.sendCareMessage();
+  const sent = h.state.careMessages?.at(-1);
+  h.update({
+    careMessages: h.state.careMessages?.map((m) => (m.id === sent?.id ? { ...m, urgent: true } : m)),
+  });
+  await h.api.replyToCareMessage();
+  const reply = h.state.careMessages?.at(-1);
+  assert.equal(reply?.replyTo, sent?.id);
+  assert.match(reply?.body ?? "", /reach out to you today/);
+  assert.match(reply?.body ?? "", /988/);
+});
+
 test("form helpers reject invalid dates and keep Central Time correct across daylight saving", () => {
   assert.equal(validateBirth(sampleProfile), "");
   assert.match(validateBirth({ month: "2", day: "30", year: "1993" }), /Check/);

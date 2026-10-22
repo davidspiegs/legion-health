@@ -1,0 +1,452 @@
+/* Structured content inside the conversation. Shared by cards across the thread. */
+.card-shell.tone-quiet {
+  background: #fafbfd;
+}
+.card-title {
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  margin: 0 0 6px;
+  text-wrap: balance;
+}
+.card-lead {
+  font-size: 15px;
+  line-height: 1.45;
+  margin: 0;
+  color: #1b2333;
+  text-wrap: pretty;
+}
+.card-foot {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+  margin: 12px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-wrap: pretty;
+}
+/* In-card actions: full width, thumb height, the dock's 16px corner. */
+.card-button {
+  position: relative;
+  min-height: 50px;
+  border-radius: 16px;
+  border: 1px solid var(--chat-chip);
+  background: white;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 15.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  text-wrap: balance;
+  text-decoration: none;
+  padding: 0 14px;
+  box-shadow: 0 1px 1px rgba(12, 22, 48, 0.04);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 140ms var(--chat-ease);
+}
+.card-button svg {
+  flex: none;
+  color: var(--blue);
+}
+.card-button.is-primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+  box-shadow: 0 8px 18px -10px rgba(46, 87, 212, 0.85);
+}
+.card-button.is-primary svg {
+  color: white;
+}
+@media (hover: hover) {
+  .card-button:not(.is-primary):hover {
+    border-color: #a9b7d3;
+    background: #fbfcfe;
+  }
+  .card-button.is-primary:hover {
+    border-color: #2f5ad6;
+    background: #2f5ad6;
+  }
+}
+.card-button:active {
+  transform: scale(0.98);
+}
+.card-text-button {
+  position: relative;
+  justify-self: start;
+  min-height: 44px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--chat-blue-text);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.card-keep {
+  white-space: nowrap;
+}
+.card-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------- Quick checks */
+.qc-card {
+  padding: 6px 16px;
+}
+.check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.check-list li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 52px;
+  padding: 8px 0;
+  font-size: 15.5px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.check-list li + li {
+  border-top: 1px solid #eef1f6;
+}
+.check-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--chat-wash);
+  color: var(--blue);
+}
+.check-list li.is-false {
+  color: var(--muted);
+}
+.check-list li.is-false .check-icon {
+  background: #f2f4f8;
+  color: #8a94a6;
+}
+.check-icon.is-new {
+  animation: card-pop 420ms var(--chat-ease) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+.check-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f2f4f8;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  color: #4d5869;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------- Off-ramps */
+/* What the patient can do next, help lines, and a way back if they tapped by mistake. */
+.card-exit-head {
+  display: grid;
+  justify-items: start;
+}
+.card-exit-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  background: var(--chat-wash);
+  color: var(--blue);
+}
+.card-steps {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 2px 14px;
+  border-radius: 16px;
+  background: #f7f9fc;
+  display: grid;
+}
+.card-steps > li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
+  padding: 12px 0;
+}
+.card-steps > li + li {
+  border-top: 1px solid #e9edf4;
+}
+.card-step-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: white;
+  color: var(--blue);
+  box-shadow: 0 0 0 1px #e6ebf3;
+  display: grid;
+  place-items: center;
+}
+.card-step-body {
+  min-width: 0;
+  padding-top: 4px;
+}
+.card-steps p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: #1b2333;
+  text-wrap: pretty;
+}
+.card-step-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  min-height: 32px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--chat-blue-text);
+  text-decoration: underline;
+  text-decoration-color: rgba(45, 87, 210, 0.3);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+@media (hover: hover) {
+  .card-step-link:hover {
+    text-decoration-color: currentColor;
+  }
+}
+/* Help lines, on every off-ramp: one sentence and three equal buttons. */
+.card-support {
+  margin-top: 12px;
+  padding: 13px 14px 14px;
+  border-radius: 16px;
+  background: #f7f9fc;
+}
+.card-support p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #1b2333;
+  text-wrap: pretty;
+}
+.card-pills {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+  gap: 6px;
+  margin-top: 11px;
+}
+.card-pill {
+  min-height: 44px;
+  padding: 0 4px;
+  border-radius: 12px;
+  border: 1px solid #dfe5ef;
+  background: white;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    transform 140ms var(--chat-ease);
+}
+.card-pill svg {
+  flex: none;
+  color: var(--blue);
+}
+@media (hover: hover) {
+  .card-pill:hover {
+    border-color: #a9b7d3;
+  }
+}
+.card-pill:active {
+  transform: scale(0.97);
+}
+.card-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+.card-done {
+  display: grid;
+  gap: 2px;
+  margin-top: 16px;
+}
+.card-fix {
+  display: grid;
+  margin-top: 12px;
+}
+.card-fix .card-foot {
+  margin-top: 8px;
+}
+/* A card from another set with this card's actions under it. */
+.card-stack {
+  width: 100%;
+  max-width: 540px;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.card-stack > .card-fix {
+  margin-top: 0;
+  justify-items: start;
+}
+
+/* ------------------------------------------------------------------- Sheets */
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 6, 20, 0.32);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 20;
+  animation: scrim-in 220ms ease both;
+}
+.sheet:focus {
+  outline: none;
+}
+.sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: white;
+  border-radius: 24px 24px 0 0;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 40px -16px rgba(0, 6, 20, 0.3);
+  animation: sheet-up 440ms var(--chat-spring) both;
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+/* Phones: the sheet rises from the bottom edge. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+/* Wide screens: a centered dialog that settles in. */
+@keyframes sheet-in {
+  from {
+    transform: translateY(12px) scale(0.98);
+    opacity: 0;
+  }
+}
+@media (min-width: 760px) {
+  .sheet-scrim {
+    align-items: center;
+  }
+  .sheet {
+    border-radius: 24px;
+    box-shadow: 0 30px 80px -24px rgba(0, 6, 20, 0.45);
+    animation: sheet-in 320ms var(--chat-ease) both;
+  }
+}
+
+/* A request that was recorded, styled like the confirmations in Help. */
+.card-confirm {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #eef7f2;
+  color: #0e4a2f;
+  font-size: 14.5px;
+  line-height: 1.4;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-wrap: pretty;
+  animation: card-confirm-in 260ms var(--chat-ease) both;
+}
+.card-confirm:focus {
+  outline: none;
+}
+.card-confirm:focus-visible {
+  outline: 2px solid #1f4fd1;
+  outline-offset: 3px;
+}
+.card-confirm-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--chat-ok);
+  color: white;
+  display: grid;
+  place-items: center;
+  flex: none;
+  animation: card-pop 420ms 80ms var(--chat-ease) both;
+}
+@keyframes card-confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes card-pop {
+  0% {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Small controls get a full-size touch area without changing the layout. */
+.card-text-button::after,
+.card-step-link::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100% + 12px, 44px);
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-scrim,
+  .sheet,
+  .card-confirm,
+  .card-confirm-icon,
+  .check-icon.is-new {
+    animation: none;
+  }
+  .card-button,
+  .card-pill {
+    transition: none;
+  }
+  .card-button:active,
+  .card-pill:active {
+    transform: none;
+  }
+}

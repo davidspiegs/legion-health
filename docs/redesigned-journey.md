@@ -1,5 +1,7 @@
 # From finding care to a completed first visit
 
+> **Baseline documentation.** This describes the screen-based baseline (`baseline-v1`, now at `?experience=classic`). The chat onboarding in the open PR is described in [chat-onboarding-design.md](chat-onboarding-design.md); its vendors, timing and tracking differ.
+
 Updated October 20, 2026. This describes the implemented patient journey in `prototype/`. The assignment defines the endpoint as the **first completed visit**, not an account, reservation, payment page, or confirmed appointment. Checkout and the patient portal now form one continuing experience. Providers, appointments, payments, records, messages, and visits remain fictional local simulations; the research canvas documents the separately observed live experience.
 
 ## The journey

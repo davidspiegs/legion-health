@@ -205,7 +205,7 @@ export function IntakeScreens(p: ScreenProps) {
             <p>Psychiatric care by video</p>
           </div>
           <img
-            src="/images/maya-chen.png"
+            src="/images/maya-chen.jpg"
             alt="Maya Chen, a fictional clinician in this preview"
           />
         </div>

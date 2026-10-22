@@ -1,3 +1,5 @@
+import type { MatchResult } from "../chat/inventory";
+
 export type Step =
   | "welcome"
   | "fit-state"
@@ -48,7 +50,15 @@ export type Scenario =
   | "clinician-late"
   | "care-plan-delayed"
   | "signin-expired"
-  | "reminder-failed";
+  | "reminder-failed"
+  | "identity-not-found"
+  | "code-not-delivered"
+  | "coverage-not-found"
+  | "calendars-unavailable"
+  | "id-unreadable"
+  | "share-failed"
+  | "prescription-failed"
+  | "mychart-unavailable";
 export type Coverage = "selfpay" | "insurance";
 export type ServiceName =
   | "Profile"
@@ -61,7 +71,12 @@ export type ServiceName =
   | "Reminders"
   | "Video"
   | "Encounter"
-  | "Care team";
+  | "Care team"
+  | "Verified"
+  | "Persona"
+  | "Clinician directory"
+  | "DoseSpot"
+  | "Epic MyChart";
 export interface Profile {
   firstName: string;
   lastName: string;
@@ -157,6 +172,49 @@ export interface CareMessage {
   sender: "patient" | "care-team";
   status: "sending" | "delivered" | "failed";
   replyTo?: string;
+  /** Risk language was found, so the care team checks in today instead of sending the routine reply. */
+  urgent?: boolean;
+  /** Who on the care team wrote a reply, when it's their clinician ("Dr. Chen") rather than the team. */
+  author?: string;
+  /** The model's first pass on a patient's message, for the care team inbox. */
+  triage?: CareTriage;
+}
+export type TriageCategory = "scheduling" | "billing" | "medication" | "clinical" | "records" | "other";
+export interface CareTriage {
+  category: TriageCategory;
+  /** One line for the team. */
+  summary: string;
+  /** A reply the team can edit and send; empty when there's nothing to start from. */
+  draft: string;
+  status: "drafting" | "ready" | "failed";
+}
+/** The patient's pharmacy for e-prescribing, saved in DoseSpot (simulated). */
+export interface Pharmacy {
+  name: string;
+  address: string;
+  ncpdpId: string;
+}
+/** A prescription the clinician sent through DoseSpot (simulated). */
+export interface Prescription {
+  id: string;
+  medication: string;
+  supply: string;
+  pharmacy: string;
+  /** Failed means the pharmacy didn't confirm it; the care team resends it. */
+  status: "sent" | "failed";
+  at: string;
+}
+/** A chart the patient shared from Epic MyChart (simulated). */
+export interface ChartImport {
+  organization: string;
+  importedAt: string;
+  conditions: string[];
+  medications: string[];
+  allergies: string[];
+  labResults: number;
+  visitNotes: number;
+  /** Shared after the patient approved their visit brief, so the brief shows it as added later. */
+  afterApproval?: boolean;
 }
 export interface JourneyState {
   version: 1;
@@ -206,6 +264,9 @@ export interface JourneyState {
     publishedAt?: string;
     followupWeeks: number;
   };
+  pharmacy?: Pharmacy | null;
+  prescriptions?: Prescription[];
+  chartImport?: ChartImport | null;
   appointment: Appointment | null;
   followupAppointment: Appointment | null;
   bookingMode: "first" | "reschedule" | "followup";
@@ -233,6 +294,23 @@ export interface JourneyState {
   events: ServiceEvent[];
   faultsUsed: string[];
 }
+export interface IdentityRecord {
+  firstName: string;
+  lastName: string;
+  address: string;
+  city: string;
+  zip: string;
+  sexAtBirth: "Female" | "Male";
+}
+export type IdentityLookup = { status: "found"; record: IdentityRecord } | { status: "not-found" };
+export type InsuranceDiscovery = { status: "found"; payer: string; memberId: string } | { status: "not-found" };
+export interface MatchRequest {
+  conditions: string[];
+  payer: string;
+  availability: string[];
+  coverage: Coverage;
+}
+export type PhotoIdResult = { status: "verified" } | { status: "unreadable" };
 export interface MockApi {
   saveDraft(stage: string): Promise<void>;
   getProviders(): Promise<Provider[]>;
@@ -265,6 +343,25 @@ export interface MockApi {
   reschedule(slotId: string): Promise<void>;
   sendCareMessage(): Promise<void>;
   replyToCareMessage(): Promise<void>;
+  /** Texts a sign-in code to the phone on file (Verified, simulated). */
+  sendVerificationCode(): Promise<{ sentAt: string }>;
+  checkVerificationCode(code: string): Promise<{ valid: boolean }>;
+  /** Name and address from the phone number and birth date (Verified, simulated). */
+  lookupIdentity(): Promise<IdentityLookup>;
+  /** Plan and member ID for the patient (Sohar insurance discovery, simulated). */
+  discoverInsurance(): Promise<InsuranceDiscovery>;
+  /** Clinicians ranked by focus, plan and openings (Legion directory and calendars, simulated). */
+  matchClinicians(request: MatchRequest): Promise<MatchResult>;
+  /** Matches a selfie to a photo ID (Persona, simulated). */
+  verifyPhotoId(): Promise<PhotoIdResult>;
+  /** Sends the visit summary to the patient's doctor over the health network (Metriport, simulated). */
+  shareVisitSummary(): Promise<{ sentAt: string }>;
+  /** Saves the patient's pharmacy for prescriptions (DoseSpot, simulated). */
+  savePharmacy(pharmacy: { name: string; address: string }): Promise<Pharmacy>;
+  /** Sends a prescription to the saved pharmacy (DoseSpot, simulated). */
+  sendPrescription(request: { medication: string; supply: string }): Promise<Prescription>;
+  /** Imports the chart the patient chose to share in MyChart (Epic MyChart, simulated). */
+  importChart(organization: string): Promise<ChartImport>;
 }
 export interface ScreenProps {
   state: JourneyState;

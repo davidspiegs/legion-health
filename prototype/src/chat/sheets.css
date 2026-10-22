@@ -1,0 +1,2432 @@
+/* Help, the journey, the info cards and the reviewer surfaces. Every class here is prefixed sh-. */
+:where(.sh-card, .sh-sheet) {
+  --sh-line: var(--chat-line, #e4e9f2);
+  --sh-edge: #e6ebf3;
+  --sh-rule: #eef1f6;
+  --sh-panel: #f7f9fc;
+  --sh-chip: var(--chat-chip, #d5dcea);
+  --sh-ease: var(--chat-ease, cubic-bezier(0.22, 1, 0.36, 1));
+  --sh-spring: var(--chat-spring, cubic-bezier(0.32, 0.72, 0, 1));
+  --sh-ok: var(--chat-ok, #13824f);
+  --sh-wait: var(--chat-wait, #9a5b00);
+  --sh-crisis: var(--chat-crisis, #b42318);
+  --sh-link: var(--chat-blue-text, #2d57d2);
+  --sh-wash: var(--chat-wash, #eef3ff);
+  --sh-text: #1b2333;
+  --sh-soft-text: #3d4757;
+  --sh-tint: #f5f7fb;
+  --sh-dash: #c3cde3;
+}
+.sh-vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sh-card p,
+.sh-sheet p,
+.sh-sheet dd,
+.sh-card dd {
+  text-wrap: pretty;
+}
+
+/* ------------------------------------------------------------- shared layout */
+
+.sh-sheet {
+  display: grid;
+  gap: 26px;
+  min-width: 0;
+  color: var(--ink);
+}
+.sh-section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.sh-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sh-h {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+}
+.sh-h4 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--muted);
+}
+.sh-aside {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sh-lead {
+  margin: -5px 0 2px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.sh-body {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--sh-text);
+}
+.sh-meta,
+.sh-empty,
+.sh-source {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.sh-meta:empty {
+  display: none;
+}
+.sh-missing {
+  color: var(--muted);
+}
+/* For reviewers only: the preview's dashed edge, so it never reads as part of care. */
+.sh-note {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px dashed var(--sh-dash);
+  border-radius: 14px;
+  background: white;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.sh-note svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--blue);
+}
+
+/* ------------------------------------------------------------- buttons */
+
+/* Matched to the thread's card buttons. */
+.sh-btn {
+  position: relative;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--sh-chip);
+  background: white;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 550;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  text-decoration: none;
+  text-wrap: balance;
+  box-shadow: 0 1px 1px rgba(12, 22, 48, 0.04);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 140ms var(--sh-ease);
+}
+.sh-btn svg {
+  flex: none;
+  color: var(--blue);
+}
+.sh-btn.is-primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 8px 18px -10px rgba(46, 87, 212, 0.85);
+}
+.sh-btn.is-urgent {
+  background: var(--sh-crisis);
+  border-color: var(--sh-crisis);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 8px 18px -10px rgba(180, 35, 24, 0.75);
+}
+.sh-btn.is-primary svg,
+.sh-btn.is-urgent svg {
+  color: white;
+}
+.sh-btn.is-emergency svg {
+  color: var(--sh-crisis);
+}
+.sh-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.sh-btn:disabled {
+  opacity: 1;
+  color: #8b95a7;
+  background: #f6f7fa;
+  box-shadow: none;
+}
+.sh-btn.is-primary:disabled {
+  color: white;
+  background: #c7d1e4;
+  border-color: #c7d1e4;
+}
+@media (hover: hover) {
+  .sh-btn:not(.is-primary):not(.is-urgent):hover:not(:disabled) {
+    border-color: #a9b7d3;
+    background: #fbfcfe;
+  }
+  .sh-btn.is-primary:hover:not(:disabled) {
+    background: #2f5ad6;
+    border-color: #2f5ad6;
+  }
+}
+.sh-btn-two {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 58px;
+  padding: 8px 14px;
+}
+.sh-btn-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sh-btn-sub {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.sh-link {
+  position: relative;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sh-link);
+  font-size: 14.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+}
+.sh-chevron {
+  flex: none;
+  transition: transform 260ms var(--sh-ease);
+}
+[aria-expanded="true"] > .sh-chevron {
+  transform: rotate(180deg);
+}
+.sh-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.sh-section .sh-actions {
+  margin-top: 0;
+}
+.sh-row2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.sh-footer-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 8px;
+}
+
+/* An inline confirmation replaces the control that caused it. */
+.sh-status {
+  margin: 0;
+  min-height: 48px;
+  padding: 13px 14px;
+  border-radius: 16px;
+  background: #eef7f2;
+  color: #0e4a2f;
+  font-size: 14.5px;
+  line-height: 1.4;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  animation: sh-in 260ms var(--sh-ease) both;
+}
+.sh-status:focus {
+  outline: none;
+}
+.sh-status:focus-visible {
+  outline: 2px solid #1f4fd1;
+  outline-offset: 3px;
+}
+.sh-status-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #2b5a42;
+  text-wrap: pretty;
+}
+.sh-status-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--sh-ok);
+  color: white;
+  display: grid;
+  place-items: center;
+  animation: sh-pop 360ms var(--sh-spring) 60ms both;
+}
+
+/* ------------------------------------------------------------- info cards */
+
+/* Icon rows: the disclosure and the youth next steps. */
+.sh-points {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.sh-points > li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.sh-points p {
+  margin: 0;
+  padding-top: 5px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--sh-text);
+}
+.sh-points strong {
+  font-weight: 650;
+  color: var(--ink);
+}
+.sh-point-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sh-wash);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+}
+/* Wren's own point wears Wren's face, the same one as in the thread. */
+.sh-points .assistant-avatar.sh-point-avatar {
+  width: 32px;
+  height: 32px;
+}
+.sh-points .sh-point-link {
+  margin: 2px 0 -10px;
+  font-size: 14.5px;
+}
+
+/* Numbered next steps. */
+.sh-steps {
+  list-style: none;
+  counter-reset: sh-step;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.sh-steps > li {
+  counter-increment: sh-step;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--sh-text);
+}
+.sh-steps > li::before {
+  content: counter(sh-step);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sh-wash);
+  color: var(--sh-link);
+  font-size: 13px;
+  font-weight: 650;
+  display: grid;
+  place-items: center;
+}
+.sh-steps > li > div {
+  padding-top: 3px;
+}
+
+/* How information is used */
+.sh-uses {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.sh-uses > li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.sh-use-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sh-wash);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+}
+.sh-uses strong {
+  display: block;
+  padding-top: 1px;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.sh-uses p {
+  margin: 2px 0 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--sh-soft-text);
+}
+.sh-operator {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* 988 links, the same size and weight as the other cards' help lines. */
+.sh-pills {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+.sh-pill {
+  min-height: 44px;
+  padding: 0 4px;
+  border-radius: 12px;
+  border: 1px solid #dfe5ef;
+  background: white;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    transform 140ms var(--sh-ease);
+}
+.sh-pill svg {
+  flex: none;
+  color: var(--blue);
+}
+.sh-pill.is-emergency svg {
+  color: var(--sh-crisis);
+}
+.sh-pill:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) {
+  .sh-pill:hover {
+    border-color: #a9b7d3;
+  }
+}
+.sh-support p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--sh-text);
+}
+
+/* Crisis: one strong action, then quieter ones. */
+.sh-crisis-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.sh-crisis-actions .sh-btn.is-urgent {
+  min-height: 52px;
+  font-size: 16px;
+}
+.sh-crisis-alt {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.sh-es {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--sh-soft-text);
+}
+/* The optional callback sits below every crisis line, set apart and quieter than them. */
+.sh-callback {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sh-rule);
+}
+.sh-callback-done {
+  margin-top: 16px;
+}
+.sh-phone {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.sh-phone-label {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+.sh-phone-detail {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+/* Field and button share a line until the field would cut off its example, then stack. */
+.sh-phone-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.sh-phone-row > .sh-phone-input {
+  flex: 999 1 164px;
+}
+.sh-phone-row > .sh-btn {
+  flex: 1 0 auto;
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 14px;
+}
+.sh-phone-input {
+  width: 100%;
+  min-width: 0;
+  height: 52px;
+  padding: 0 15px;
+  border: 1px solid #cfd6e3;
+  border-radius: 14px;
+  background: white;
+  color: var(--ink);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.04);
+  scroll-margin: 24px 0 120px;
+  -webkit-appearance: none;
+  appearance: none;
+  transition:
+    border-color 180ms ease,
+    box-shadow 200ms var(--sh-ease);
+}
+.sh-phone .sh-phone-input:focus {
+  box-shadow:
+    0 0 0 1px var(--blue),
+    0 0 0 5px rgba(58, 104, 233, 0.13);
+}
+.sh-phone-input::placeholder {
+  color: #8a94a6;
+  opacity: 1;
+}
+.sh-phone-input[aria-invalid="true"] {
+  border-color: var(--sh-crisis);
+  background: #fffafa;
+}
+.sh-phone .sh-phone-input[aria-invalid="true"]:focus {
+  border-color: var(--sh-crisis) !important;
+  box-shadow:
+    0 0 0 1px var(--sh-crisis),
+    0 0 0 5px rgba(180, 35, 24, 0.11);
+}
+.sh-phone-error {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--sh-crisis);
+  animation: sh-in 220ms var(--sh-ease) both;
+}
+.sh-phone-error svg {
+  flex: none;
+  margin-top: 1.5px;
+}
+.sh-crisis-foot {
+  margin-top: 12px;
+  display: grid;
+  gap: 2px;
+}
+.sh-crisis-foot p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* Asking for a person: two rows that say what happens next. */
+.sh-reach {
+  width: 100%;
+  min-height: 66px;
+  padding: 11px 14px;
+  border: 1px solid var(--sh-edge);
+  border-radius: 16px;
+  background: white;
+  color: var(--ink);
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.04);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 140ms var(--sh-ease);
+}
+.sh-reach:active {
+  transform: scale(0.985);
+}
+@media (hover: hover) {
+  .sh-reach:hover {
+    border-color: #c9d3e6;
+    background: #fbfcfe;
+  }
+}
+.sh-reach-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--sh-wash);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+}
+.sh-reach-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.sh-reach-text strong {
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.006em;
+}
+.sh-reach-text span {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-wrap: balance;
+}
+/* In a thread card the column is narrower, so the row tightens a little. */
+.sh-card .sh-reach {
+  grid-template-columns: 36px minmax(0, 1fr);
+  padding: 10px 12px;
+}
+.sh-card .sh-reach-icon {
+  width: 36px;
+  height: 36px;
+}
+.sh-card .sh-reach-text span {
+  font-size: 13px;
+}
+.sh-reach-ask {
+  padding: 14px;
+  border: 1px solid var(--sh-edge);
+  border-radius: 16px;
+  background: white;
+  animation: sh-in 260ms var(--sh-ease) both;
+}
+
+/* ------------------------------------------------------------- help */
+
+/* Crisis lines first: a warm tint that's easy to find, never alarming. */
+.sh-crisisbar {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #f4dfdc;
+  border-radius: 20px;
+  background: #fff8f7;
+}
+.sh-crisisbar-head {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.sh-crisisbar-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: white;
+  color: var(--sh-crisis);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 1px 2px rgba(180, 35, 24, 0.14);
+}
+.sh-crisisbar-head .sh-h {
+  padding-top: 5px;
+}
+.sh-crisisbar p {
+  margin: 3px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--sh-text);
+}
+.sh-crisis-compact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.sh-crisis-compact .sh-btn {
+  border-color: #f0dbd8;
+  font-size: 15px;
+}
+.sh-crisis-compact .sh-btn svg {
+  color: var(--sh-crisis);
+}
+.sh-crisisbar .sh-es {
+  margin: 0;
+  font-size: 13.5px;
+}
+
+/* Prompts, not answers: soft so they never read as choices in the dock. */
+.sh-suggest {
+  display: grid;
+  gap: 6px;
+}
+.sh-suggestion {
+  min-height: 46px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--sh-wash);
+  color: var(--sh-link);
+  font-size: 15px;
+  font-weight: 550;
+  line-height: 1.3;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  animation: sh-in 340ms var(--sh-ease) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+  transition:
+    background-color 160ms ease,
+    transform 140ms var(--sh-ease);
+}
+.sh-suggestion:active {
+  transform: scale(0.985);
+}
+@media (hover: hover) {
+  .sh-suggestion:hover {
+    background: #e4ecff;
+  }
+}
+.sh-qa {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 0;
+}
+.sh-qa > * + .msg.from-patient {
+  margin-top: 16px;
+}
+.sh-qa .msg.from-patient + .msg.from-agent {
+  margin-top: 8px;
+}
+.sh-noted-line {
+  margin: 6px 0 0 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--sh-ok);
+  animation: sh-in 240ms var(--sh-ease) both;
+}
+.sh-qa-crisis {
+  margin: 10px 0 0 36px;
+}
+.sh-qa-crisis .sh-crisis-actions {
+  margin-top: 0;
+}
+/* The composer, as in the thread: typing is the exception, so it looks like messaging. */
+.sh-ask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 5px 5px 18px;
+  border-radius: 26px;
+  border: 1px solid transparent;
+  background: var(--chat-agent, #f1f4f9);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.sh-ask:focus-within {
+  background: white;
+  border-color: var(--blue);
+  box-shadow:
+    0 0 0 1px var(--blue),
+    0 0 0 5px rgba(58, 104, 233, 0.12);
+}
+.sh-ask input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0;
+  border: 0 !important;
+  outline: 0;
+  background: transparent;
+  box-shadow: none !important;
+  font-size: 16px;
+  color: var(--ink);
+}
+.sh-ask input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.sh-ask-send {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--blue);
+  color: white;
+  display: grid;
+  place-items: center;
+  transition:
+    background-color 160ms ease,
+    transform 160ms var(--sh-ease);
+}
+.sh-ask-send::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+}
+.sh-ask-send:not(:disabled):active {
+  transform: scale(0.9);
+}
+.sh-ask-send:disabled {
+  background: #cdd5e4;
+  opacity: 1;
+}
+.sh-noted {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--sh-panel);
+}
+.sh-noted ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-size: 14.5px;
+  line-height: 1.4;
+  color: var(--sh-text);
+}
+.sh-disclose {
+  width: 100%;
+  min-height: 48px;
+  margin: -12px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+.sh-disclose svg {
+  color: var(--muted);
+}
+.sh-disclose-body {
+  animation: sh-in 260ms var(--sh-ease) both;
+}
+.sh-disclose-body .sh-uses {
+  margin-top: 6px;
+}
+.sh-entry {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px dashed var(--sh-dash);
+  background: var(--sh-tint);
+  color: var(--ink);
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+}
+.sh-entry strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+.sh-entry > span:last-child > span {
+  display: block;
+  margin-top: 2px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.sh-entry-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: white;
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.06);
+}
+
+/* ------------------------------------------------------------- journey */
+
+.sh-rail-title {
+  margin: 0 0 -8px;
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.016em;
+}
+
+/* Four chapters as one timeline: done in blue, the current one ringed, the rest waiting. */
+.sh-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.sh-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 8px 12px;
+  border-radius: 16px;
+}
+.sh-stage:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 25px;
+  top: 40px;
+  bottom: -10px;
+  width: 2px;
+  border-radius: 2px;
+  background: #e6eaf2;
+}
+.sh-stage.is-done:not(:last-child)::after {
+  background: var(--blue);
+}
+.sh-stage.is-current {
+  background: #f4f7ff;
+}
+.sh-stage-dot {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background-color 240ms var(--sh-ease),
+    color 240ms var(--sh-ease);
+}
+.is-done .sh-stage-dot {
+  background: var(--blue);
+  color: white;
+}
+.is-current .sh-stage-dot {
+  background: white;
+  color: var(--blue);
+  box-shadow: inset 0 0 0 2px var(--blue);
+}
+/* Where you are breathes, slowly. */
+.is-current .sh-stage-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(58, 104, 233, 0.25);
+  animation: sh-breathe 2.6s ease-in-out infinite;
+}
+.is-next .sh-stage-dot {
+  background: #f1f3f8;
+  color: var(--muted);
+}
+.sh-stage-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding-top: 3px;
+}
+.sh-stage-text strong {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.sh-stage-text span {
+  font-size: 13.5px;
+  line-height: 1.38;
+  color: var(--muted);
+}
+.is-current .sh-stage-text span {
+  color: var(--sh-text);
+}
+.is-next .sh-stage-text strong {
+  color: #4a5465;
+  font-weight: 550;
+}
+
+/* What you've shared: one panel, a chapter per group, each answer with Change. */
+.sh-shared-panel {
+  padding: 2px 14px;
+  border-radius: 16px;
+  background: var(--sh-panel);
+}
+.sh-shared-group + .sh-shared-group {
+  border-top: 1px solid #e8ecf3;
+}
+.sh-group-toggle {
+  width: 100%;
+  min-height: 50px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+.sh-group-count {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 450;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sh-group-toggle svg {
+  color: var(--muted);
+}
+.sh-shared[hidden] {
+  display: none;
+}
+.sh-shared:not([hidden]) {
+  animation: sh-in 260ms var(--sh-ease) both;
+}
+.sh-shared {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: grid;
+}
+.sh-shared-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 54px;
+  padding: 7px 0;
+}
+.sh-shared-row + .sh-shared-row {
+  border-top: 1px solid #e8ecf3;
+}
+.sh-shared-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.sh-shared-label {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.sh-shared-value {
+  font-size: 15px;
+  line-height: 1.38;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sh-change {
+  flex: none;
+  min-height: 44px;
+  padding: 0 4px 0 10px;
+}
+
+/* Receipts as a quiet timeline: who did it, what, where it came from, when. */
+.sh-log-wrap {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sh-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.sh-log-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 7px 0;
+}
+.sh-log-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 13.5px;
+  top: 41px;
+  bottom: -5px;
+  width: 1px;
+  background: #e3e8f0;
+}
+.sh-actor,
+.sh-log .assistant-avatar.sh-actor-avatar,
+.sh-followups .assistant-avatar.sh-actor-avatar {
+  width: 28px;
+  height: 28px;
+}
+.sh-actor {
+  border-radius: 50%;
+  background: #f1f3f8;
+  color: #4a5465;
+  display: grid;
+  place-items: center;
+}
+.sh-actor.is-clinician,
+.sh-actor.is-team {
+  background: #e6f4ec;
+  color: var(--sh-ok);
+}
+.sh-log-body {
+  min-width: 0;
+}
+.sh-log-action {
+  margin: 0;
+  padding-top: 3px;
+  font-size: 15px;
+  line-height: 1.38;
+  color: var(--ink);
+}
+.sh-log-who {
+  display: block;
+  margin-bottom: 1px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--muted);
+}
+.sh-log-meta {
+  margin: 2px 0 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.sh-log-meta time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.sh-log.is-compact .sh-log-action {
+  font-size: 14px;
+}
+.sh-more {
+  justify-self: start;
+}
+.sh-followups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.sh-followups li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.sh-followups p {
+  margin: 0;
+  padding-top: 3px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+/* Revocable choices, in one panel. */
+.sh-choices {
+  display: grid;
+  padding: 2px 14px;
+  border-radius: 16px;
+  background: var(--sh-panel);
+}
+.sh-choice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 0;
+}
+.sh-choice + .sh-choice {
+  border-top: 1px solid #e8ecf3;
+}
+.sh-choice-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.sh-choice-desc {
+  margin: 3px 0 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.sh-choices > .sh-meta {
+  padding: 0 0 12px;
+}
+.sh-switch {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sh-switch:disabled {
+  opacity: 0.5;
+}
+.sh-switch-track {
+  position: relative;
+  width: 50px;
+  height: 30px;
+  border-radius: 15px;
+  /* 3:1 against the panel and the thumb. */
+  background: #8692a9;
+  transition: background-color 240ms ease;
+}
+.sh-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  box-shadow:
+    0 2px 4px rgba(0, 6, 20, 0.2),
+    0 0 0 0.5px rgba(0, 6, 20, 0.05);
+  transition: transform 320ms var(--sh-spring);
+}
+.sh-switch[aria-checked="true"] .sh-switch-track {
+  background: var(--blue);
+}
+.sh-switch[aria-checked="true"] .sh-switch-thumb {
+  transform: translateX(20px);
+}
+/* The state in words, so on and off never rest on color alone. */
+.sh-switch-state {
+  width: 3ch;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: right;
+  color: var(--muted);
+}
+.sh-switch[aria-checked="true"] .sh-switch-state {
+  color: var(--ink);
+}
+
+/* The desktop rail is narrow even on wide screens. */
+.sh-journey.is-rail {
+  gap: 24px;
+}
+.sh-journey.is-rail .sh-stage {
+  padding: 7px 10px;
+}
+.sh-journey.is-rail .sh-stage:not(:last-child)::after {
+  left: 23px;
+}
+
+/* ------------------------------------------------------------- preview tools */
+
+/* Reviewer tools: a tinted workspace with white panels, plainly not part of the patient's care. */
+.sh-preview {
+  display: grid;
+  gap: 26px;
+  padding: 14px 14px 16px;
+  border-radius: 20px;
+  background: var(--sh-tint);
+  min-width: 0;
+}
+.sh-preview .sh-kv {
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: white;
+}
+.sh-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.sh-tiles > li {
+  display: grid;
+  min-width: 0;
+}
+.sh-tile {
+  width: 100%;
+  min-height: 92px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--sh-edge);
+  background: white;
+  color: var(--ink);
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.04);
+  transition:
+    border-color 160ms ease,
+    transform 140ms var(--sh-ease);
+}
+.sh-tile:active {
+  transform: scale(0.98);
+}
+.sh-tile-step {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--sh-wash);
+  color: var(--sh-link);
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  display: grid;
+  place-items: center;
+}
+.sh-tile strong {
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.sh-tile > span:last-child {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.sh-tools {
+  display: grid;
+  gap: 8px;
+}
+.sh-tool {
+  min-height: 66px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--sh-edge);
+  background: white;
+  color: var(--ink);
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(12, 22, 48, 0.04);
+  transition:
+    border-color 160ms ease,
+    transform 140ms var(--sh-ease);
+}
+.sh-tool:active {
+  transform: scale(0.985);
+}
+.sh-tool strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+.sh-tool > span:last-child > span {
+  display: block;
+  margin-top: 1px;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.sh-tool-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--sh-wash);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+}
+@media (hover: hover) {
+  .sh-tile:hover,
+  .sh-tool:hover {
+    border-color: #a9b7d3;
+  }
+  .sh-scenario:hover:not([aria-pressed="true"]) {
+    background: #fafbfd;
+  }
+}
+/* Scenarios read as one list of radios. */
+.sh-scenarios {
+  display: grid;
+  border: 1px solid var(--sh-edge);
+  border-radius: 16px;
+  background: white;
+  overflow: hidden;
+}
+.sh-scenario {
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  transition: background-color 160ms ease;
+}
+.sh-scenario + .sh-scenario {
+  border-top: 1px solid var(--sh-rule);
+}
+.sh-scenario strong {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 550;
+  line-height: 1.3;
+}
+.sh-scenario > span:last-child > span {
+  display: block;
+  margin-top: 1px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.sh-scenario-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid #b9c4d8;
+  display: grid;
+  place-items: center;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 280ms var(--sh-spring);
+}
+.sh-scenario[aria-pressed="true"] {
+  background: #f6f9ff;
+}
+.sh-scenario[aria-pressed="true"] strong {
+  font-weight: 650;
+}
+.sh-scenario[aria-pressed="true"] .sh-scenario-mark {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: white;
+  transform: scale(1.04);
+}
+.sh-scenario:focus-visible {
+  outline-offset: -3px;
+}
+.sh-scenario-status {
+  display: grid;
+  gap: 8px;
+}
+.sh-scenario-status:empty {
+  display: none;
+}
+.sh-scenario-status > * {
+  animation: sh-in 240ms var(--sh-ease) both;
+}
+.sh-scenario-status .sh-btn {
+  justify-self: start;
+}
+.sh-inbox {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  border: 1px solid var(--sh-edge);
+  border-radius: 16px;
+  background: white;
+  overflow: hidden;
+}
+.sh-msg {
+  padding: 11px 14px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+.sh-msg + .sh-msg {
+  border-top: 1px solid var(--sh-rule);
+}
+.sh-msg-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--sh-wash);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+}
+.sh-msg-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 550;
+  line-height: 1.3;
+}
+.sh-msg-meta {
+  margin: 1px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sh-msg-status {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.sh-msg-status.is-delivered {
+  color: var(--sh-ok);
+}
+.sh-msg-status.is-failed {
+  color: var(--sh-crisis);
+}
+.sh-restart {
+  justify-self: start;
+  color: var(--muted);
+}
+.sh-confirm {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--sh-edge);
+  background: white;
+  animation: sh-in 240ms var(--sh-ease) both;
+}
+.sh-confirm p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.4;
+  color: var(--sh-text);
+}
+
+/* ------------------------------------------------------------- clinician view */
+
+/* A chart: dense, scannable, and every line earns its place. */
+.sh-chart {
+  gap: 0;
+}
+.sh-chart > * + * {
+  margin-top: 22px;
+}
+.sh-chart > .sh-section + .sh-section {
+  padding-top: 20px;
+  border-top: 1px solid var(--sh-rule);
+}
+.sh-banner {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--sh-wash);
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+}
+.sh-banner svg {
+  color: var(--blue);
+  margin-top: 1px;
+}
+.sh-banner strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 650;
+}
+.sh-banner span span {
+  display: block;
+  margin-top: 2px;
+  font-size: 13.5px;
+  line-height: 1.42;
+  color: var(--sh-text);
+}
+.sh-banner .sh-banner-meta {
+  margin-top: 6px;
+  font-weight: 550;
+}
+.sh-chart-head {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--sh-panel);
+}
+.sh-chart-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #edf2ff 0%, #dee7ff 100%);
+  color: var(--sh-link);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: grid;
+  place-items: center;
+}
+.sh-chart-avatar.is-empty {
+  color: var(--muted);
+  background: #eef1f6;
+}
+.sh-chart-who {
+  min-width: 0;
+}
+.sh-chart-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+.sh-chart-sub {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sh-kv {
+  margin: 0;
+  display: grid;
+}
+.sh-kv > div {
+  display: grid;
+  grid-template-columns: minmax(96px, 33%) minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 0;
+}
+.sh-kv > div + div {
+  border-top: 1px solid var(--sh-rule);
+}
+.sh-kv dt {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.sh-kv dd {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.42;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sh-kv.is-tight > div {
+  padding: 5px 0;
+}
+.sh-kv.is-tight dt,
+.sh-kv.is-tight dd {
+  font-size: 13px;
+}
+.sh-kv.is-tight dd {
+  color: var(--sh-text);
+}
+/* Review first: the only warm panel in the chart. */
+.sh-attn {
+  list-style: none;
+  margin: 0;
+  padding: 2px 14px;
+  border: 1px solid #f1e2c4;
+  border-radius: 16px;
+  background: #fffaf1;
+}
+.sh-attn li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 0;
+  font-size: 14.5px;
+  line-height: 1.4;
+}
+.sh-attn li + li {
+  border-top: 1px solid #f3e7cf;
+}
+.sh-gaps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.sh-gaps li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  font-size: 14.5px;
+  line-height: 1.4;
+}
+/* A due time sits at the end of the line while it fits, and drops below the text when it doesn't. */
+.sh-attn-body,
+.sh-task-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px 10px;
+  min-width: 0;
+}
+.sh-attn-text,
+.sh-task-head .sh-task-title {
+  flex: 1 1 13em;
+  min-width: 0;
+}
+.sh-attn svg {
+  color: var(--sh-wait);
+  margin-top: 2px;
+}
+.sh-gaps svg {
+  color: var(--muted);
+  margin-top: 2px;
+}
+.sh-ok-line {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f2f9f5;
+  font-size: 14.5px;
+  color: var(--sh-text);
+}
+.sh-ok-line svg {
+  flex: none;
+  color: var(--sh-ok);
+}
+.sh-cite {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sh-panel);
+  border-left: 3px solid #d6deec;
+}
+.sh-cite figcaption {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--muted);
+}
+.sh-cite blockquote {
+  margin: 2px 0 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sh-explore {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.sh-explore li {
+  display: grid;
+  gap: 2px;
+  padding-left: 12px;
+  border-left: 2px solid var(--sh-wash);
+}
+.sh-explore strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+.sh-explore span {
+  font-size: 14.5px;
+  line-height: 1.42;
+  color: var(--sh-text);
+}
+.sh-screens {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.sh-screens > li {
+  padding: 10px 0;
+}
+.sh-screens > li + li {
+  border-top: 1px solid var(--sh-rule);
+}
+.sh-screen-q {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.sh-screen-a {
+  margin: 3px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.sh-screen-a.is-risk {
+  color: var(--sh-crisis);
+}
+.sh-screen-meta {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sh-flag {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fffaf1;
+  border: 1px solid #f1e2c4;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+}
+.sh-flag.is-today {
+  background: #fff6f5;
+  border-color: #f4d9d5;
+}
+.sh-flag > svg {
+  color: var(--sh-wait);
+  margin-top: 2px;
+}
+.sh-flag.is-today > svg {
+  color: var(--sh-crisis);
+}
+.sh-flag-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.sh-flag-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 650;
+  line-height: 1.38;
+  color: var(--ink);
+}
+.sh-flag-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--sh-text);
+}
+.sh-flag .sh-cite {
+  margin-top: 2px;
+  background: white;
+}
+.sh-flag-meta {
+  margin: 2px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.sh-flag-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+/* Due times: today stands out, everything else stays quiet. */
+.sh-due {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: #eef1f6;
+  color: #3d4757;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.sh-due.is-today {
+  background: #fdecea;
+  color: #9b1c12;
+}
+.sh-due.is-done {
+  background: #e6f4ec;
+  color: #0e5a36;
+}
+.sh-subhead {
+  margin-top: 6px;
+}
+.sh-meds dd {
+  display: grid;
+  gap: 2px;
+}
+.sh-med-value {
+  font-weight: 600;
+}
+.sh-med-source {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.sh-med-check {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.sh-med-check svg {
+  flex: none;
+  margin-top: 1px;
+}
+.sh-med-check.is-ok svg {
+  color: var(--sh-ok);
+}
+.sh-med-check.is-review svg {
+  color: var(--sh-wait);
+}
+.sh-med-check.is-open {
+  color: var(--muted);
+}
+/* Screening scores as two small read-outs, with the cutoff marked on each bar. */
+.sh-scores {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 10px;
+}
+.sh-score-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 8px;
+  border-radius: 16px;
+  background: var(--sh-panel);
+  min-width: 0;
+}
+.sh-score-card.is-over {
+  background: #fffaf1;
+  box-shadow: inset 0 0 0 1px #f1e2c4;
+}
+.sh-score-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sh-score-name strong {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.sh-score-name span {
+  margin-left: 6px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.sh-score {
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.sh-score small {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.sh-score-bar {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+}
+.sh-score-bar i {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: #e3e8f1;
+}
+.sh-score-bar i.is-on {
+  background: var(--blue);
+}
+.is-over .sh-score-bar i.is-on {
+  background: #c98a2a;
+}
+.sh-score-bar i.is-cut::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  right: -2.5px;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(0, 6, 20, 0.45);
+}
+.sh-score-note {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sh-score-note.is-over {
+  color: var(--ink);
+  font-weight: 550;
+}
+.sh-score-note svg {
+  color: var(--sh-wait);
+}
+.sh-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.sh-checks li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 10px 0;
+}
+.sh-checks li + li {
+  border-top: 1px solid var(--sh-rule);
+}
+.sh-checks svg {
+  align-self: start;
+  margin-top: 2px;
+}
+.sh-check-rule {
+  font-size: 14.5px;
+  font-weight: 550;
+  line-height: 1.35;
+}
+.sh-check-status {
+  justify-self: end;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.sh-check-evidence {
+  grid-column: 2 / -1;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.sh-checks .is-pass svg {
+  color: var(--sh-ok);
+}
+.sh-checks .is-pass .sh-check-status {
+  background: #e6f4ec;
+  color: #0e5a36;
+}
+.sh-checks .is-review svg {
+  color: var(--sh-wait);
+}
+.sh-checks .is-review .sh-check-status {
+  background: #fbf0dc;
+  color: #7a4800;
+}
+.sh-checks .is-stop svg {
+  color: var(--sh-crisis);
+}
+.sh-checks .is-stop .sh-check-status {
+  background: #fdecea;
+  color: #9b1c12;
+}
+.sh-checks .is-open svg {
+  color: var(--muted);
+}
+.sh-checks .is-open .sh-check-status {
+  background: #eef1f6;
+  color: #4a5465;
+}
+/*
+ * Sticky inside the sheet's scroller. The sheet keeps 20px (plus the safe area)
+ * of bottom padding, which sticky positioning respects, so the bar reaches into
+ * it; otherwise a strip of the packet scrolls by underneath the buttons.
+ */
+.sh-chart-actions {
+  --sh-sheet-pad: calc(20px + env(safe-area-inset-bottom));
+  position: sticky;
+  bottom: calc(-1 * var(--sh-sheet-pad));
+  z-index: 3;
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 calc(-1 * var(--sh-sheet-pad));
+  padding: 12px 0 var(--sh-sheet-pad);
+  background: white;
+  border-top: 1px solid var(--sh-rule);
+  box-shadow: 0 -16px 24px -18px rgba(12, 22, 48, 0.18);
+}
+.sh-chart > .sh-chart-actions {
+  margin-top: 18px;
+}
+.sh-chart-actions .sh-meta {
+  color: var(--sh-text);
+  animation: sh-in 240ms var(--sh-ease) both;
+}
+.sh-chart-buttons {
+  display: flex;
+  gap: 8px;
+}
+.sh-chart-buttons .sh-btn {
+  padding: 0 12px;
+  font-size: 14.5px;
+  gap: 6px;
+  white-space: nowrap;
+}
+.sh-chart-buttons .sh-btn.is-primary {
+  flex: 1;
+}
+
+/* Care team queue: open first, soonest due first. */
+.sh-tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.sh-task {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 0;
+}
+.sh-task + .sh-task {
+  border-top: 1px solid var(--sh-rule);
+}
+.sh-task-mark {
+  display: grid;
+  padding-top: 2px;
+  color: var(--sh-wait);
+}
+.sh-task.is-done .sh-task-mark {
+  color: var(--sh-ok);
+}
+.sh-task-body {
+  min-width: 0;
+}
+.sh-task-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 550;
+  line-height: 1.38;
+  color: var(--ink);
+}
+.sh-task.is-done .sh-task-title {
+  color: var(--muted);
+}
+.sh-task-meta {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.sh-task-meta time,
+.sh-event-time {
+  white-space: nowrap;
+}
+.sh-preview .sh-tasks,
+.sh-events {
+  padding: 2px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--sh-edge);
+  background: white;
+}
+.sh-events-wrap {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.sh-events-wrap .sh-link {
+  justify-self: start;
+}
+.sh-events {
+  list-style: none;
+  margin: 0;
+}
+.sh-event {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  padding: 10px 0;
+}
+.sh-event + .sh-event {
+  border-top: 1px solid var(--sh-rule);
+}
+.sh-event-name,
+.sh-event-props {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.sh-event-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.sh-event-time {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sh-event-props {
+  grid-column: 1 / -1;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------- agent-ready graph */
+
+.sh-graph-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+.sh-copied {
+  margin-top: -18px;
+}
+.sh-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+.sh-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13.5px;
+}
+.sh-col-node {
+  width: 36%;
+}
+.sh-col-state {
+  width: 64px;
+}
+.sh-table th,
+.sh-table td {
+  padding: 9px 8px;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.4;
+}
+.sh-table thead th {
+  padding-top: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.sh-table tbody th {
+  font-weight: 400;
+}
+.sh-table td {
+  color: var(--sh-text);
+}
+.sh-table tbody tr:nth-child(odd) {
+  background: #f8f9fc;
+}
+.sh-table tbody tr.is-active {
+  background: var(--sh-wash);
+}
+.sh-table tbody tr > :first-child {
+  border-radius: 10px 0 0 10px;
+}
+.sh-table tbody tr > :last-child {
+  border-radius: 0 10px 10px 0;
+}
+.sh-node-id {
+  display: block;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sh-node-meta {
+  display: block;
+  margin-top: 1px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.sh-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 550;
+  color: var(--muted);
+}
+.sh-state.is-done {
+  color: var(--sh-ok);
+}
+.sh-state.is-now {
+  color: var(--blue);
+}
+
+/* ------------------------------------------------------------- motion and wide screens */
+
+@keyframes sh-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes sh-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes sh-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(58, 104, 233, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(58, 104, 233, 0);
+  }
+}
+
+@media (min-width: 760px) {
+  .sh-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-status,
+  .sh-status-icon,
+  .sh-noted-line,
+  .sh-shared:not([hidden]),
+  .sh-disclose-body,
+  .sh-scenario-status > *,
+  .sh-confirm,
+  .sh-chart-actions .sh-meta,
+  .sh-suggestion,
+  .sh-reach-ask,
+  .sh-phone-error,
+  .is-current .sh-stage-dot::after {
+    animation: none;
+  }
+  .sh-btn,
+  .sh-pill,
+  .sh-reach,
+  .sh-tile,
+  .sh-tool,
+  .sh-suggestion,
+  .sh-chevron,
+  .sh-phone-input,
+  .sh-switch-track,
+  .sh-switch-thumb,
+  .sh-stage-dot,
+  .sh-scenario,
+  .sh-scenario-mark,
+  .sh-ask,
+  .sh-ask-send {
+    transition: none;
+  }
+  .sh-btn:active:not(:disabled),
+  .sh-pill:active,
+  .sh-reach:active,
+  .sh-tile:active,
+  .sh-tool:active,
+  .sh-suggestion:active,
+  .sh-ask-send:not(:disabled):active {
+    transform: none;
+  }
+}

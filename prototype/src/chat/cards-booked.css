@@ -1,0 +1,342 @@
+/* The booking confirmation: the midpoint of onboarding, not its end. */
+.card-shell.bk-card {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  padding: 0 16px 16px;
+  overflow: hidden;
+  container: bk-card / inline-size;
+}
+
+/* The moment: a seal that pops, then the day and time, large. */
+.bk-hero {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  margin: 0 -16px;
+  padding: 22px 16px 16px;
+  border-bottom: 1px solid #eef1f6;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(19, 130, 79, 0.1) 0%, rgba(19, 130, 79, 0) 62%),
+    linear-gradient(180deg, #f4fbf7 0%, rgba(244, 251, 247, 0) 100%);
+}
+.bk-seal {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--chat-ok);
+  color: white;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 8px 18px -8px rgba(19, 130, 79, 0.75);
+}
+.bk-seal svg {
+  width: 24px;
+  height: 24px;
+  overflow: visible;
+}
+.bk-seal path {
+  fill: none;
+  stroke: white;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+}
+.bk-status {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.3;
+  font-weight: 650;
+  color: #0f7346;
+}
+.bk-when {
+  margin: 4px 0 0;
+  display: grid;
+  gap: 2px;
+}
+.bk-when strong {
+  font-size: 23px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.bk-when span {
+  font-size: 16px;
+  line-height: 1.35;
+  color: #2f3849;
+  font-variant-numeric: tabular-nums;
+}
+.bk-card.is-cancelled .bk-hero {
+  background: #f7f9fc;
+}
+.bk-card.is-cancelled .bk-seal {
+  background: #e9edf4;
+  color: #5d6778;
+  box-shadow: none;
+}
+.bk-card.is-cancelled .bk-status {
+  color: var(--muted);
+}
+.bk-card.is-cancelled .bk-when strong {
+  color: #5d6778;
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+/* Who, in a quiet nested panel. */
+.bk-who {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #f7f9fc;
+}
+.bk-who img,
+.bk-initials {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 26%;
+}
+.bk-who img {
+  outline: 1px solid rgba(0, 6, 20, 0.06);
+  outline-offset: -1px;
+}
+.bk-initials {
+  display: grid;
+  place-items: center;
+  background: var(--soft);
+  color: var(--blue);
+  font-weight: 650;
+  font-size: 15px;
+}
+.bk-who-text {
+  min-width: 0;
+}
+.bk-who strong {
+  display: block;
+  font-size: 15.5px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  color: var(--ink);
+}
+.bk-who small {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.bk-who small svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--blue);
+}
+
+/* What it costs and when, said once. */
+.bk-cost {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #2f3849;
+  text-wrap: pretty;
+}
+.bk-cost svg {
+  margin-top: 2px;
+  color: var(--blue);
+}
+
+.bk-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.bk-actions .card-button {
+  min-height: 48px;
+  padding: 0 8px;
+  gap: 7px;
+  white-space: nowrap;
+}
+/* On phones the two actions stack full width rather than crowd their labels side by side. */
+@container bk-card (max-width: 359px) {
+  .bk-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* What happens next: four steps through the first completed visit. */
+.bk-next {
+  border-top: 1px solid #eef1f6;
+  padding-top: 14px;
+}
+.bk-next-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.bk-next ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.bk-next li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: 12px;
+  padding-bottom: 14px;
+}
+.bk-next li:last-child {
+  padding-bottom: 0;
+}
+/* The line between steps; done stretches turn green. */
+.bk-next li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 25px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 2px;
+  background: #e6eaf2;
+}
+.bk-next li.is-done:not(:last-child)::after {
+  background: #bfe3cf;
+}
+.bk-dot {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #d5dbe7;
+  background: white;
+  display: grid;
+  place-items: center;
+  color: white;
+}
+.bk-next li.is-done .bk-dot {
+  background: var(--chat-ok);
+  border-color: var(--chat-ok);
+}
+/* Where the patient is now: a blue ring with a soft halo. */
+.bk-next li.is-current .bk-dot {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px rgba(58, 104, 233, 0.12);
+}
+.bk-next li.is-current .bk-dot::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+.bk-step-text {
+  min-width: 0;
+  padding-top: 1px;
+}
+.bk-next strong {
+  display: block;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.bk-next small {
+  display: block;
+  margin-top: 1px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.bk-next li:not(.is-done):not(.is-current) strong {
+  color: #3d4657;
+}
+
+/* First reveal: the seal pops and draws its check, a ring breathes out, then the steps settle in. */
+.msg.enter .bk-seal {
+  animation: bk-pop 520ms 120ms var(--chat-ease) both;
+}
+.msg.enter .bk-seal::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: bk-ping 900ms 260ms ease-out both;
+  pointer-events: none;
+}
+.msg.enter .bk-seal path {
+  animation: bk-draw 420ms 320ms var(--chat-ease) both;
+}
+.msg.enter .bk-status,
+.msg.enter .bk-when {
+  animation: bk-rise 380ms 260ms var(--chat-ease) both;
+}
+.msg.enter .bk-next li {
+  animation: bk-rise 320ms var(--chat-ease) both;
+  animation-delay: calc(420ms + var(--i, 0) * 70ms);
+}
+@keyframes bk-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes bk-ping {
+  from {
+    box-shadow: 0 0 0 0 rgba(19, 130, 79, 0.32);
+  }
+  to {
+    box-shadow: 0 0 0 16px rgba(19, 130, 79, 0);
+  }
+}
+@keyframes bk-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-card *,
+  .bk-card *::before,
+  .bk-card *::after {
+    animation: none !important;
+  }
+}

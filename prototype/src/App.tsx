@@ -723,7 +723,7 @@ export default function App() {
         <aside className="review-rail">
           <a
             className="project-link"
-            href="https://github.com/davidspiegs/legion-health-assignment/blob/assignment/journey-audit/docs/redesigned-journey.md"
+            href="https://github.com/davidspiegs/legion-health/blob/main/docs/redesigned-journey.md"
             target="_blank"
             rel="noreferrer"
           >
@@ -1193,7 +1193,7 @@ export default function App() {
               ) : null}
               <a
                 className="review-mode-link"
-                href={reviewMode ? "/" : "/?review=1"}
+                href={reviewMode ? "/?experience=classic" : "/?review=1"}
               >
                 {reviewMode
                   ? "Return to the patient experience"
