@@ -84,6 +84,7 @@ import {
   type RiskSource,
   type ScreenItem,
 } from "./state";
+import { briefReason } from "./visit";
 import "./sheets.css";
 
 /* ============================================================== Shared */
@@ -2332,9 +2333,11 @@ const GOAL_LABELS: Record<string, string> = {
 function ReasonSection({ s, questions }: { s: ChatJourney; questions: string[] }) {
   const conditions = s.conditions.map(conditionLabel);
   const words = s.chat.storyMode === "words" && s.chat.storyText;
+  const reason = briefReason(s);
   return (
     <Section title="Reason and goals">
       <dl className="sh-kv">
+        {reason.by !== "patient" ? <Row k="Reason for visit" v={reason.text} /> : null}
         <Row k="Help with" v={conditions.length ? listOf(conditions) : <Missing />} />
         <Row k="Visit goal" v={s.goal ? (GOAL_LABELS[s.goal] ?? s.goal) : <Missing />} />
       </dl>
