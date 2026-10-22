@@ -94,7 +94,7 @@ import {
   type RiskSource,
   type ScreenItem,
 } from "./state";
-import { briefReason } from "./visit";
+import { briefFocus, briefReason } from "./visit";
 import "./sheets.css";
 
 /* ============================================================== Shared */
@@ -2348,12 +2348,14 @@ function ReasonSection({ s, questions }: { s: ChatJourney; questions: string[] }
   const conditions = s.conditions.map((c) => (c === "Other" && other ? other : conditionLabel(c)));
   const words = s.chat.storyMode === "words" && s.chat.storyText;
   const reason = briefReason(s);
+  const focus = briefFocus(s);
   return (
     <Section title="Reason and goals">
       <dl className="sh-kv">
         {reason.by !== "patient" ? <Row k="Reason for visit" v={reason.text} /> : null}
         <Row k="Help with" v={conditions.length ? listOf(conditions) : <Missing />} />
         <Row k="Visit goal" v={s.goal ? (GOAL_LABELS[s.goal] ?? s.goal) : <Missing />} />
+        {focus ? <Row k="What to cover" v={focus} /> : null}
       </dl>
       {words ? (
         <Cite who={s.chat.storyConfirmed ? `Patient said, then confirmed ${ASSISTANT.name}’s reading` : "Patient said"}>

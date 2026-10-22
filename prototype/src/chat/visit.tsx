@@ -1925,6 +1925,9 @@ function storyReason(s: ChatJourney): string {
 /** Wren's draft, only while it was written from the brief's current inputs; an older one is stale. */
 const currentDraft = (s: ChatJourney) => (s.chat.briefDraft?.key === briefKey(s) ? s.chat.briefDraft : null);
 
+/** What the patient wants to cover, from Wren's current draft; "" when there's none. */
+export const briefFocus = (s: ChatJourney): string => currentDraft(s)?.focus.trim() ?? "";
+
 export function briefReason(s: ChatJourney): { text: string; by: "edit" | "draft" | "patient" } {
   const edited = editedReason(s);
   if (edited) return { text: edited, by: "edit" };
@@ -1998,7 +2001,7 @@ function chartRow(s: ChatJourney): BriefRow | null {
 
 function briefRows(s: ChatJourney, who: Who): BriefRow[] {
   const reason = briefReason(s);
-  const focus = currentDraft(s)?.focus.trim();
+  const focus = briefFocus(s);
   const drafted = `Drafted by ${ASSISTANT.name}`;
   const note = (s.chat.note || s.briefNote).trim();
   const rows: (BriefRow | null)[] = [
