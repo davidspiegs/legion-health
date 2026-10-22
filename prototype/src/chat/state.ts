@@ -2,8 +2,10 @@ import type { JourneyState } from "../model/types";
 import type { PostHogEvent } from "./analytics";
 import { initialState } from "../model/fixtures";
 
-/** Work Wren does on the patient’s behalf. Each job renders as a work card with a receipt. */
+/** Work Wren does on the patient’s behalf. Most render as a work card with a receipt. */
 export type JobId =
+  /** Claude reading the patient’s own words; the thread shows Wren typing meanwhile. */
+  | "story"
   | "match"
   | "hold"
   | "code"
@@ -110,6 +112,10 @@ export interface ChatState {
   storyMode: "" | "chips" | "words";
   storyText: string;
   storySuggested: string[];
+  /** The read-back of the patient’s words, from Claude or the local reader. */
+  storyReflection: string;
+  /** Risk language in the story, from the local check or added by Claude’s reading. */
+  storyCrisis: boolean;
   storyConfirmed: boolean;
   otherText: string;
   otherDone: boolean;
@@ -232,6 +238,8 @@ export function initialChat(): ChatState {
     storyMode: "",
     storyText: "",
     storySuggested: [],
+    storyReflection: "",
+    storyCrisis: false,
     storyConfirmed: false,
     otherText: "",
     otherDone: false,

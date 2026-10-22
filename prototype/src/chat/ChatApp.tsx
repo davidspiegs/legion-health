@@ -34,7 +34,7 @@ import {
   useDoubleTapShield,
 } from "./parts";
 import { registerCards, renderCard } from "./cards";
-import { SCRIPT } from "./script";
+import { SCRIPT, readingStory } from "./script";
 import { flagRisk } from "./safety";
 import { answerQuestion } from "./guide-ai";
 import {
@@ -748,7 +748,8 @@ function ChatApp() {
           .reverse()
           .find((item) => item.nodeId === activeNode.id && item.from === "agent" && item.block.kind === "text")?.key
       : undefined;
-  const typingNow = !settled && next?.from === "agent";
+  // Wren types while the next message is paced in, and while Claude reads the patient's words.
+  const typingNow = settled ? readingStory(state) : next?.from === "agent";
   const showHome = booked && settled && !editingNode && homeActions.length > 0 && (!dockInput || homeOpen);
   // While a sheet or the visit room is up, the conversation behind it is out of reach, for screen readers too.
   const covered = visitOpen || !!(sheet && sheetEntry);

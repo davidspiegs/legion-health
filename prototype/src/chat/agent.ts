@@ -2,7 +2,9 @@ import type { Appointment, MockApi, Slot } from "../model/types";
 import { followupSlots, formatDate, formatTime, slots, validateBirth } from "../model/fixtures";
 import { eligibilityInputKey, journeyNow } from "../model/journey-state";
 import { anonymousId, capture, forward, type EventProps, type PostHogEvent } from "./analytics";
+import { readStory } from "./guide-ai";
 import { clinicianById, fitsPreference, formalName, inventory } from "./inventory";
+import { readStoryLive } from "./story";
 import {
   type Benefits,
   type CareTask,
@@ -688,6 +690,34 @@ export async function runRecords(ctx: ChatContext) {
     setJob(ctx, "records", { status: "failed", finishedAt: Date.now(), note: result });
     receipt(ctx, "Requested your records; none were available yet", "Metriport health network (simulated)");
   }
+}
+
+/**
+ * Reads what the patient wrote about why they want care. The local reading is stored at once,
+ * so the crisis lines never wait and a page closed mid-call still has a reading to confirm;
+ * Claude's reading then replaces it, and the read-back waits while the call runs.
+ */
+export async function runStory(ctx: ChatContext, text: string) {
+  const local = readStory(text);
+  ctx.update({
+    chat: {
+      storyMode: "words",
+      storyText: text,
+      storySuggested: local.conditions,
+      storyReflection: local.reflection,
+      storyCrisis: local.crisis,
+      storyConfirmed: false,
+    },
+  });
+  if (local.crisis) return;
+  const current = begin(ctx, "story", fingerprint(text));
+  const reading = await readStoryLive(text, local);
+  // A restart or a jump while Claude was reading leaves the new conversation alone.
+  if (!current()) return;
+  ctx.update({
+    chat: { storySuggested: reading.conditions, storyReflection: reading.reflection, storyCrisis: reading.crisis },
+  });
+  setJob(ctx, "story", { status: "done", finishedAt: Date.now() });
 }
 
 const BRIEF_DRAFTED = "Drafted a visit brief for your clinician to review";

@@ -21,6 +21,7 @@ import {
   runIdentity,
   runMatch,
   runRecords,
+  runStory,
   sendCode,
   slotLabel,
   track,
@@ -192,8 +193,11 @@ const story: Node = {
     return null;
   },
   after: (s) => {
-    if (s.chat.storyMode === "words")
-      return mentionsCrisis(s.chat.storyText) ? [say("care", CARE_FIRST), card("support-line")] : reflection(s);
+    if (s.chat.storyMode === "words") {
+      if (storyRisk(s)) return [say("care", CARE_FIRST), card("support-line")];
+      // Wren is typing while Claude reads the words.
+      return readingStory(s) ? [] : reflection(s);
+    }
     const unsure = s.conditions.length === 1 && s.conditions[0] === "I'm not sure";
     return [
       say(
@@ -204,7 +208,7 @@ const story: Node = {
       ),
     ];
   },
-  submit: (value, ctx) => {
+  submit: async (value, ctx) => {
     if (value === "__words") {
       ctx.update({ chat: { storyMode: "words", storyConfirmed: false } });
       return false;
@@ -215,25 +219,30 @@ const story: Node = {
     }
     if (Array.isArray(value))
       return ctx.update({ conditions: value, chat: { storyMode: "chips", storyConfirmed: false } });
-    const reading = readStory(value);
-    ctx.update({
-      chat: { storyMode: "words", storyText: value, storySuggested: reading.conditions, storyConfirmed: false },
-    });
+    await runStory(ctx, value);
     // Risk language doesn't stop the conversation; it asks about safety right away.
-    if (mentionsCrisis(value)) flagRisk(ctx, "story", value);
+    if (storyRisk(ctx.get())) flagRisk(ctx, "story", value);
   },
 };
 
+/** Risk language in the story: the local check's, or one Claude's reading added. */
+const storyRisk = (s: ChatJourney) => s.chat.storyCrisis || mentionsCrisis(s.chat.storyText);
+
+/** Claude is reading the patient's words; the read-back and its question wait. */
+export const readingStory = (s: ChatJourney) => s.chat.jobs.story?.status === "running";
+
 /** The patient's own words, read back as a starting point, never a diagnosis. */
 function reflection(s: ChatJourney): AgentBlock[] {
-  const reading = readStory(s.chat.storyText);
+  // The stored reading; a conversation saved before readings were stored reads the words again.
+  const local = s.chat.storyReflection && s.chat.storySuggested.length ? null : readStory(s.chat.storyText);
+  const conditions = local?.conditions ?? s.chat.storySuggested;
   return [
-    say("reflect", reading.reflection),
+    say("reflect", local?.reflection ?? s.chat.storyReflection),
     say(
       "noted",
-      reading.conditions[0] === "I'm not sure"
+      conditions[0] === "I'm not sure"
         ? "I’ll tell your clinician you’re not sure yet what to call it. Did I get that right?"
-        : `I’ll note ${listOf(reading.conditions.map((c) => (c === "Other" ? "what you described" : conditionLabel(c))))} for your clinician as a starting point, not a diagnosis. Did I get that right?`,
+        : `I’ll note ${listOf(conditions.map((c) => (c === "Other" ? "what you described" : conditionLabel(c))))} for your clinician as a starting point, not a diagnosis. Did I get that right?`,
     ),
   ];
 }
@@ -244,14 +253,17 @@ const storyConfirm: Node = {
   stage: "story",
   applies: (s) => s.chat.storyMode === "words" && !!s.chat.storyText,
   // After risk language, the read-back waits until safety has been asked.
-  say: (s) => (mentionsCrisis(s.chat.storyText) ? reflection(s) : []),
-  input: () => ({
-    kind: "single",
-    options: [
-      { value: "choose", label: "Not quite" },
-      { value: "right", label: "Yes, that’s right" },
-    ],
-  }),
+  say: (s) => (storyRisk(s) ? reflection(s) : []),
+  input: (s) =>
+    readingStory(s)
+      ? null
+      : {
+          kind: "single",
+          options: [
+            { value: "choose", label: "Not quite" },
+            { value: "right", label: "Yes, that’s right" },
+          ],
+        },
   answer: (s) => (s.chat.storyConfirmed ? { text: "Yes, that’s right", editable: false } : null),
   submit: (value, ctx) => {
     const suggested = ctx.get().chat.storySuggested;
